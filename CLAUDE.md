@@ -37,6 +37,13 @@ This project uses Rails' built-in test framework (Minitest) with the following c
 - **Seed database**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails db:seed`
 - **Reset and seed**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails db:reset`
 
+## Seed Data for New Models/Controllers/Views
+**IMPORTANT**: Whenever a new model, controller, or view is created (or an existing one is modified in a way that affects what is shown on screen), automatically add representative seed data to `db/seeds.rb` and run `db:seed` so the visual changes can be reviewed immediately in the browser.
+
+- Add enough records to exercise the view (e.g., multiple rows for index pages, a variety of attribute values where relevant).
+- Make the seed code idempotent (e.g., use `find_or_create_by!` or guard with `Model.exists?`) so re-running seeds does not create duplicates.
+- After updating seeds, run: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails db:seed`.
+
 ## JavaScript and Turbo Drive
 **IMPORTANT**: This Rails 7+ application uses Turbo Drive which intercepts navigation and can prevent JavaScript from loading properly on initial page visits (works on refresh but not on first load).
 

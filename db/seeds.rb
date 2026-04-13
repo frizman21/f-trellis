@@ -7,3 +7,13 @@
 #   ["Action", "Comedy", "Drama", "Horror"].each do |genre_name|
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
+
+[
+  { first_name: "Ada",     last_name: "Lovelace" },
+  { first_name: "Alan",    last_name: "Turing" },
+  { first_name: "Grace",   last_name: "Hopper" },
+  { first_name: "Linus",   last_name: "Torvalds" },
+  { first_name: "Margaret", last_name: "Hamilton" }
+].each do |attrs|
+  Person.find_or_create_by!(attrs)
+end
