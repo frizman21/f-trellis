@@ -16,18 +16,25 @@ organisation, a place, etc.).
 
 **Rules**
 
-- The entity table has **no domain attributes**. It exists only as a stable
-  identity (primary key + `created_at` / `updated_at`).
+- The entity table has **no domain attributes** except the `current_detail_id`
+  pointer (see below). It exists only as a stable identity
+  (primary key + `created_at` / `updated_at` + `current_detail_id`).
 - All facts about the entity live in a companion **Detail** table (see §2).
 - The Ruby class is singular (`Person`), the table is Rails-pluralised
   (`people`).
 - Model declares `has_many :<entity>_details, dependent: :destroy`.
+- Model declares `belongs_to :current_detail, class_name: "<Entity>Detail", optional: true`.
+  The entity table carries a nullable FK `current_detail_id` pointing at the
+  row in `<entity>_details` that should be treated as the authoritative /
+  "now" record. Views and non-historical queries read through this pointer
+  rather than sorting by `as_of` on the fly.
 
 **Example**
 
 ```ruby
 class Person < ApplicationRecord
   has_many :person_details, dependent: :destroy
+  belongs_to :current_detail, class_name: "PersonDetail", optional: true
 end
 ```
 
@@ -35,7 +42,19 @@ end
 create_table :people do |t|
   t.timestamps
 end
+
+add_reference :people, :current_detail,
+  foreign_key: { to_table: :person_details }, null: true
 ```
+
+**Maintaining `current_detail_id`**
+
+The pointer is set explicitly — not inferred on every read. When a new
+Detail is inserted with a later `as_of` than the currently-pointed row,
+the parent's `current_detail_id` should be updated to point at the new
+row. The enforcement mechanism (a callback on the Detail, an explicit
+service object, a DB trigger, …) is an application-level choice — pick
+one and apply it consistently across all tier 1 entities.
 
 ---
 
@@ -128,8 +147,13 @@ concrete example.
 
 - [ ] Migration creating `<entity>s` with only `t.timestamps`.
 - [ ] Migration creating `<entity>_details` per §2.
-- [ ] `app/models/<entity>.rb` with `has_many :<entity>_details, dependent: :destroy`.
+- [ ] Migration adding nullable `current_detail_id` FK on `<entity>s`
+      referencing `<entity>_details`.
+- [ ] `app/models/<entity>.rb` with
+      `has_many :<entity>_details, dependent: :destroy` and
+      `belongs_to :current_detail, class_name: "<Entity>Detail", optional: true`.
 - [ ] `app/models/<entity>_detail.rb` with `belongs_to :<entity>`.
-- [ ] Seed data exercising at least one entity with one detail.
-- [ ] Views dereference the current detail via
-      `entity.<entity>_details.order(as_of: :desc).first`.
+- [ ] Seed data exercising at least one entity with one detail, with
+      `current_detail_id` populated.
+- [ ] Views dereference the current detail via `entity.current_detail`.
+- [ ] `current_detail_id` is maintained whenever a newer Detail is created.
