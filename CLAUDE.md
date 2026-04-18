@@ -6,22 +6,22 @@ This project runs in Docker containers. All Rails and database commands must be 
 **Note**: You can assume the development environment is running when testing or development work is needed.
 
 ## Command Patterns
-- **Rails commands**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails [command]`
-- **Rails console**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails console`
-- **Database commands**: `docker-compose -f docker-compose.dev.yml  exec web bundle exec rails db:[command]`
-- **General shell access**: `docker-compose -f docker-compose.dev.yml exec web bash`
+- **Rails commands**: `docker-compose exec web bundle exec rails [command]`
+- **Rails console**: `docker-compose exec web bundle exec rails console`
+- **Database commands**: `docker-compose exec web bundle exec rails db:[command]`
+- **General shell access**: `docker-compose exec web bash`
 
 ## Testing
 This project uses Rails' built-in test framework (Minitest) with the following commands:
 
-- **Run all tests**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails test`
-- **Run all tests with fresh database**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails test:db`
-- **Run specific test file**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails test test/models/travel_test.rb`
-- **Run specific test**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails test test/models/travel_test.rb:test_method_name`
-- **Run model tests**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails test test/models/`
-- **Run controller tests**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails test test/controllers/`
-- **Run system tests**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails test:system`
-- **Run business card tests** (skipped by default to avoid OpenAI API costs): `docker-compose -f docker-compose.dev.yml exec -e BUSINESS_CARD_TESTS=true web bundle exec rails test`
+- **Run all tests**: `docker-compose exec web bundle exec rails test`
+- **Run all tests with fresh database**: `docker-compose exec web bundle exec rails test:db`
+- **Run specific test file**: `docker-compose exec web bundle exec rails test test/models/travel_test.rb`
+- **Run specific test**: `docker-compose exec web bundle exec rails test test/models/travel_test.rb:test_method_name`
+- **Run model tests**: `docker-compose exec web bundle exec rails test test/models/`
+- **Run controller tests**: `docker-compose exec web bundle exec rails test test/controllers/`
+- **Run system tests**: `docker-compose exec web bundle exec rails test:system`
+- **Run business card tests** (skipped by default to avoid OpenAI API costs): `docker-compose exec -e BUSINESS_CARD_TESTS=true web bundle exec rails test`
 
 **IMPORTANT**: Always run tests after making changes to views, controllers, or models to ensure nothing is broken:
 - After updating view templates (especially forms), run system tests to ensure they still render and function correctly
@@ -34,15 +34,15 @@ This project uses Rails' built-in test framework (Minitest) with the following c
 - **Type checking**: [Add type checking command when known]
 
 ## Database Seeding
-- **Seed database**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails db:seed`
-- **Reset and seed**: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails db:reset`
+- **Seed database**: `docker-compose exec web bundle exec rails db:seed`
+- **Reset and seed**: `docker-compose exec web bundle exec rails db:reset`
 
 ## Seed Data for New Models/Controllers/Views
 **IMPORTANT**: Whenever a new model, controller, or view is created (or an existing one is modified in a way that affects what is shown on screen), automatically add representative seed data to `db/seeds.rb` and run `db:seed` so the visual changes can be reviewed immediately in the browser.
 
 - Add enough records to exercise the view (e.g., multiple rows for index pages, a variety of attribute values where relevant).
 - Make the seed code idempotent (e.g., use `find_or_create_by!` or guard with `Model.exists?`) so re-running seeds does not create duplicates.
-- After updating seeds, run: `docker-compose -f docker-compose.dev.yml exec web bundle exec rails db:seed`.
+- After updating seeds, run: `docker-compose exec web bundle exec rails db:seed`.
 
 ## JavaScript and Turbo Drive
 **IMPORTANT**: This Rails 7+ application uses Turbo Drive which intercepts navigation and can prevent JavaScript from loading properly on initial page visits (works on refresh but not on first load).
