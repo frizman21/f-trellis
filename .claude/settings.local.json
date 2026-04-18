@@ -5,7 +5,9 @@
       "Bash(docker compose:*)",
       "Bash(docker-compose exec *)",
       "Bash(git -C /Users/mike/projects/f-dod log --oneline --all -- .env .env.example)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Edit(/Users/mike/projects/f-dod/**)",
+      "Write(/Users/mike/projects/f-dod/**)"
     ]
   }
 }
