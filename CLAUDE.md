@@ -3,7 +3,11 @@
 ## Data Model
 See `docs/data-model-spec.md` for the repeating shape used by tier 1 entities
 and their relationships (entity + versioned, confidence-scored detail record).
-Follow this pattern when adding new entities.
+Follow this pattern when adding new tier 1 entities.
+
+See `docs/application-data-structures.md` for operational data structures
+(Source, SourceDatum, SourceProcessingReport, Skill, SkillRevision) that
+support the application but are **not** tier 1 knowledge entities.
 
 ## Development Environment
 This project runs in Docker containers. All Rails and database commands must be executed within the containerized environment.
