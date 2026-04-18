@@ -1,24 +1,52 @@
 # README
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+## Initializing the local environment
 
-Things you may want to cover:
+The application runs in Docker. All Rails and database commands below execute inside the `web` container.
 
-* Ruby version
+### 1. Create a local `.env`
 
-* System dependencies
+Copy the example file and fill in any values you need to override:
 
-* Configuration
+```sh
+cp .env.example .env
+```
 
-* Database creation
+`.env` is gitignored. The default `docker-compose.yml` works without any overrides.
 
-* Database initialization
+### 2. Start the containers
 
-* How to run the test suite
+```sh
+docker-compose up -d
+```
 
-* Services (job queues, cache servers, search engines, etc.)
+On first boot the `web` container runs `bundle install` followed by `bin/rails db:prepare`, which creates and migrates the **development** database.
 
-* Deployment instructions
+### 3. Create the test database
 
-* ...
+`db:prepare` only touches the current `RAILS_ENV` (development). Create the test database explicitly:
+
+```sh
+docker-compose exec web bundle exec rails db:create RAILS_ENV=test
+docker-compose exec web bundle exec rails db:schema:load RAILS_ENV=test
+```
+
+### 4. Seed development data (optional)
+
+```sh
+docker-compose exec web bundle exec rails db:seed
+```
+
+## Running the test suite
+
+```sh
+docker-compose exec web bundle exec rails test
+```
+
+To reset the test database and run the full suite:
+
+```sh
+docker-compose exec web bundle exec rails test:db
+```
+
+See `CLAUDE.md` for the full command reference.
