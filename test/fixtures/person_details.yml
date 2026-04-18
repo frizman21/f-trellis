@@ -1,0 +1,15 @@
+one:
+  person: one
+  first_name: Ada
+  last_name: Lovelace
+  additional_attributes: {}
+  confidence_tenths: 1000
+  as_of: <%= Time.zone.parse("1843-10-01") %>
+
+two:
+  person: two
+  first_name: Alan
+  last_name: Turing
+  additional_attributes: {}
+  confidence_tenths: 1000
+  as_of: <%= Time.zone.parse("1936-01-01") %>

@@ -1,3 +1,3 @@
 class Source < ApplicationRecord
-  has_one_attached :archive
+  has_many :source_data, dependent: :destroy
 end

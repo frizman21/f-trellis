@@ -1,3 +1,18 @@
-<h1><%= @person.first_name %> <%= @person.last_name %></h1>
+<% detail = @person.person_details.order(as_of: :desc).first %>
+
+<h1><%= detail ? "#{detail.first_name} #{detail.last_name}" : "Unnamed person ##{@person.id}" %></h1>
+
+<% if @person.person_details.any? %>
+  <h2>Details</h2>
+  <ul>
+    <% @person.person_details.order(as_of: :desc).each do |d| %>
+      <li>
+        <%= d.first_name %> <%= d.last_name %>
+        &mdash; as of <%= d.as_of&.to_date %>
+        (confidence <%= d.confidence_tenths.to_i / 10.0 %>%)
+      </li>
+    <% end %>
+  </ul>
+<% end %>
 
 <p><%= link_to "Back to people", people_path %></p>

@@ -1,19 +1,13 @@
-# This file should ensure the existence of records required to run the application in every environment (production,
-# development, test). The code here should be idempotent so that it can be executed at any point in every environment.
-# The data can then be loaded with the bin/rails db:seed command (or created alongside the database with db:setup).
-#
-# Example:
-#
-#   ["Action", "Comedy", "Drama", "Horror"].each do |genre_name|
-#     MovieGenre.find_or_create_by!(name: genre_name)
-#   end
-
 [
-  { first_name: "Ada",     last_name: "Lovelace" },
-  { first_name: "Alan",    last_name: "Turing" },
-  { first_name: "Grace",   last_name: "Hopper" },
-  { first_name: "Linus",   last_name: "Torvalds" },
-  { first_name: "Margaret", last_name: "Hamilton" }
+  { first_name: "Ada",      last_name: "Lovelace",  as_of: Time.zone.parse("1843-10-01"), confidence_tenths: 1000 },
+  { first_name: "Alan",     last_name: "Turing",    as_of: Time.zone.parse("1936-01-01"), confidence_tenths: 1000 },
+  { first_name: "Grace",    last_name: "Hopper",    as_of: Time.zone.parse("1944-06-01"), confidence_tenths: 1000 },
+  { first_name: "Linus",    last_name: "Torvalds",  as_of: Time.zone.parse("1991-08-25"), confidence_tenths: 950 },
+  { first_name: "Margaret", last_name: "Hamilton",  as_of: Time.zone.parse("1969-07-20"), confidence_tenths: 900 }
 ].each do |attrs|
-  Person.find_or_create_by!(attrs)
+  detail = PersonDetail.find_by(first_name: attrs[:first_name], last_name: attrs[:last_name])
+  next if detail
+
+  person = Person.create!
+  PersonDetail.create!(attrs.merge(person: person, additional_attributes: {}))
 end

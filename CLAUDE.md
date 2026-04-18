@@ -1,5 +1,10 @@
 # Claude Configuration
 
+## Data Model
+See `docs/data-model-spec.md` for the repeating shape used by tier 1 entities
+and their relationships (entity + versioned, confidence-scored detail record).
+Follow this pattern when adding new entities.
+
 ## Development Environment
 This project runs in Docker containers. All Rails and database commands must be executed within the containerized environment.
 
