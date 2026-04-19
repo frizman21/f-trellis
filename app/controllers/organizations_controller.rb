@@ -1,14 +1,18 @@
 class OrganizationsController < ApplicationController
+  PER_PAGE = 25
+
   def index
     @query = params[:q].to_s.strip
 
     if @query.present?
       @match_reasons = compute_match_reasons(@query)
-      @organizations = Organization.where(id: @match_reasons.keys).distinct
+      scope = Organization.where(id: @match_reasons.keys).distinct
     else
       @match_reasons = {}
-      @organizations = Organization.all
+      scope = Organization.all
     end
+
+    @organizations = scope.order(:id).page(params[:page]).per(PER_PAGE)
   end
 
   def show

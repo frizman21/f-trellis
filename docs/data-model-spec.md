@@ -378,6 +378,10 @@ pattern already in the codebase.
       - while searching, the Types column is replaced with a "Matched on"
         column listing the specific fields/values that caused each row
         to appear (deduplicated per entity);
+      - **pagination** via `kaminari` (`scope.page(params[:page]).per(N)`)
+        with a "Showing X of Y" caption above the table and a
+        `<%= paginate @collection %>` block below — search filtering
+        composes with pagination (filter first, then page);
       - empty/no-match messaging.
 - [ ] `<Entity>Controller#show` view with:
       - name / `as_of` / confidence / types derived from

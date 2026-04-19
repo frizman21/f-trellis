@@ -1,14 +1,18 @@
 class PeopleController < ApplicationController
+  PER_PAGE = 25
+
   def index
     @query = params[:q].to_s.strip
 
     if @query.present?
       @match_reasons = compute_match_reasons(@query)
-      @people = Person.where(id: @match_reasons.keys).distinct
+      scope = Person.where(id: @match_reasons.keys).distinct
     else
       @match_reasons = {}
-      @people = Person.all
+      scope = Person.all
     end
+
+    @people = scope.order(:id).page(params[:page]).per(PER_PAGE)
   end
 
   def show

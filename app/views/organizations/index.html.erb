@@ -13,6 +13,10 @@
 <% searching = @query.present? %>
 
 <% if @organizations.any? %>
+  <p class="text-muted small">
+    Showing <%= @organizations.size %> of <%= @organizations.total_count %>.
+  </p>
+
   <table class="table">
     <thead>
       <tr>
@@ -45,6 +49,8 @@
       <% end %>
     </tbody>
   </table>
+
+  <%= paginate @organizations %>
 <% else %>
   <p>
     <% if searching %>

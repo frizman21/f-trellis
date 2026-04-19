@@ -1,14 +1,18 @@
 class FacilitiesController < ApplicationController
+  PER_PAGE = 25
+
   def index
     @query = params[:q].to_s.strip
 
     if @query.present?
       @match_reasons = compute_match_reasons(@query)
-      @facilities = Facility.where(id: @match_reasons.keys).distinct
+      scope = Facility.where(id: @match_reasons.keys).distinct
     else
       @match_reasons = {}
-      @facilities = Facility.all
+      scope = Facility.all
     end
+
+    @facilities = scope.order(:id).page(params[:page]).per(PER_PAGE)
   end
 
   def show

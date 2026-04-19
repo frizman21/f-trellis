@@ -1,0 +1,4 @@
+<%# Receives `url`, `current_page`, `total_pages`, `per_page`, `remote`. %>
+<li class="page-item">
+  <%= link_to_unless current_page.first?, raw("&laquo; First"), url, remote: remote, class: "page-link" %>
+</li>
