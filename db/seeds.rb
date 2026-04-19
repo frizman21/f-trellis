@@ -34,15 +34,15 @@ people_entries = [
         first_name: "Augusta Ada", last_name: "Byron",
         as_of: Time.zone.parse("1815-12-10"), confidence_tenths: 700,
         additional_attributes: { "field" => "Mathematics", "institution" => "Home study" },
-        source_url: "https://example.com/ada-byron-birth.txt",
-        source_description: "Birth record of Augusta Ada Byron."
+        source_url: "https://en.wikipedia.org/wiki/Ada_Lovelace",
+        source_description: "Wikipedia: Ada Lovelace."
       },
       {
         first_name: "Ada", last_name: "Lovelace",
         as_of: Time.zone.parse("1843-10-01"), confidence_tenths: 1000,
         additional_attributes: { "field" => "Analytical Engine", "institution" => "Independent" },
-        source_url: "https://example.com/ada-lovelace-notes.txt",
-        source_description: "Notes on the Analytical Engine."
+        source_url: "https://en.wikipedia.org/wiki/Note_G",
+        source_description: "Wikipedia: Note G (Ada Lovelace's algorithm for the Analytical Engine)."
       }
     ]
   },
@@ -53,15 +53,15 @@ people_entries = [
         first_name: "Alan M.", last_name: "Turing",
         as_of: Time.zone.parse("1936-11-12"), confidence_tenths: 950,
         additional_attributes: { "field" => "Computability", "institution" => "Cambridge" },
-        source_url: "https://example.com/turing-on-computable-numbers.txt",
-        source_description: "On Computable Numbers, 1936."
+        source_url: "https://en.wikipedia.org/wiki/Turing%27s_proof",
+        source_description: "Wikipedia: Turing's proof (On Computable Numbers, 1936)."
       },
       {
         first_name: "Alan", last_name: "Turing",
         as_of: Time.zone.parse("1950-10-01"), confidence_tenths: 1000,
         additional_attributes: { "field" => "Artificial Intelligence", "institution" => "University of Manchester" },
-        source_url: "https://example.com/turing-mind-1950.txt",
-        source_description: "Computing Machinery and Intelligence."
+        source_url: "https://en.wikipedia.org/wiki/Computing_Machinery_and_Intelligence",
+        source_description: "Wikipedia: Computing Machinery and Intelligence."
       }
     ]
   },
@@ -72,15 +72,15 @@ people_entries = [
         first_name: "Grace M.", last_name: "Hopper",
         as_of: Time.zone.parse("1944-06-01"), confidence_tenths: 900,
         additional_attributes: { "specialty" => "Mark I programming", "company" => "U.S. Navy" },
-        source_url: "https://example.com/hopper-mark-i.txt",
-        source_description: "Harvard Mark I manual contributions."
+        source_url: "https://en.wikipedia.org/wiki/Harvard_Mark_I",
+        source_description: "Wikipedia: Harvard Mark I."
       },
       {
         first_name: "Grace", last_name: "Hopper",
         as_of: Time.zone.parse("1959-04-01"), confidence_tenths: 1000,
         additional_attributes: { "specialty" => "Compilers", "company" => "U.S. Navy" },
-        source_url: "https://example.com/hopper-cobol.txt",
-        source_description: "COBOL design work."
+        source_url: "https://en.wikipedia.org/wiki/COBOL",
+        source_description: "Wikipedia: COBOL."
       }
     ]
   },
@@ -91,15 +91,15 @@ people_entries = [
         first_name: "Linus", last_name: "Torvalds",
         as_of: Time.zone.parse("1991-08-25"), confidence_tenths: 950,
         additional_attributes: { "specialty" => "Operating Systems", "company" => "University of Helsinki" },
-        source_url: "https://example.com/torvalds-linux-announcement.txt",
-        source_description: "Linux kernel announcement."
+        source_url: "https://en.wikipedia.org/wiki/History_of_Linux",
+        source_description: "Wikipedia: History of Linux."
       },
       {
         first_name: "Linus", last_name: "Torvalds",
         as_of: Time.zone.parse("2005-04-07"), confidence_tenths: 1000,
         additional_attributes: { "specialty" => "Version Control", "company" => "Linux Foundation" },
-        source_url: "https://example.com/torvalds-git-initial.txt",
-        source_description: "Git initial release notes."
+        source_url: "https://en.wikipedia.org/wiki/Git",
+        source_description: "Wikipedia: Git."
       }
     ]
   },
@@ -110,15 +110,15 @@ people_entries = [
         first_name: "Margaret", last_name: "Hamilton",
         as_of: Time.zone.parse("1965-01-01"), confidence_tenths: 850,
         additional_attributes: { "specialty" => "Flight Software", "company" => "MIT Instrumentation Lab" },
-        source_url: "https://example.com/hamilton-apollo-guidance.txt",
-        source_description: "Apollo Guidance Computer early work."
+        source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer",
+        source_description: "Wikipedia: Apollo Guidance Computer."
       },
       {
         first_name: "Margaret H.", last_name: "Hamilton",
         as_of: Time.zone.parse("1969-07-20"), confidence_tenths: 1000,
         additional_attributes: { "specialty" => "Flight Software", "company" => "MIT" },
-        source_url: "https://example.com/hamilton-apollo-11.txt",
-        source_description: "Apollo 11 landing software account."
+        source_url: "https://en.wikipedia.org/wiki/Margaret_Hamilton_(software_engineer)",
+        source_description: "Wikipedia: Margaret Hamilton (software engineer)."
       }
     ]
   }

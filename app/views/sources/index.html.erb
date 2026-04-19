@@ -1,0 +1,33 @@
+<h1>Sources</h1>
+
+<% if @sources.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>URL</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @sources.each do |source| %>
+        <tr>
+          <td>
+            <%= external_link_to truncate(source.url.to_s, length: 40), source.url %>
+          </td>
+          <td><%= source.status %></td>
+          <td><%= source.created_at&.to_date %></td>
+          <td><%= link_to "Details", source_path(source) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= paginate @sources %>
+  <p class="text-muted small">
+    Showing <%= @sources.size %> of <%= @sources.total_count %>.
+  </p>
+<% else %>
+  <p>No sources yet.</p>
+<% end %>

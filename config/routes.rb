@@ -7,6 +7,8 @@ Rails.application.routes.draw do
 
   resources :people, only: [:index, :show]
   resources :person_types, only: [:index]
+  resources :sources, only: [:index, :show]
+  get "source_data/:id/download", to: "source_data#download", as: :download_source_datum
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest

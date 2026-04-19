@@ -1,0 +1,49 @@
+<h1>Source #<%= @source.id %></h1>
+
+<dl>
+  <dt>URL</dt>
+  <dd><%= external_link_to @source.url, @source.url %></dd>
+
+  <dt>Description</dt>
+  <dd><%= @source.description.presence || "—" %></dd>
+
+  <dt>Status</dt>
+  <dd><%= @source.status %></dd>
+
+  <dt>Created</dt>
+  <dd><%= @source.created_at %></dd>
+
+  <dt>Updated</dt>
+  <dd><%= @source.updated_at %></dd>
+</dl>
+
+<h2>Source Data</h2>
+
+<% if @source.source_data.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Content type</th>
+        <th>Size</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @source.source_data.order(:created_at).each do |datum| %>
+        <tr>
+          <td><%= datum.id %></td>
+          <td><%= datum.content_type %></td>
+          <td><%= number_to_human_size(datum.data&.bytesize.to_i) %></td>
+          <td><%= datum.created_at&.to_date %></td>
+          <td><%= link_to "Download", download_source_datum_path(datum) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>No source data attached yet.</p>
+<% end %>
+
+<p><%= link_to "Back to sources", sources_path %></p>
