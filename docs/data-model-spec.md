@@ -70,7 +70,7 @@ the "current" view of an entity is derived by picking the most recent detail
 | Column                  | Type       | Purpose                                                        |
 |-------------------------|------------|----------------------------------------------------------------|
 | `<entity>_id`           | FK, NOT NULL | Reference to the parent entity.                              |
-| `additional_attributes` | `jsonb`, NOT NULL, default `{}` | Open-ended attributes that aren't (yet) promoted to typed columns. |
+| `additional_attributes` | `jsonb`, NOT NULL, default `{}` | Property bag for open-ended attributes (see §2a). |
 | `confidence_tenths`     | `integer`  | Confidence in this assertion, in tenths of a percent. `1` = 0.1%, `1000` = 100%. |
 | `as_of`                 | `datetime` | When the assertion is effective (not when it was recorded — `created_at` covers that). |
 | `created_at` / `updated_at` | `datetime` | Standard Rails timestamps.                               |
@@ -80,6 +80,34 @@ the "current" view of an entity is derived by picking the most recent detail
 Add columns on the Detail table for attributes that are always or often
 present and worth querying directly (e.g. `first_name`, `last_name` on
 `PersonDetail`). Everything else goes into `additional_attributes`.
+
+### §2a. `additional_attributes` — the property bag
+
+`additional_attributes` has the **same shape on every tier 1 entity's
+Detail table**:
+
+- A single `jsonb` column, NOT NULL, default `{}`.
+- A **flat map from string keys to scalar values** (string, number, boolean).
+  No nested objects. No arrays.
+- Keys are lowercase `snake_case`. No leading/trailing whitespace.
+- Absence of a key means "unknown", not "null". Do not store explicit
+  `null` values — omit the key instead.
+- The set of *meaningful* keys for a given Detail is implied by the
+  associated type record (e.g. `PersonType#additional_attribute_keys` for
+  `PersonDetail`). Extra keys are permitted but not guaranteed to be
+  surfaced; missing keys are not an error at the data layer.
+
+Why flat string-scalar maps:
+
+- Uniform handling across entities (same read/write code, same indexing
+  strategy, same UI rendering).
+- Simple JSONB indexing (e.g. `jsonb_path_ops` GIN indexes) and
+  predictable query plans.
+- Graduating a frequently-used key to a real column is always a
+  mechanical migration — never a schema redesign.
+
+Values that need richer structure are a signal to promote the key to a
+typed column (or to a separate relation), not to nest inside the bag.
 
 **Rules**
 

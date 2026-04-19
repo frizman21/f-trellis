@@ -6,18 +6,36 @@
   <dl>
     <dt>As of</dt><dd><%= current.as_of&.to_date %></dd>
     <dt>Confidence</dt><dd><%= current.confidence_tenths.to_i / 10.0 %>%</dd>
+    <% if current.person_types.any? %>
+      <dt>Types</dt><dd><%= current.person_types.map(&:name).join(", ") %></dd>
+    <% end %>
   </dl>
+
+  <% if current.additional_attributes.any? %>
+    <h2>Attributes</h2>
+    <table class="table table-sm">
+      <tbody>
+        <% current.additional_attributes.each do |key, value| %>
+          <tr>
+            <th><%= key.humanize %></th>
+            <td><%= value %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 <% end %>
 
 <% prior = @person.person_details.where.not(id: current&.id).order(as_of: :desc) %>
 <% if prior.any? %>
   <h2>Prior details</h2>
-  <table>
+  <table class="table">
     <thead>
       <tr>
         <th>Name</th>
         <th>As of</th>
         <th>Confidence</th>
+        <th>Attributes</th>
       </tr>
     </thead>
     <tbody>
@@ -26,6 +44,11 @@
           <td><%= d.first_name %> <%= d.last_name %></td>
           <td><%= d.as_of&.to_date %></td>
           <td><%= d.confidence_tenths.to_i / 10.0 %>%</td>
+          <td>
+            <% if d.additional_attributes.any? %>
+              <%= d.additional_attributes.map { |k, v| "#{k.humanize}: #{v}" }.join("; ") %>
+            <% end %>
+          </td>
         </tr>
       <% end %>
     </tbody>

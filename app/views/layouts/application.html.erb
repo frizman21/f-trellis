@@ -37,9 +37,17 @@
       <div class="row">
         <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar" style="min-height: calc(100vh - 56px);">
           <div class="position-sticky pt-3">
+            <h6 class="sidebar-heading px-3 mt-3 mb-1 text-muted text-uppercase small">Knowledge</h6>
             <ul class="nav flex-column">
               <li class="nav-item">
                 <%= link_to "People", people_path, class: "nav-link" %>
+              </li>
+            </ul>
+
+            <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted text-uppercase small">Types</h6>
+            <ul class="nav flex-column">
+              <li class="nav-item">
+                <%= link_to "Person Types", person_types_path, class: "nav-link" %>
               </li>
             </ul>
           </div>
