@@ -277,6 +277,56 @@ end
 - Otherwise: same `as_of` / `confidence_tenths` / property-bag /
   source-processing-report contract as §2.
 
+### Self-referential relationships (entity ↔ same entity)
+
+When both endpoints are the same tier 1 entity (a marriage between two
+people, a partnership between two companies), follow the same pattern
+with these adjustments:
+
+- **Naming**: `<entity>_<entity>` for the relationship table — Rails
+  inflection turns `person_person` into `person_people`,
+  `organization_organization` into `organization_organizations`. The
+  detail/type tables follow.
+- **FK columns** on the relationship row: `<entity>_a_id` and
+  `<entity>_b_id` (both NOT NULL). Use
+  `belongs_to :<entity>_a, class_name: "<Entity>"` and
+  `belongs_to :<entity>_b, class_name: "<Entity>"` so the same class can
+  sit on either side.
+- **Symmetric edges**: insert with `(a_id, b_id)` sorted ascending so
+  `(A, B)` and `(B, A)` collapse to one row. The unique composite index
+  on `(<entity>_a_id, <entity>_b_id)` enforces no duplicate pairs once
+  callers honor the sort. (No DB CHECK is added today; future creation
+  paths must sort.)
+- **Endpoint association**: each entity gets two `has_many` declarations
+  (`<rel>s_as_a`, `<rel>s_as_b`) plus a small instance method that
+  returns both directions as one relation:
+
+  ```ruby
+  def person_people
+    PersonPerson.where("person_a_id = :id OR person_b_id = :id", id: id)
+  end
+  ```
+
+  Use that method on the show page.
+- **`other_<entity>(record)` helper** on the relationship model so the
+  show page can ask "given me, who is on the other side?":
+
+  ```ruby
+  def other_person(person)
+    person_a_id == person.id ? person_b : person_a
+  end
+  ```
+
+- **Show page**: list "Related <entity>s" instead of the cross-entity
+  "Other side" — render the `other_<entity>` for each incident edge.
+- **Postgres identifier limit (63 chars)** can bite when both sides are
+  long words. Example: the conventional join name
+  `organization_organization_detail_organization_organization_types`
+  is 64 characters and gets rejected. Pick a shortened name explicitly
+  (e.g. `org_org_typings`, model `OrgOrgTyping`) — Rails' `has_many
+  :through` resolves through the join association name, not the table
+  name, so the rest of the model code stays readable.
+
 ---
 
 ## 5. Conventions checklist when adding a new tier 1 entity
@@ -499,6 +549,11 @@ below as items from §7 are completed.
 
 - **PersonOrganization** (`app/models/person_organization.rb`) — links a
   Person to an Organization (e.g. employment, affiliation).
+- **PersonPerson** (`app/models/person_person.rb`) — self-referential
+  link between two people (e.g. marriage, friendship, family).
+- **OrganizationOrganization** (`app/models/organization_organization.rb`)
+  — self-referential link between two organizations (e.g. partnership,
+  subsidiary).
 
 ### Completion matrix
 
@@ -507,22 +562,22 @@ matrix disagrees with reality, update the matrix.
 
 Legend: **✓** done · **⚬** partial · **·** not started.
 
-| §7 checklist item                                             | PersonOrganization |
-|---------------------------------------------------------------|:------------------:|
-| Relationship table (`<rel>s`) + unique edge index             |         ✓          |
-| Detail table (`<rel>_details`)                                |         ✓          |
-| `current_detail_id` FK on `<rel>s`                            |         ✓          |
-| Type table (`<rel>_types`) + unique `name` index              |         ✓          |
-| Detail↔Type M2M join table                                    |         ✓          |
-| Relationship model + FKs + `current_detail` + details         |         ✓          |
-| Detail model + `<rel>` + SPR + M2M types                      |         ✓          |
-| Type model + reverse M2M                                      |         ✓          |
-| Join model                                                    |         ✓          |
-| Endpoints' `has_many :<rel>s` + `has_many :<other>, through:` |         ✓          |
-| `SourceProcessingReport.has_many :<rel>_details`              |         ✓          |
-| `<Rel>TypesController` full CRUD + form                       |         ✓          |
-| Sidebar link to `<Rel>TypesController#index` under Types      |         ✓          |
-| Endpoint show pages list the other side via this relationship |         ✓          |
-| Seed: one `<Rel>` + details + real report + current populated |         ✓          |
-| Seed: at least one `<Rel>Type` attached to each detail        |         ✓          |
-| Runtime: `current_detail_id` auto-maintained on new Detail    |         ·          |
+| §7 checklist item                                             | PersonOrganization | PersonPerson | OrganizationOrganization |
+|---------------------------------------------------------------|:------------------:|:------------:|:------------------------:|
+| Relationship table (`<rel>s`) + unique edge index             |         ✓          |      ✓       |            ✓             |
+| Detail table (`<rel>_details`)                                |         ✓          |      ✓       |            ✓             |
+| `current_detail_id` FK on `<rel>s`                            |         ✓          |      ✓       |            ✓             |
+| Type table (`<rel>_types`) + unique `name` index              |         ✓          |      ✓       |            ✓             |
+| Detail↔Type M2M join table                                    |         ✓          |      ✓       |            ✓             |
+| Relationship model + FKs + `current_detail` + details         |         ✓          |      ✓       |            ✓             |
+| Detail model + `<rel>` + SPR + M2M types                      |         ✓          |      ✓       |            ✓             |
+| Type model + reverse M2M                                      |         ✓          |      ✓       |            ✓             |
+| Join model                                                    |         ✓          |      ✓       |            ✓             |
+| Endpoints' `has_many :<rel>s` + `has_many :<other>, through:` |         ✓          |      ✓       |            ✓             |
+| `SourceProcessingReport.has_many :<rel>_details`              |         ✓          |      ✓       |            ✓             |
+| `<Rel>TypesController` full CRUD + form                       |         ✓          |      ✓       |            ✓             |
+| Sidebar link to `<Rel>TypesController#index` under Types      |         ✓          |      ✓       |            ✓             |
+| Endpoint show pages list the other side via this relationship |         ✓          |      ✓       |            ✓             |
+| Seed: one `<Rel>` + details + real report + current populated |         ✓          |      ✓       |            ✓             |
+| Seed: at least one `<Rel>Type` attached to each detail        |         ✓          |      ✓       |            ✓             |
+| Runtime: `current_detail_id` auto-maintained on new Detail    |         ·          |      ·       |            ·             |

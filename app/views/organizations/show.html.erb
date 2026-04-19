@@ -82,4 +82,32 @@
   </table>
 <% end %>
 
+<% org_relationships = @organization.organization_organizations.includes(:organization_a, :organization_b, current_detail: :organization_organization_types) %>
+<% if org_relationships.any? %>
+  <h2>Related organizations</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Organization</th>
+        <th>Types</th>
+        <th>As of</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% org_relationships.each do |oo| %>
+        <% other = oo.other_organization(@organization) %>
+        <% other_detail = other&.current_detail %>
+        <% rel_detail = oo.current_detail %>
+        <tr>
+          <td>
+            <%= link_to (other_detail ? other_detail.name : "Organization ##{other&.id}"), other %>
+          </td>
+          <td><%= rel_detail&.organization_organization_types&.map(&:name)&.join(", ") %></td>
+          <td><%= rel_detail&.as_of&.to_date %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
 <p><%= link_to "Back to organizations", organizations_path %></p>

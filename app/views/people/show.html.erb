@@ -82,4 +82,32 @@
   </table>
 <% end %>
 
+<% person_relationships = @person.person_people.includes(:person_a, :person_b, current_detail: :person_person_types) %>
+<% if person_relationships.any? %>
+  <h2>Related people</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Person</th>
+        <th>Types</th>
+        <th>As of</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% person_relationships.each do |pp| %>
+        <% other = pp.other_person(@person) %>
+        <% other_detail = other&.current_detail %>
+        <% rel_detail = pp.current_detail %>
+        <tr>
+          <td>
+            <%= link_to (other_detail ? "#{other_detail.first_name} #{other_detail.last_name}" : "Person ##{other&.id}"), other %>
+          </td>
+          <td><%= rel_detail&.person_person_types&.map(&:name)&.join(", ") %></td>
+          <td><%= rel_detail&.as_of&.to_date %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
 <p><%= link_to "Back to people", people_path %></p>

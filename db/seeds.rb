@@ -505,3 +505,153 @@ if PersonOrganization.count < 200
     created += 1
   end
 end
+
+# Self-referential types (PersonPerson, OrganizationOrganization)
+person_person_types = {
+  "Marriage"   => { description: "Spousal relationship.",     keys: [ "since" ] },
+  "Friendship" => { description: "Close personal friendship.", keys: [] },
+  "Family"     => { description: "Familial relationship.",    keys: [ "kind" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = PersonPersonType.find_or_create_by!(name: name) do |pt|
+    pt.description = attrs[:description]
+    pt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+organization_organization_types = {
+  "Partnership" => { description: "Business partnership between two organizations.", keys: [ "since", "scope" ] },
+  "Subsidiary"  => { description: "One organization is a subsidiary of the other.",  keys: [] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = OrganizationOrganizationType.find_or_create_by!(name: name) do |ot|
+    ot.description = attrs[:description]
+    ot.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+# Random PersonPerson rows between synthetic people.
+if PersonPerson.count < 30
+  synthetic_people = Person.where(id: synthetic_report.person_details.select(:person_id)).to_a
+  rng = Random.new(20260420)
+  attempts = 0
+  created = 0
+  pp_type_pool = person_person_types.values
+
+  while created < 25 && attempts < 200 && synthetic_people.size >= 2
+    attempts += 1
+    a, b = synthetic_people.sample(2, random: rng)
+    next if a.id == b.id
+
+    pa, pb = [ a.id, b.id ].sort
+    next if PersonPerson.exists?(person_a_id: pa, person_b_id: pb)
+
+    pp = PersonPerson.create!(person_a_id: pa, person_b_id: pb)
+    detail = PersonPersonDetail.create!(
+      person_person: pp,
+      as_of: Faker::Date.between(from: 10.years.ago.to_date, to: Date.today),
+      confidence_tenths: 850,
+      additional_attributes: { "kind" => Faker::Relationship.familial },
+      source_processing_report: synthetic_report
+    )
+    detail.person_person_types = [ pp_type_pool.sample(random: rng) ]
+    pp.update!(current_detail: detail)
+    created += 1
+  end
+end
+
+# Random OrganizationOrganization rows between synthetic orgs.
+if OrganizationOrganization.count < 8
+  synthetic_orgs = Organization.where(id: synthetic_report.organization_details.select(:organization_id)).to_a
+  rng = Random.new(20260421)
+  attempts = 0
+  created = 0
+  oo_type_pool = organization_organization_types.values
+
+  while created < 6 && attempts < 100 && synthetic_orgs.size >= 2
+    attempts += 1
+    a, b = synthetic_orgs.sample(2, random: rng)
+    next if a.id == b.id
+
+    oa, ob = [ a.id, b.id ].sort
+    next if OrganizationOrganization.exists?(organization_a_id: oa, organization_b_id: ob)
+
+    oo = OrganizationOrganization.create!(organization_a_id: oa, organization_b_id: ob)
+    detail = OrganizationOrganizationDetail.create!(
+      organization_organization: oo,
+      as_of: Faker::Date.between(from: 10.years.ago.to_date, to: Date.today),
+      confidence_tenths: 900,
+      additional_attributes: { "scope" => Faker::Company.industry },
+      source_processing_report: synthetic_report
+    )
+    detail.organization_organization_types = [ oo_type_pool.sample(random: rng) ]
+    oo.update!(current_detail: detail)
+    created += 1
+  end
+end
+
+# ---------------------------------------------------------------------------
+# Ensure every Person has at least one PersonPerson edge, and every
+# Organization has at least one OrganizationOrganization edge. Pairs
+# unconnected entities two-by-two; if a single id is left over, links it to a
+# random already-existing peer.
+# ---------------------------------------------------------------------------
+
+def ensure_self_relationships(rel_class:, all_ids:, fk_a:, fk_b:, random_seed:, &build_detail)
+  connected_ids = (rel_class.distinct.pluck(fk_a) + rel_class.distinct.pluck(fk_b)).uniq.to_set
+  needs = all_ids.reject { |id| connected_ids.include?(id) }
+  rng = Random.new(random_seed)
+  needs = needs.shuffle(random: rng)
+
+  needs.each_slice(2) do |pair|
+    if pair.size == 2
+      a_id, b_id = pair.minmax
+    else
+      leftover = pair.first
+      partner = (all_ids - [ leftover ]).sample(random: rng)
+      next if partner.nil?
+      a_id, b_id = [ leftover, partner ].minmax
+    end
+
+    next if a_id == b_id
+    next if rel_class.exists?(fk_a => a_id, fk_b => b_id)
+
+    rel = rel_class.create!(fk_a => a_id, fk_b => b_id)
+    detail = build_detail.call(rel, rng)
+    rel.update!(current_detail: detail)
+  end
+end
+
+ensure_self_relationships(
+  rel_class: PersonPerson,
+  all_ids: Person.pluck(:id),
+  fk_a: :person_a_id,
+  fk_b: :person_b_id,
+  random_seed: 20260422
+) do |rel, rng|
+  detail = PersonPersonDetail.create!(
+    person_person: rel,
+    as_of: Faker::Date.between(from: 10.years.ago.to_date, to: Date.today),
+    confidence_tenths: 800,
+    additional_attributes: { "kind" => Faker::Relationship.familial },
+    source_processing_report: synthetic_report
+  )
+  detail.person_person_types = [ person_person_types.values.sample(random: rng) ]
+  detail
+end
+
+ensure_self_relationships(
+  rel_class: OrganizationOrganization,
+  all_ids: Organization.pluck(:id),
+  fk_a: :organization_a_id,
+  fk_b: :organization_b_id,
+  random_seed: 20260423
+) do |rel, rng|
+  detail = OrganizationOrganizationDetail.create!(
+    organization_organization: rel,
+    as_of: Faker::Date.between(from: 10.years.ago.to_date, to: Date.today),
+    confidence_tenths: 850,
+    additional_attributes: { "scope" => Faker::Company.industry },
+    source_processing_report: synthetic_report
+  )
+  detail.organization_organization_types = [ organization_organization_types.values.sample(random: rng) ]
+  detail
+end
