@@ -1,0 +1,95 @@
+<% current = @part.current_detail %>
+
+<h1><%= current ? current.name : "Unnamed part ##{@part.id}" %></h1>
+
+<% if current %>
+  <dl>
+    <dt>As of</dt><dd><%= current.as_of&.to_date %></dd>
+    <dt>Confidence</dt><dd><%= current.confidence_tenths.to_i / 10.0 %>%</dd>
+    <% if current.part_types.any? %>
+      <dt>Types</dt><dd><%= current.part_types.map(&:name).join(", ") %></dd>
+    <% end %>
+  </dl>
+
+  <% if current.additional_attributes.any? %>
+    <h2>Attributes</h2>
+    <table class="table table-sm">
+      <tbody>
+        <% current.additional_attributes.each do |key, value| %>
+          <tr><th><%= key.humanize %></th><td><%= value %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+<% end %>
+
+<% prior = @part.part_details.where.not(id: current&.id).order(as_of: :desc) %>
+<% if prior.any? %>
+  <h2>Prior details</h2>
+  <table class="table">
+    <thead>
+      <tr><th>Name</th><th>As of</th><th>Confidence</th><th>Attributes</th></tr>
+    </thead>
+    <tbody>
+      <% prior.each do |d| %>
+        <tr>
+          <td><%= d.name %></td>
+          <td><%= d.as_of&.to_date %></td>
+          <td><%= d.confidence_tenths.to_i / 10.0 %>%</td>
+          <td>
+            <% if d.additional_attributes.any? %>
+              <%= d.additional_attributes.map { |k, v| "#{k.humanize}: #{v}" }.join("; ") %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<% organizations = @part.part_organizations.includes(:organization, current_detail: :part_organization_types) %>
+<% if organizations.any? %>
+  <h2>Organizations</h2>
+  <table class="table">
+    <thead>
+      <tr><th>Organization</th><th>Types</th><th>As of</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% organizations.each do |po| %>
+        <% org_detail = po.organization.current_detail %>
+        <% rel_detail = po.current_detail %>
+        <tr>
+          <td><%= link_to (org_detail ? org_detail.name : "Organization ##{po.organization_id}"), po.organization %></td>
+          <td><%= rel_detail&.part_organization_types&.map(&:name)&.join(", ") %></td>
+          <td><%= rel_detail&.as_of&.to_date %></td>
+          <td><%= link_to "Relationship", part_organization_path(po), class: "btn btn-sm btn-outline-primary" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<% part_relationships = @part.part_parts.includes(:part_a, :part_b, current_detail: :part_part_types) %>
+<% if part_relationships.any? %>
+  <h2>Related parts</h2>
+  <table class="table">
+    <thead>
+      <tr><th>Part</th><th>Types</th><th>As of</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% part_relationships.each do |pp| %>
+        <% other = pp.other_part(@part) %>
+        <% other_detail = other&.current_detail %>
+        <% rel_detail = pp.current_detail %>
+        <tr>
+          <td><%= link_to (other_detail ? other_detail.name : "Part ##{other&.id}"), other %></td>
+          <td><%= rel_detail&.part_part_types&.map(&:name)&.join(", ") %></td>
+          <td><%= rel_detail&.as_of&.to_date %></td>
+          <td><%= link_to "Relationship", part_part_path(pp), class: "btn btn-sm btn-outline-primary" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<p><%= link_to "Back to parts", parts_path %></p>

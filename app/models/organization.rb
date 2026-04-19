@@ -2,6 +2,8 @@ class Organization < ApplicationRecord
   has_many :organization_details, dependent: :destroy
   has_many :person_organizations, dependent: :destroy
   has_many :people, through: :person_organizations
+  has_many :part_organizations, dependent: :destroy
+  has_many :parts, through: :part_organizations
 
   has_many :organization_organizations_as_a,
            class_name: "OrganizationOrganization",

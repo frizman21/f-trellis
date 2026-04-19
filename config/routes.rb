@@ -11,12 +11,18 @@ Rails.application.routes.draw do
   resources :organization_types, only: [:index, :new, :create, :edit, :update]
   resources :facilities, only: [:index, :show]
   resources :facility_types, only: [:index, :new, :create, :edit, :update]
+  resources :parts, only: [:index, :show]
+  resources :part_types, only: [:index, :new, :create, :edit, :update]
   resources :person_organizations,            only: [:show]
   resources :person_organization_types,       only: [:index, :new, :create, :edit, :update]
   resources :person_people,                   only: [:show]
   resources :person_person_types,             only: [:index, :new, :create, :edit, :update]
   resources :organization_organizations,      only: [:show]
   resources :organization_organization_types, only: [:index, :new, :create, :edit, :update]
+  resources :part_organizations,              only: [:show]
+  resources :part_organization_types,         only: [:index, :new, :create, :edit, :update]
+  resources :part_parts,                      only: [:show]
+  resources :part_part_types,                 only: [:index, :new, :create, :edit, :update]
   resources :sources, only: [:index, :show, :new, :create] do
     member do
       post :fetch

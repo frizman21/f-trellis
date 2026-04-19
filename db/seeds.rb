@@ -655,3 +655,156 @@ ensure_self_relationships(
   detail.organization_organization_types = [ organization_organization_types.values.sample(random: rng) ]
   detail
 end
+
+# ---------------------------------------------------------------------------
+# Parts: tier 1 + Part↔Organization + Part↔Part composition.
+# ---------------------------------------------------------------------------
+
+part_types = {
+  "Component"    => { description: "An atomic part used inside larger assemblies.", keys: [ "material", "manufacturer_part_number" ] },
+  "Assembly"     => { description: "A collection of parts assembled into a unit.",  keys: [ "manufacturer_part_number" ] },
+  "Raw Material" => { description: "A bulk input not yet assembled.",               keys: [ "form" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = PartType.find_or_create_by!(name: name) do |pt|
+    pt.description = attrs[:description]
+    pt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+part_organization_types = {
+  "Manufacturer" => { description: "Organization manufactures the part.", keys: [ "since", "factory" ] },
+  "Consumer"     => { description: "Organization uses or buys the part.", keys: [ "since" ] },
+  "Demand"       => { description: "Organization has signaled demand for the part.", keys: [ "quantity_per_year" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = PartOrganizationType.find_or_create_by!(name: name) do |pot|
+    pot.description = attrs[:description]
+    pot.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+part_part_types = {
+  "Composition" => { description: "Part B is a component of Part A.", keys: [ "quantity" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = PartPartType.find_or_create_by!(name: name) do |ppt|
+    ppt.description = attrs[:description]
+    ppt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+# Seeded parts tied to existing Apollo / NASA story.
+parts_data = {
+  "Apollo Guidance Computer" => {
+    types: [ "Assembly" ],
+    additional_attributes: { "manufacturer_part_number" => "AGC-Block-II" },
+    source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
+  },
+  "AGC Memory Module" => {
+    types: [ "Component" ],
+    additional_attributes: { "material" => "Magnetic core rope memory", "manufacturer_part_number" => "AGC-MEM" },
+    source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
+  },
+  "AGC CPU Module" => {
+    types: [ "Component" ],
+    additional_attributes: { "material" => "RTL flat-pack ICs", "manufacturer_part_number" => "AGC-CPU" },
+    source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
+  },
+  "AGC Power Supply" => {
+    types: [ "Component" ],
+    additional_attributes: { "manufacturer_part_number" => "AGC-PSU" },
+    source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
+  }
+}
+
+apollo_source = Source.find_or_create_by!(url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer") do |s|
+  s.description = "Wikipedia: Apollo Guidance Computer."
+end
+apollo_report = SourceProcessingReport.find_or_create_by!(source: apollo_source, skill_revision: summarize_revision) do |r|
+  r.facts = { "subject" => "Apollo Guidance Computer" }
+end
+
+parts_by_name = {}
+parts_data.each do |name, attrs|
+  detail = PartDetail.find_by(name: name)
+  if detail.nil?
+    part = Part.create!
+    detail = PartDetail.create!(
+      part: part,
+      name: name,
+      as_of: Time.zone.parse("1969-07-20"),
+      confidence_tenths: 950,
+      additional_attributes: attrs[:additional_attributes],
+      source_processing_report: apollo_report
+    )
+  end
+  detail.part_types = attrs[:types].map { |t| part_types.fetch(t) }
+  detail.part.update!(current_detail: detail) unless detail.part.current_detail_id == detail.id
+  parts_by_name[name] = detail.part
+end
+
+# NASA is the consumer of the Apollo Guidance Computer.
+nasa_org = OrganizationDetail.find_by(name: "National Aeronautics and Space Administration")&.organization
+agc_part = parts_by_name["Apollo Guidance Computer"]
+
+if nasa_org && agc_part
+  po = PartOrganization.find_or_create_by!(part: agc_part, organization: nasa_org)
+  detail = po.part_organization_details.find_or_create_by!(as_of: Time.zone.parse("1966-08-25")) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = 1000
+    d.additional_attributes = { "since" => "1966" }
+  end
+  detail.part_organization_types = [ part_organization_types.fetch("Consumer") ]
+  po.update!(current_detail: detail) unless po.current_detail_id == detail.id
+end
+
+# Compositional relationships: AGC is composed of memory, CPU, power supply.
+[ "AGC Memory Module", "AGC CPU Module", "AGC Power Supply" ].each do |child_name|
+  parent = agc_part
+  child  = parts_by_name[child_name]
+  next unless parent && child
+
+  a_id, b_id = [ parent.id, child.id ].minmax
+  pp = PartPart.find_or_create_by!(part_a_id: a_id, part_b_id: b_id)
+  detail = pp.part_part_details.find_or_create_by!(as_of: Time.zone.parse("1969-07-20")) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = 950
+    d.additional_attributes = { "quantity" => "1", "parent" => parent.id == a_id ? "a" : "b" }
+  end
+  detail.part_part_types = [ part_part_types.fetch("Composition") ]
+  pp.update!(current_detail: detail) unless pp.current_detail_id == detail.id
+end
+
+# Ensure every part has at least one Manufacturer organization. Pulls from
+# the synthetic Faker companies so we don't accidentally make NASA the
+# manufacturer of its own AGC.
+manufacturer_type = part_organization_types.fetch("Manufacturer")
+synthetic_orgs = Organization.where(id: synthetic_report.organization_details.select(:organization_id)).to_a
+mfg_rng = Random.new(20260424)
+
+Part.find_each do |part|
+  has_manufacturer = PartOrganizationDetail
+    .joins(:part_organization_types, :part_organization)
+    .where(part_organizations: { part_id: part.id }, part_organization_types: { id: manufacturer_type.id })
+    .exists?
+  next if has_manufacturer
+  next if synthetic_orgs.empty?
+
+  # Avoid orgs already linked to this part (the unique index forbids duplicate
+  # part↔org pairs, and re-using a Consumer org as the Manufacturer would be wrong).
+  linked_org_ids = part.part_organizations.pluck(:organization_id)
+  candidates = synthetic_orgs.reject { |o| linked_org_ids.include?(o.id) }
+  next if candidates.empty?
+
+  org = candidates.sample(random: mfg_rng)
+  po = PartOrganization.find_or_create_by!(part: part, organization: org)
+  detail = po.part_organization_details.create!(
+    as_of: Faker::Date.between(from: 5.years.ago.to_date, to: Date.today),
+    confidence_tenths: 800,
+    additional_attributes: {
+      "since"   => mfg_rng.rand(1990..2024).to_s,
+      "factory" => "#{Faker::Address.city}, #{Faker::Address.state_abbr}"
+    },
+    source_processing_report: synthetic_report
+  )
+  detail.part_organization_types = [ manufacturer_type ]
+  po.update!(current_detail: detail)
+end

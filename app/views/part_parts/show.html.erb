@@ -1,0 +1,79 @@
+<% a_detail = @part_a.current_detail %>
+<% b_detail = @part_b.current_detail %>
+
+<h1>
+  <%= a_detail ? a_detail.name : "Part ##{@part_a.id}" %>
+  &nbsp;↔&nbsp;
+  <%= b_detail ? b_detail.name : "Part ##{@part_b.id}" %>
+</h1>
+
+<h2>Parties</h2>
+<table class="table">
+  <thead><tr><th>Side</th><th>Name</th><th>Type(s)</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td><%= link_to (a_detail ? a_detail.name : "Part ##{@part_a.id}"), @part_a %></td>
+      <td><%= a_detail&.part_types&.map(&:name)&.join(", ") %></td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td><%= link_to (b_detail ? b_detail.name : "Part ##{@part_b.id}"), @part_b %></td>
+      <td><%= b_detail&.part_types&.map(&:name)&.join(", ") %></td>
+    </tr>
+  </tbody>
+</table>
+
+<% if @current %>
+  <h2>Current relationship detail</h2>
+  <dl>
+    <dt>As of</dt><dd><%= @current.as_of&.to_date %></dd>
+    <dt>Confidence</dt><dd><%= @current.confidence_tenths.to_i / 10.0 %>%</dd>
+    <% if @current.part_part_types.any? %>
+      <dt>Types</dt><dd><%= @current.part_part_types.map(&:name).join(", ") %></dd>
+    <% end %>
+    <% if @current.source_processing_report %>
+      <dt>Source</dt>
+      <dd><%= link_to @current.source_processing_report.source.url, @current.source_processing_report.source %></dd>
+    <% end %>
+  </dl>
+
+  <% if @current.additional_attributes.any? %>
+    <h3>Additional attributes</h3>
+    <table class="table table-sm">
+      <tbody>
+        <% @current.additional_attributes.each do |key, value| %>
+          <tr><th><%= key.humanize %></th><td><%= value %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+<% else %>
+  <p class="text-muted">No current detail set on this relationship.</p>
+<% end %>
+
+<% if @prior.any? %>
+  <h2>Prior relationship details</h2>
+  <table class="table">
+    <thead><tr><th>As of</th><th>Confidence</th><th>Types</th><th>Additional attributes</th></tr></thead>
+    <tbody>
+      <% @prior.each do |d| %>
+        <tr>
+          <td><%= d.as_of&.to_date %></td>
+          <td><%= d.confidence_tenths.to_i / 10.0 %>%</td>
+          <td><%= d.part_part_types.map(&:name).join(", ") %></td>
+          <td>
+            <% if d.additional_attributes.any? %>
+              <%= d.additional_attributes.map { |k, v| "#{k.humanize}: #{v}" }.join("; ") %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<p>
+  <%= link_to "Back to #{a_detail&.name || "part A"}", @part_a %> ·
+  <%= link_to "Back to #{b_detail&.name || "part B"}", @part_b %>
+</p>

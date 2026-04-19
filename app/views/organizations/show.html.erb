@@ -114,4 +114,26 @@
   </table>
 <% end %>
 
+<% part_links = @organization.part_organizations.includes(:part, current_detail: :part_organization_types) %>
+<% if part_links.any? %>
+  <h2>Parts</h2>
+  <table class="table">
+    <thead>
+      <tr><th>Part</th><th>Types</th><th>As of</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% part_links.each do |po| %>
+        <% part_detail = po.part.current_detail %>
+        <% rel_detail = po.current_detail %>
+        <tr>
+          <td><%= link_to (part_detail ? part_detail.name : "Part ##{po.part_id}"), po.part %></td>
+          <td><%= rel_detail&.part_organization_types&.map(&:name)&.join(", ") %></td>
+          <td><%= rel_detail&.as_of&.to_date %></td>
+          <td><%= link_to "Relationship", part_organization_path(po), class: "btn btn-sm btn-outline-primary" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
 <p><%= link_to "Back to organizations", organizations_path %></p>

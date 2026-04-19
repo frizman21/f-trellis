@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_19_010010) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_20_000015) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -133,6 +133,131 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_19_010010) do
     t.bigint "current_detail_id"
     t.datetime "updated_at", null: false
     t.index ["current_detail_id"], name: "index_organizations_on_current_detail_id"
+  end
+
+  create_table "part_detail_part_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "part_detail_id", null: false
+    t.bigint "part_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_detail_id", "part_type_id"], name: "index_pdpt_part_on_detail_and_type", unique: true
+    t.index ["part_detail_id"], name: "index_part_detail_part_types_on_part_detail_id"
+    t.index ["part_type_id"], name: "index_part_detail_part_types_on_part_type_id"
+  end
+
+  create_table "part_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "part_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_id"], name: "index_part_details_on_part_id"
+    t.index ["source_processing_report_id"], name: "index_part_details_on_source_processing_report_id"
+  end
+
+  create_table "part_organization_detail_part_organization_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "part_organization_detail_id", null: false
+    t.bigint "part_organization_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_organization_detail_id", "part_organization_type_id"], name: "index_podpot_part_on_pair", unique: true
+    t.index ["part_organization_detail_id"], name: "index_podpot_part_on_detail_id"
+    t.index ["part_organization_type_id"], name: "index_podpot_part_on_type_id"
+  end
+
+  create_table "part_organization_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "part_organization_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_organization_id"], name: "index_part_organization_details_on_part_organization_id"
+    t.index ["source_processing_report_id"], name: "index_part_organization_details_on_source_processing_report_id"
+  end
+
+  create_table "part_organization_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_part_organization_types_on_name", unique: true
+  end
+
+  create_table "part_organizations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "organization_id", null: false
+    t.bigint "part_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_part_organizations_on_current_detail_id"
+    t.index ["organization_id"], name: "index_part_organizations_on_organization_id"
+    t.index ["part_id", "organization_id"], name: "index_part_organizations_on_part_id_and_organization_id", unique: true
+    t.index ["part_id"], name: "index_part_organizations_on_part_id"
+  end
+
+  create_table "part_part_detail_part_part_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "part_part_detail_id", null: false
+    t.bigint "part_part_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_part_detail_id", "part_part_type_id"], name: "index_ppdppt_part_on_pair", unique: true
+    t.index ["part_part_detail_id"], name: "index_ppdppt_part_on_detail_id"
+    t.index ["part_part_type_id"], name: "index_ppdppt_part_on_type_id"
+  end
+
+  create_table "part_part_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "part_part_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_part_id"], name: "index_part_part_details_on_part_part_id"
+    t.index ["source_processing_report_id"], name: "index_part_part_details_on_source_processing_report_id"
+  end
+
+  create_table "part_part_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_part_part_types_on_name", unique: true
+  end
+
+  create_table "part_parts", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "part_a_id", null: false
+    t.bigint "part_b_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_part_parts_on_current_detail_id"
+    t.index ["part_a_id", "part_b_id"], name: "index_part_parts_on_part_a_id_and_part_b_id", unique: true
+    t.index ["part_a_id"], name: "index_part_parts_on_part_a_id"
+    t.index ["part_b_id"], name: "index_part_parts_on_part_b_id"
+  end
+
+  create_table "part_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_part_types_on_name", unique: true
+  end
+
+  create_table "parts", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_parts_on_current_detail_id"
   end
 
   create_table "people", force: :cascade do |t|
@@ -324,6 +449,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_19_010010) do
   add_foreign_key "organization_organizations", "organizations", column: "organization_a_id"
   add_foreign_key "organization_organizations", "organizations", column: "organization_b_id"
   add_foreign_key "organizations", "organization_details", column: "current_detail_id"
+  add_foreign_key "part_detail_part_types", "part_details"
+  add_foreign_key "part_detail_part_types", "part_types"
+  add_foreign_key "part_details", "parts"
+  add_foreign_key "part_details", "source_processing_reports"
+  add_foreign_key "part_organization_detail_part_organization_types", "part_organization_details"
+  add_foreign_key "part_organization_detail_part_organization_types", "part_organization_types"
+  add_foreign_key "part_organization_details", "part_organizations"
+  add_foreign_key "part_organization_details", "source_processing_reports"
+  add_foreign_key "part_organizations", "organizations"
+  add_foreign_key "part_organizations", "part_organization_details", column: "current_detail_id"
+  add_foreign_key "part_organizations", "parts"
+  add_foreign_key "part_part_detail_part_part_types", "part_part_details"
+  add_foreign_key "part_part_detail_part_part_types", "part_part_types"
+  add_foreign_key "part_part_details", "part_parts"
+  add_foreign_key "part_part_details", "source_processing_reports"
+  add_foreign_key "part_parts", "part_part_details", column: "current_detail_id"
+  add_foreign_key "part_parts", "parts", column: "part_a_id"
+  add_foreign_key "part_parts", "parts", column: "part_b_id"
+  add_foreign_key "parts", "part_details", column: "current_detail_id"
   add_foreign_key "people", "person_details", column: "current_detail_id"
   add_foreign_key "person_detail_person_types", "person_details"
   add_foreign_key "person_detail_person_types", "person_types"
