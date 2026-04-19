@@ -1,0 +1,20 @@
+<h1>
+  <%= @skill.name %>
+  <small class="text-muted">revision <%= @revision.sequence %></small>
+</h1>
+
+<dl>
+  <dt>Skill</dt>
+  <dd><%= link_to @skill.name, skill_path(@skill) %></dd>
+
+  <dt>Sequence</dt>
+  <dd><%= @revision.sequence %></dd>
+
+  <dt>Created</dt>
+  <dd><%= @revision.created_at %></dd>
+</dl>
+
+<h2>Content</h2>
+<pre class="p-3 bg-light border rounded"><%= @revision.content %></pre>
+
+<p><%= link_to "Back to #{@skill.name}", skill_path(@skill) %></p>

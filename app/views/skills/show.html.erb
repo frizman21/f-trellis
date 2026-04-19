@@ -1,0 +1,52 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0"><%= @skill.name %></h1>
+  <%= link_to "Edit", edit_skill_path(@skill), class: "btn btn-primary" %>
+</div>
+
+<dl>
+  <dt>Purpose</dt>
+  <dd><%= @skill.purpose.presence || "—" %></dd>
+
+  <dt>Active</dt>
+  <dd><%= @skill.is_active? ? "Yes" : "No" %></dd>
+
+  <dt>Revisions</dt>
+  <dd><%= @revisions.size %></dd>
+</dl>
+
+<% central = "Central Time (US & Canada)" %>
+<% fmt = "%Y-%m-%d %H:%M %Z" %>
+
+<% if @current_revision %>
+  <h2>
+    Current revision
+    <small class="text-muted">#<%= @current_revision.sequence %></small>
+  </h2>
+  <p class="text-muted small">
+    Created <%= @current_revision.created_at.in_time_zone(central).strftime(fmt) %>.
+    <%= link_to "Open", skill_revision_path(@current_revision) %>
+  </p>
+  <pre class="p-3 bg-light border rounded"><%= @current_revision.content %></pre>
+<% end %>
+
+<% if @revisions.size > 1 %>
+  <h2>Prior revisions</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @revisions.drop(1).each do |r| %>
+        <tr>
+          <td><%= link_to r.sequence, skill_revision_path(r), class: "btn btn-sm btn-outline-primary" %></td>
+          <td><%= r.created_at.in_time_zone(central).strftime(fmt) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<p><%= link_to "Back to skills", skills_path %></p>

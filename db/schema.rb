@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_18_150011) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_18_150012) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -57,8 +57,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_18_150011) do
   create_table "skill_revisions", force: :cascade do |t|
     t.string "content"
     t.datetime "created_at", null: false
+    t.integer "sequence", default: 0, null: false
     t.bigint "skill_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["skill_id", "sequence"], name: "index_skill_revisions_on_skill_id_and_sequence", unique: true
     t.index ["skill_id"], name: "index_skill_revisions_on_skill_id"
   end
 
