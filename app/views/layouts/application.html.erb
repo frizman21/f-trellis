@@ -61,6 +61,12 @@
         </nav>
 
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+          <% if flash[:notice].present? %>
+            <div class="alert alert-success" role="alert"><%= flash[:notice] %></div>
+          <% end %>
+          <% if flash[:alert].present? %>
+            <div class="alert alert-warning" role="alert"><%= flash[:alert] %></div>
+          <% end %>
           <%= yield %>
         </main>
       </div>

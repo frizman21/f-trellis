@@ -1,0 +1,30 @@
+<h1>New Source</h1>
+
+<%= form_with model: @source, local: true do |f| %>
+  <% if @source.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% @source.errors.full_messages.each do |m| %>
+          <li><%= m %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :url, class: "form-label" %>
+    <%= f.url_field :url,
+                    value: f.object.url,
+                    class: "form-control",
+                    required: true,
+                    placeholder: "https://example.com/article" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :description, class: "form-label" %>
+    <%= f.text_area :description, class: "form-control", rows: 3 %>
+  </div>
+
+  <%= f.submit "Create source", class: "btn btn-primary" %>
+  <%= link_to "Cancel", sources_path, class: "btn btn-outline-secondary" %>
+<% end %>

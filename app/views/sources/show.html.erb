@@ -8,7 +8,15 @@
   <dd><%= @source.description.presence || "—" %></dd>
 
   <dt>Status</dt>
-  <dd><%= @source.status %></dd>
+  <dd>
+    <%= @source.status %>
+    <% if @source.status == "new" %>
+      <%= button_to "Fetch now",
+                    fetch_source_path(@source),
+                    method: :post,
+                    class: "btn btn-sm btn-primary ms-2" %>
+    <% end %>
+  </dd>
 
   <dt>Created</dt>
   <dd><%= @source.created_at %></dd>
