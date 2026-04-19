@@ -522,9 +522,19 @@ the two singular snake-case entity names in alphabetical order
       under the **Types** section in
       `app/views/layouts/application.html.erb`, alongside the tier 1
       type links.
-- [ ] (Optional, on demand) Browseable `<Rel>` index/show. Often a
-      relationship is reached *through* one of its endpoints — these
-      views can be added later as the UI calls for them.
+- [ ] `<Rel>Controller#show` view that renders both parties (each
+      linked to its own show page), the current detail's
+      `as_of` / confidence / types / linked Source, the property bag as
+      a key/value table, and a prior-details table. The "other side"
+      tables on each endpoint's show page each get a per-row link to
+      this relationship show. **Self-referential relationships need
+      this too**: both parties are still distinct records, and the
+      per-edge view exposes relationship-only state (the relationship's
+      types, `as_of`, confidence, and property bag for *this* edge) that
+      doesn't fit cleanly on either endpoint's show page.
+- [ ] (Optional, on demand) Browseable `<Rel>` index. Often a
+      relationship is reached *through* one of its endpoints; the index
+      can be added later as the UI calls for it.
 
 **Seed**
 
@@ -560,7 +570,8 @@ below as items from §7 are completed.
 Same maintenance rules as §6: keep this in sync with the code; if the
 matrix disagrees with reality, update the matrix.
 
-Legend: **✓** done · **⚬** partial · **·** not started.
+Legend: **✓** done · **⚬** partial · **·** not started · **—** not applicable
+(e.g. cross-entity-only items in self-referential columns).
 
 | §7 checklist item                                             | PersonOrganization | PersonPerson | OrganizationOrganization |
 |---------------------------------------------------------------|:------------------:|:------------:|:------------------------:|
@@ -578,6 +589,7 @@ Legend: **✓** done · **⚬** partial · **·** not started.
 | `<Rel>TypesController` full CRUD + form                       |         ✓          |      ✓       |            ✓             |
 | Sidebar link to `<Rel>TypesController#index` under Types      |         ✓          |      ✓       |            ✓             |
 | Endpoint show pages list the other side via this relationship |         ✓          |      ✓       |            ✓             |
+| `<Rel>Controller#show` + per-edge link from both endpoints    |         ✓          |      ✓       |            ✓             |
 | Seed: one `<Rel>` + details + real report + current populated |         ✓          |      ✓       |            ✓             |
 | Seed: at least one `<Rel>Type` attached to each detail        |         ✓          |      ✓       |            ✓             |
 | Runtime: `current_detail_id` auto-maintained on new Detail    |         ·          |      ·       |            ·             |

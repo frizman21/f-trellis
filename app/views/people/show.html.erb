@@ -64,6 +64,7 @@
         <th>Organization</th>
         <th>Types</th>
         <th>As of</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -76,6 +77,7 @@
           </td>
           <td><%= rel_detail&.person_organization_types&.map(&:name)&.join(", ") %></td>
           <td><%= rel_detail&.as_of&.to_date %></td>
+          <td><%= link_to "Relationship", person_organization_path(po), class: "btn btn-sm btn-outline-primary" %></td>
         </tr>
       <% end %>
     </tbody>
@@ -91,6 +93,7 @@
         <th>Person</th>
         <th>Types</th>
         <th>As of</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -104,6 +107,7 @@
           </td>
           <td><%= rel_detail&.person_person_types&.map(&:name)&.join(", ") %></td>
           <td><%= rel_detail&.as_of&.to_date %></td>
+          <td><%= link_to "Relationship", person_person_path(pp), class: "btn btn-sm btn-outline-primary" %></td>
         </tr>
       <% end %>
     </tbody>
