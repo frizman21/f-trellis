@@ -1,4 +1,7 @@
-<h1>Facility Types</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Facility Types</h1>
+  <%= link_to "New facility type", new_facility_type_path, class: "btn btn-primary" %>
+</div>
 
 <% if @facility_types.any? %>
   <table class="table">
@@ -7,6 +10,7 @@
         <th>Name</th>
         <th>Description</th>
         <th>Additional attribute keys</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -15,6 +19,7 @@
           <td><%= ft.name %></td>
           <td><%= ft.description %></td>
           <td><%= ft.additional_attribute_keys.join(", ") %></td>
+          <td><%= link_to "Edit", edit_facility_type_path(ft), class: "btn btn-sm btn-outline-primary" %></td>
         </tr>
       <% end %>
     </tbody>

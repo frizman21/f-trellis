@@ -8,9 +8,9 @@ Rails.application.routes.draw do
   resources :people, only: [:index, :show]
   resources :person_types, only: [:index, :new, :create, :edit, :update]
   resources :organizations, only: [:index, :show]
-  resources :organization_types, only: [:index]
+  resources :organization_types, only: [:index, :new, :create, :edit, :update]
   resources :facilities, only: [:index, :show]
-  resources :facility_types, only: [:index]
+  resources :facility_types, only: [:index, :new, :create, :edit, :update]
   resources :sources, only: [:index, :show, :new, :create] do
     member do
       post :fetch

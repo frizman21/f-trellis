@@ -301,6 +301,18 @@ matrix below as items from §5 are completed.
 
 ### Completion matrix
 
+**Keep this matrix up to date.** When you:
+
+- **Add a new tier 1 entity**, add a column for it and a bullet to the
+  running list above.
+- **Finish a §5 checklist item for an existing entity**, flip the cell
+  from `·` or `⚬` to `✓`.
+- **Add a new §5 checklist item**, add a row here so existing entities
+  can be assessed against it.
+
+If the matrix disagrees with the code, the code wins — update the matrix
+to match. The matrix is a scoreboard, not a source of truth.
+
 Legend: **✓** done · **⚬** partial · **·** not started.
 
 | §5 checklist item                                        | Person | Organization | Facility |
@@ -315,10 +327,10 @@ Legend: **✓** done · **⚬** partial · **·** not started.
 | Type model + reverse M2M                                 |   ✓    |      ✓       |    ✓     |
 | Join model                                               |   ✓    |      ✓       |    ✓     |
 | `SourceProcessingReport.has_many :<entity>_details`      |   ✓    |      ✓       |    ✓     |
-| Routes: entity index/show + type full CRUD               |   ✓    |      ⚬       |    ⚬     |
+| Routes: entity index/show + type full CRUD               |   ✓    |      ✓       |    ✓     |
 | Index view with search + Matched-on column               |   ✓    |      ✓       |    ✓     |
 | Show view with current + attributes + prior              |   ✓    |      ✓       |    ✓     |
-| `<Entity>TypesController` full CRUD + form               |   ✓    |      ·       |    ·     |
+| `<Entity>TypesController` full CRUD + form               |   ✓    |      ✓       |    ✓     |
 | Sidebar links (Knowledge + Types)                        |   ✓    |      ✓       |    ✓     |
 | Seed: multi-detail + real reports + types + current      |   ✓    |      ✓       |    ✓     |
 | Runtime: views use `entity.current_detail`               |   ✓    |      ✓       |    ✓     |
