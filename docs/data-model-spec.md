@@ -1,17 +1,17 @@
 # Data Model Specification
 
-This document defines the repeating shape used by every tier 1 entity in the
-application and the relationships between them. Follow it when adding new
-entities so the codebase stays consistent and queries remain predictable.
+This document defines the repeating shape used by every tier 1 knowledge entity in the
+application and the relationships between them. Implement these concepts when adding new
+entities so the codebase.
 
 The canonical example is `Person` / `PersonDetail`. Everything below generalises
 that pattern.
 
 ---
 
-## 1. Tier 1 Entity
+## 1. Tier 1 Knowledge Entity
 
-A **tier 1 entity** is a real-world subject the system tracks (a person, an
+A **tier 1 knowledge entity** is a real-world subject the system tracks (a person, an
 organisation, a place, etc.).
 
 **Rules**
@@ -73,6 +73,7 @@ the "current" view of an entity is derived by picking the most recent detail
 | `additional_attributes` | `jsonb`, NOT NULL, default `{}` | Property bag for open-ended attributes (see §2a). |
 | `confidence_tenths`     | `integer`  | Confidence in this assertion, in tenths of a percent. `1` = 0.1%, `1000` = 100%. |
 | `as_of`                 | `datetime` | When the assertion is effective (not when it was recorded — `created_at` covers that). |
+| `source_processing_report_id` | FK, NOT NULL | The `SourceProcessingReport` that produced this detail — i.e., which skill revision was run against which source to extract these facts. See §2b. |
 | `created_at` / `updated_at` | `datetime` | Standard Rails timestamps.                               |
 
 **Typed columns**
@@ -109,6 +110,34 @@ Why flat string-scalar maps:
 Values that need richer structure are a signal to promote the key to a
 typed column (or to a separate relation), not to nest inside the bag.
 
+### §2b. Provenance — `source_processing_report_id`
+
+Every Detail record carries a **required** FK to the
+`SourceProcessingReport` that produced it. This links an assertion about a
+tier 1 entity back to the exact `Source` and `SkillRevision` that generated
+its facts, so any detail can answer:
+
+- *Which document did this come from?* → `detail.source_processing_report.source`
+- *Which skill revision extracted it?* → `detail.source_processing_report.skill_revision`
+- *What raw facts did the run emit?* → `detail.source_processing_report.facts`
+
+Rules:
+
+- The column is **NOT NULL**. Every detail must be attributable to a
+  processing run. Manual entries, imports, and seed data must each
+  synthesize a `SourceProcessingReport` (with an appropriate `Source` and
+  `SkillRevision`) and attach it.
+- The column is **always named `source_processing_report_id`**, regardless
+  of entity type — every tier 1 Detail shares the same column name.
+- On the model: `belongs_to :source_processing_report` (not optional).
+- On `SourceProcessingReport`: `has_many :<entity>_details` for each tier 1
+  entity whose details it can produce. Do **not** use `dependent: :nullify`,
+  since the FK cannot be nulled — choose `:destroy` or `:restrict_with_error`
+  based on desired cascade semantics.
+- `SourceProcessingReport`, `Source`, and `Skill` / `SkillRevision` are
+  application data structures, not tier 1 entities — see
+  `docs/application-data-structures.md`.
+
 **Rules**
 
 - The Detail class is singular `<Entity>Detail` (e.g. `PersonDetail`); the
@@ -124,6 +153,7 @@ typed column (or to a separate relation), not to nest inside the bag.
 ```ruby
 class PersonDetail < ApplicationRecord
   belongs_to :person
+  belongs_to :source_processing_report
 end
 ```
 
@@ -135,6 +165,7 @@ create_table :person_details do |t|
   t.jsonb :additional_attributes, null: false, default: {}
   t.integer :confidence_tenths
   t.datetime :as_of
+  t.references :source_processing_report, null: false, foreign_key: true
   t.timestamps
 end
 ```
@@ -180,7 +211,11 @@ concrete example.
 - [ ] `app/models/<entity>.rb` with
       `has_many :<entity>_details, dependent: :destroy` and
       `belongs_to :current_detail, class_name: "<Entity>Detail", optional: true`.
-- [ ] `app/models/<entity>_detail.rb` with `belongs_to :<entity>`.
+- [ ] `app/models/<entity>_detail.rb` with `belongs_to :<entity>` and
+      `belongs_to :source_processing_report` (required).
+- [ ] `SourceProcessingReport` updated with
+      `has_many :<entity>_details` using a cascade rule that does not
+      nullify the FK (e.g. `dependent: :destroy`).
 - [ ] Seed data exercising at least one entity with one detail, with
       `current_detail_id` populated.
 - [ ] Views dereference the current detail via `entity.current_detail`.

@@ -132,6 +132,19 @@ people_entries.each do |entry|
   person = existing_detail&.person || Person.create!
 
   entry[:details].each do |d|
+    source = Source.find_or_create_by!(url: d[:source_url]) do |s|
+      s.description = d[:source_description]
+    end
+
+    report = SourceProcessingReport.find_or_create_by!(source: source, skill_revision: summarize_revision) do |r|
+      r.facts = {
+        "first_name" => d[:first_name],
+        "last_name" => d[:last_name],
+        "confidence_tenths" => d[:confidence_tenths],
+        "additional_attributes" => d[:additional_attributes]
+      }
+    end
+
     detail = PersonDetail.find_or_create_by!(
       person: person,
       first_name: d[:first_name],
@@ -140,22 +153,10 @@ people_entries.each do |entry|
     ) do |pd|
       pd.confidence_tenths = d[:confidence_tenths]
       pd.additional_attributes = d[:additional_attributes]
+      pd.source_processing_report = report
     end
 
     detail.person_types = entry[:types].map { |n| person_types.fetch(n) }
-
-    source = Source.find_or_create_by!(url: d[:source_url]) do |s|
-      s.description = d[:source_description]
-    end
-
-    SourceProcessingReport.find_or_create_by!(source: source, skill_revision: summarize_revision) do |r|
-      r.facts = {
-        "first_name" => d[:first_name],
-        "last_name" => d[:last_name],
-        "confidence_tenths" => d[:confidence_tenths],
-        "additional_attributes" => d[:additional_attributes]
-      }
-    end
   end
 
   latest = entry[:details].max_by { |d| d[:as_of] }

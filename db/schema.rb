@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_18_150009) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_18_150010) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -39,8 +39,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_18_150009) do
     t.string "first_name"
     t.string "last_name"
     t.bigint "person_id", null: false
+    t.bigint "source_processing_report_id"
     t.datetime "updated_at", null: false
     t.index ["person_id"], name: "index_person_details_on_person_id"
+    t.index ["source_processing_report_id"], name: "index_person_details_on_source_processing_report_id"
   end
 
   create_table "person_types", force: :cascade do |t|
@@ -98,6 +100,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_18_150009) do
   add_foreign_key "person_detail_person_types", "person_details"
   add_foreign_key "person_detail_person_types", "person_types"
   add_foreign_key "person_details", "people"
+  add_foreign_key "person_details", "source_processing_reports"
   add_foreign_key "skill_revisions", "skills"
   add_foreign_key "source_data", "sources"
   add_foreign_key "source_processing_reports", "skill_revisions"
