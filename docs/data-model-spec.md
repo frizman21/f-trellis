@@ -204,19 +204,81 @@ concrete example.
 
 ## 5. Conventions checklist when adding a new tier 1 entity
 
+`<entity>` is the singular snake-case name (e.g. `person`). `<Entity>` is
+its CamelCase form. "Type" items follow the `PersonType` / `PersonDetail`
+pattern already in the codebase.
+
+**Schema**
+
 - [ ] Migration creating `<entity>s` with only `t.timestamps`.
-- [ ] Migration creating `<entity>_details` per §2.
+- [ ] Migration creating `<entity>_details` per §2 (includes
+      `additional_attributes jsonb NOT NULL default '{}'`,
+      `confidence_tenths`, `as_of`, and
+      `source_processing_report_id` NOT NULL).
 - [ ] Migration adding nullable `current_detail_id` FK on `<entity>s`
       referencing `<entity>_details`.
+- [ ] Migration creating `<entity>_types` with `name`, `description`,
+      `additional_attribute_keys` (text[], NOT NULL, default `[]`), and
+      a unique index on `name`.
+- [ ] Migration creating the many-to-many join table between
+      `<entity>_details` and `<entity>_types` with a unique composite index.
+
+**Models**
+
 - [ ] `app/models/<entity>.rb` with
       `has_many :<entity>_details, dependent: :destroy` and
       `belongs_to :current_detail, class_name: "<Entity>Detail", optional: true`.
-- [ ] `app/models/<entity>_detail.rb` with `belongs_to :<entity>` and
-      `belongs_to :source_processing_report` (required).
-- [ ] `SourceProcessingReport` updated with
-      `has_many :<entity>_details` using a cascade rule that does not
-      nullify the FK (e.g. `dependent: :destroy`).
-- [ ] Seed data exercising at least one entity with one detail, with
-      `current_detail_id` populated.
-- [ ] Views dereference the current detail via `entity.current_detail`.
-- [ ] `current_detail_id` is maintained whenever a newer Detail is created.
+- [ ] `app/models/<entity>_detail.rb` with `belongs_to :<entity>`,
+      `belongs_to :source_processing_report` (required), and
+      `has_many :<entity>_types, through: <join model>`.
+- [ ] `app/models/<entity>_type.rb` with the reverse `has_many :<entity>_details,
+      through: <join model>`.
+- [ ] Join model for the detail/type relation.
+- [ ] `SourceProcessingReport` updated with `has_many :<entity>_details`
+      using a cascade rule that does not nullify the FK
+      (e.g. `dependent: :destroy`).
+
+**Routes, controllers, views**
+
+- [ ] Routes: `resources :<entity>s, only: [:index, :show]` and
+      `resources :<entity>_types, only: [:index]` (extend as needed for
+      create/edit flows).
+- [ ] `<Entity>Controller#index` view with:
+      - a search form (GET `q`) that case-insensitively matches against
+        all typed Detail columns *and* every value in
+        `additional_attributes`;
+      - a results table with Name (linked to show) and Types;
+      - while searching, the Types column is replaced with a "Matched on"
+        column listing the specific fields/values that caused each row
+        to appear (deduplicated per entity);
+      - empty/no-match messaging.
+- [ ] `<Entity>Controller#show` view with:
+      - name / `as_of` / confidence / types derived from
+        `entity.current_detail`;
+      - `additional_attributes` rendered as a key/value table;
+      - a "Prior details" table of non-current details ordered by
+        `as_of desc`, including name, `as_of`, confidence, and a summary
+        of each detail's `additional_attributes`.
+- [ ] `<Entity>TypesController#index` listing types with name,
+      description, and `additional_attribute_keys`.
+- [ ] Sidebar wiring in `app/views/layouts/application.html.erb`:
+      entity index link under **Knowledge**; type index link under
+      **Types**.
+
+**Seed**
+
+- [ ] At least one entity with **multiple** `<Entity>Detail` rows spanning
+      different `as_of` values.
+- [ ] Every seeded detail attached to a real `SourceProcessingReport`
+      (and therefore a `Source` + `SkillRevision`).
+- [ ] At least one `<Entity>Type` defined; each seeded detail is
+      associated with one or more types.
+- [ ] `current_detail_id` populated on every seeded entity.
+
+**Runtime invariants**
+
+- [ ] Views and non-historical queries dereference the current detail via
+      `entity.current_detail`, not by sorting on `as_of`.
+- [ ] `current_detail_id` is maintained whenever a newer Detail is
+      created (callback, service object, or DB trigger — pick one and
+      apply it consistently).
