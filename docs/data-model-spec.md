@@ -286,3 +286,40 @@ pattern already in the codebase.
 - [ ] `current_detail_id` is maintained whenever a newer Detail is
       created (callback, service object, or DB trigger — pick one and
       apply it consistently).
+
+---
+
+## 6. Tier 1 entities
+
+Running list of tier 1 entities implemented in the application. Add a
+row here whenever a new tier 1 entity is introduced, and update the
+matrix below as items from §5 are completed.
+
+- **Person** (`app/models/person.rb`) — individual people named in sources.
+- **Organization** (`app/models/organization.rb`) — companies, agencies, labs, and other legal entities.
+- **Facility** (`app/models/facility.rb`) — physical locations; required typed column is `address`.
+
+### Completion matrix
+
+Legend: **✓** done · **⚬** partial · **·** not started.
+
+| §5 checklist item                                        | Person | Organization | Facility |
+|----------------------------------------------------------|:------:|:------------:|:--------:|
+| Entity table (`<entity>s`) migration                     |   ✓    |      ✓       |    ✓     |
+| Details table (`<entity>_details`) migration             |   ✓    |      ✓       |    ✓     |
+| `current_detail_id` FK migration                         |   ✓    |      ✓       |    ✓     |
+| `<entity>_types` migration + unique `name` index         |   ✓    |      ✓       |    ✓     |
+| Detail↔Type M2M join table migration                     |   ✓    |      ✓       |    ✓     |
+| Entity model + `has_many` details + `belongs_to :current_detail` | ✓ |      ✓       |    ✓     |
+| Detail model + `belongs_to :<entity>` + SPR + M2M        |   ✓    |      ✓       |    ✓     |
+| Type model + reverse M2M                                 |   ✓    |      ✓       |    ✓     |
+| Join model                                               |   ✓    |      ✓       |    ✓     |
+| `SourceProcessingReport.has_many :<entity>_details`      |   ✓    |      ✓       |    ✓     |
+| Routes: entity index/show + type full CRUD               |   ✓    |      ⚬       |    ⚬     |
+| Index view with search + Matched-on column               |   ✓    |      ✓       |    ✓     |
+| Show view with current + attributes + prior              |   ✓    |      ✓       |    ✓     |
+| `<Entity>TypesController` full CRUD + form               |   ✓    |      ·       |    ·     |
+| Sidebar links (Knowledge + Types)                        |   ✓    |      ✓       |    ✓     |
+| Seed: multi-detail + real reports + types + current      |   ✓    |      ✓       |    ✓     |
+| Runtime: views use `entity.current_detail`               |   ✓    |      ✓       |    ✓     |
+| Runtime: `current_detail_id` auto-maintained on new Detail |  ·   |      ·       |    ·     |
