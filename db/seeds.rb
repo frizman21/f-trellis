@@ -379,3 +379,129 @@ facility_entries.each do |entry|
   )
   facility.update!(current_detail: latest_detail) unless facility.current_detail_id == latest_detail.id
 end
+
+person_organization_types = {
+  "Affiliation" => { description: "General affiliation between a person and an organization.", keys: [ "role" ] },
+  "Employment"  => { description: "Person was employed by the organization.",                  keys: [ "title", "department" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = PersonOrganizationType.find_or_create_by!(name: name) do |pot|
+    pot.description = attrs[:description]
+    pot.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+# Margaret Hamilton ↔ NASA — known historical affiliation.
+margaret = PersonDetail.find_by(first_name: "Margaret H.", last_name: "Hamilton")&.person
+nasa     = OrganizationDetail.find_by(name: "National Aeronautics and Space Administration")&.organization
+nasa_report = SourceProcessingReport.joins(:source).find_by(sources: { url: "https://en.wikipedia.org/wiki/NASA" })
+
+if margaret && nasa && nasa_report
+  po = PersonOrganization.find_or_create_by!(person: margaret, organization: nasa)
+
+  detail = po.person_organization_details.find_or_create_by!(as_of: Time.zone.parse("1969-07-20")) do |d|
+    d.source_processing_report = nasa_report
+    d.confidence_tenths = 1000
+    d.additional_attributes = { "role" => "Director, Software Engineering Division", "title" => "Director", "department" => "Software Engineering Division" }
+  end
+
+  detail.person_organization_types = [
+    person_organization_types.fetch("Affiliation"),
+    person_organization_types.fetch("Employment")
+  ]
+
+  po.update!(current_detail: detail) unless po.current_detail_id == detail.id
+end
+
+# ---------------------------------------------------------------------------
+# Synthetic bulk data: ~12 random companies, ~200 random people, and random
+# employment relationships between them. Idempotent via a marker source.
+# ---------------------------------------------------------------------------
+require "faker"
+Faker::Config.random = Random.new(20260419)
+
+SYNTHETIC_SOURCE_URL = "synthetic://random-seed"
+synthetic_source = Source.find_or_create_by!(url: SYNTHETIC_SOURCE_URL) do |s|
+  s.description = "Synthetic seed data — random people, companies, and relationships."
+end
+synthetic_report = SourceProcessingReport.find_or_create_by!(
+  source: synthetic_source,
+  skill_revision: summarize_revision
+) do |r|
+  r.facts = { "synthetic" => true }
+end
+
+corporation_type = organization_types.fetch("Corporation")
+synthetic_org_count = synthetic_report.organization_details.count
+
+(12 - synthetic_org_count).clamp(0, 12).times do
+  organization = Organization.create!
+  detail = OrganizationDetail.create!(
+    organization: organization,
+    name: Faker::Company.unique.name,
+    as_of: Time.zone.now,
+    confidence_tenths: 800,
+    additional_attributes: {
+      "industry"     => Faker::Company.industry,
+      "headquarters" => "#{Faker::Address.city}, #{Faker::Address.state_abbr}"
+    },
+    source_processing_report: synthetic_report
+  )
+  detail.organization_types = [ corporation_type ]
+  organization.update!(current_detail: detail)
+end
+
+person_type_pool = [ person_types.fetch("Engineer"), person_types.fetch("Computer Scientist"), person_types.fetch("Mathematician") ]
+synthetic_person_count = synthetic_report.person_details.count
+
+(200 - synthetic_person_count).clamp(0, 200).times do
+  person = Person.create!
+  detail = PersonDetail.create!(
+    person: person,
+    first_name: Faker::Name.first_name,
+    last_name: Faker::Name.last_name,
+    as_of: Time.zone.now,
+    confidence_tenths: 700,
+    additional_attributes: {
+      "field"       => Faker::Job.field,
+      "institution" => Faker::Educator.university
+    },
+    source_processing_report: synthetic_report
+  )
+  detail.person_types = [ person_type_pool.sample ]
+  person.update!(current_detail: detail)
+end
+
+employment_type  = person_organization_types.fetch("Employment")
+affiliation_type = person_organization_types.fetch("Affiliation")
+
+if PersonOrganization.count < 200
+  synthetic_people = Person.where(id: synthetic_report.person_details.select(:person_id)).to_a
+  synthetic_orgs   = Organization.where(id: synthetic_report.organization_details.select(:organization_id)).to_a
+
+  rng = Random.new(20260419)
+  attempts = 0
+  created  = 0
+  while created < 250 && attempts < 1500 && synthetic_people.any? && synthetic_orgs.any?
+    attempts += 1
+    person       = synthetic_people.sample(random: rng)
+    organization = synthetic_orgs.sample(random: rng)
+    next if PersonOrganization.exists?(person: person, organization: organization)
+
+    po = PersonOrganization.create!(person: person, organization: organization)
+    detail = PersonOrganizationDetail.create!(
+      person_organization: po,
+      as_of: Faker::Date.between(from: 10.years.ago.to_date, to: Date.today),
+      confidence_tenths: 900,
+      additional_attributes: {
+        "title"      => Faker::Job.title,
+        "department" => Faker::Commerce.department(max: 1)
+      },
+      source_processing_report: synthetic_report
+    )
+    types = [ employment_type ]
+    types << affiliation_type if rng.rand < 0.4
+    detail.person_organization_types = types
+    po.update!(current_detail: detail)
+    created += 1
+  end
+end

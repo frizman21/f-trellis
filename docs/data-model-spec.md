@@ -187,18 +187,95 @@ only at the presentation layer: `value / 10.0`.
 
 ## 4. Relationships between tier 1 entities
 
-Relationships follow the same entity-plus-detail shape so they inherit
-provenance and confidence for free.
+A **tier 1 relationship** connects two tier 1 entities (e.g. a Person to
+an Organization) and follows the entity-plus-detail shape so it inherits
+provenance and confidence for free. The canonical example is
+`PersonOrganization` (Person ↔ Organization).
 
-1. A **relationship entity** (e.g. `Employment`, `Membership`) joins two tier 1
-   entities via two foreign keys and has no other domain attributes.
-2. A **`<relationship>_detail`** table holds the typed columns,
-   `additional_attributes`, `confidence_tenths`, and `as_of` for the
-   relationship — same shape as §2.
+Naming convention: `<EntityA><EntityB>` in alphabetical order. Always
+the same direction (`PersonOrganization`, never `OrganizationPerson`).
 
-This pattern will be locked in when the first relationship is built. Until
-then, mirror §1–§2 as closely as possible and update this section with the
-concrete example.
+### Tables
+
+1. **`<a>_<b>s`** — the relationship row itself.
+   - Two FKs: `<a>_id` (NOT NULL), `<b>_id` (NOT NULL).
+   - Unique composite index on `(<a>_id, <b>_id)` — no duplicate edges.
+   - Nullable `current_detail_id` FK to `<a>_<b>_details`, mirroring §1.
+   - No domain attributes beyond timestamps + the two FKs + the current pointer.
+
+2. **`<a>_<b>_details`** — versioned, confidence-scored assertions about
+   the relationship. Same shape as §2 with these columns:
+   - `<a>_<b>_id` (FK, NOT NULL) — the parent relationship.
+   - `as_of` (datetime).
+   - `confidence_tenths` (integer; same scale as §3).
+   - `additional_attributes` (`jsonb`, NOT NULL, default `{}`) — same
+     property-bag rules as §2a.
+   - `source_processing_report_id` (FK, NOT NULL) — same provenance rule
+     as §2b.
+
+3. **`<a>_<b>_types`** — type taxonomy for the relationship.
+   - `name` (string, unique), `description` (text).
+   - `additional_attribute_keys` (text[], NOT NULL, default `[]`) — same
+     role as on tier 1 type tables.
+
+4. **M2M join** between `<a>_<b>_details` and `<a>_<b>_types` so a single
+   detail can carry multiple types (e.g. both "Affiliation" and
+   "Employment" on a single PersonOrganization detail). Same shape as the
+   tier 1 detail↔type join: composite unique index on the two FKs.
+
+### Models
+
+```ruby
+class PersonOrganization < ApplicationRecord
+  belongs_to :person
+  belongs_to :organization
+  belongs_to :current_detail, class_name: "PersonOrganizationDetail", optional: true
+  has_many :person_organization_details, dependent: :destroy
+end
+
+class PersonOrganizationDetail < ApplicationRecord
+  belongs_to :person_organization
+  belongs_to :source_processing_report
+  has_many :person_organization_detail_person_organization_types, dependent: :destroy
+  has_many :person_organization_types,
+           through: :person_organization_detail_person_organization_types
+end
+
+class PersonOrganizationType < ApplicationRecord
+  has_many :person_organization_detail_person_organization_types, dependent: :destroy
+  has_many :person_organization_details,
+           through: :person_organization_detail_person_organization_types
+end
+```
+
+Each side of the relationship gets a `has_many :<relationship>s` and a
+`has_many :<other_side>, through: :<relationship>s`:
+
+```ruby
+class Person < ApplicationRecord
+  has_many :person_organizations, dependent: :destroy
+  has_many :organizations, through: :person_organizations
+end
+
+class Organization < ApplicationRecord
+  has_many :person_organizations, dependent: :destroy
+  has_many :people, through: :person_organizations
+end
+```
+
+`SourceProcessingReport` gains
+`has_many :<relationship>_details, dependent: :destroy`.
+
+### How a tier 1 relationship differs from a tier 1 entity
+
+- A relationship has **no required typed columns** on its detail beyond
+  the parent FK and the provenance FK — the parent FKs already identify
+  the subject. All semantic content lives in `additional_attributes` plus
+  the attached types.
+- The Detail itself has no outward `current_detail_id` — the parent
+  relationship row owns the current pointer.
+- Otherwise: same `as_of` / `confidence_tenths` / property-bag /
+  source-processing-report contract as §2.
 
 ---
 
@@ -335,3 +412,112 @@ Legend: **✓** done · **⚬** partial · **·** not started.
 | Seed: multi-detail + real reports + types + current      |   ✓    |      ✓       |    ✓     |
 | Runtime: views use `entity.current_detail`               |   ✓    |      ✓       |    ✓     |
 | Runtime: `current_detail_id` auto-maintained on new Detail |  ·   |      ·       |    ·     |
+
+---
+
+## 7. Conventions checklist when adding a new tier 1 relationship
+
+Mirrors §5 for the relationship pattern in §4. Here `<a>` and `<b>` are
+the two singular snake-case entity names in alphabetical order
+(e.g. `person`, `organization`); `<rel>` is `<a>_<b>` (e.g.
+`person_organization`); `<Rel>` is the CamelCase form (e.g.
+`PersonOrganization`).
+
+**Schema**
+
+- [ ] Migration creating `<rel>s` with two NOT NULL FKs (`<a>_id`,
+      `<b>_id`), `t.timestamps`, and a unique composite index on
+      `(<a>_id, <b>_id)`.
+- [ ] Migration creating `<rel>_details` per §4 (`<rel>_id` NOT NULL,
+      `as_of`, `confidence_tenths`, `additional_attributes` jsonb NOT
+      NULL default `{}`, `source_processing_report_id` NOT NULL).
+- [ ] Migration adding nullable `current_detail_id` FK on `<rel>s`
+      referencing `<rel>_details`.
+- [ ] Migration creating `<rel>_types` (`name` unique, `description`,
+      `additional_attribute_keys` text[] NOT NULL default `[]`).
+- [ ] Migration creating the M2M join table between `<rel>_details` and
+      `<rel>_types` with a unique composite index.
+
+**Models**
+
+- [ ] `app/models/<rel>.rb` with `belongs_to :<a>`, `belongs_to :<b>`,
+      `has_many :<rel>_details, dependent: :destroy`, and
+      `belongs_to :current_detail, class_name: "<Rel>Detail", optional: true`.
+- [ ] `app/models/<rel>_detail.rb` with `belongs_to :<rel>`,
+      `belongs_to :source_processing_report`, and
+      `has_many :<rel>_types, through: <join model>`.
+- [ ] `app/models/<rel>_type.rb` with reverse `has_many :<rel>_details,
+      through: <join model>`.
+- [ ] Join model.
+- [ ] Each tier 1 entity on either side gains
+      `has_many :<rel>s, dependent: :destroy` and
+      `has_many :<other>, through: :<rel>s`.
+- [ ] `SourceProcessingReport.has_many :<rel>_details, dependent: :destroy`.
+
+**Routes, controllers, views**
+
+- [ ] `<Rel>TypesController` with full CRUD (index, new, create, edit,
+      update) and the comma-separated → text[] split for
+      `additional_attribute_keys` — same shape as the tier 1 type
+      controllers.
+- [ ] **Each endpoint's show page lists the other side via this
+      relationship.** For `<Rel>` connecting `<a>` and `<b>`, the
+      `<a>` show view renders a "Other side" section listing every
+      related `<b>` (linked to that `<b>`'s show), the type(s) attached
+      to the relationship's current detail, and that detail's `as_of`.
+      The `<b>` show view does the symmetric thing. Use eager loading
+      (`includes(:<other>, current_detail: :<rel>_types)`) to keep the
+      query count flat.
+- [ ] (Optional, on demand) Browseable `<Rel>` index/show. Often a
+      relationship is reached *through* one of its endpoints — these
+      views can be added later as the UI calls for them.
+
+**Seed**
+
+- [ ] At least one `<Rel>` with one or more details attached to a real
+      `SourceProcessingReport`, with `current_detail_id` populated.
+- [ ] At least one `<Rel>Type` defined; each seeded detail is associated
+      with one or more types.
+
+**Runtime invariants**
+
+- [ ] `current_detail_id` on the relationship is maintained whenever a
+      newer Detail is created — same callback/service/trigger choice as
+      §5.
+
+---
+
+## 8. Tier 1 relationships
+
+Running list of tier 1 relationships implemented in the application. Add
+a row whenever a new relationship is introduced and update the matrix
+below as items from §7 are completed.
+
+- **PersonOrganization** (`app/models/person_organization.rb`) — links a
+  Person to an Organization (e.g. employment, affiliation).
+
+### Completion matrix
+
+Same maintenance rules as §6: keep this in sync with the code; if the
+matrix disagrees with reality, update the matrix.
+
+Legend: **✓** done · **⚬** partial · **·** not started.
+
+| §7 checklist item                                             | PersonOrganization |
+|---------------------------------------------------------------|:------------------:|
+| Relationship table (`<rel>s`) + unique edge index             |         ✓          |
+| Detail table (`<rel>_details`)                                |         ✓          |
+| `current_detail_id` FK on `<rel>s`                            |         ✓          |
+| Type table (`<rel>_types`) + unique `name` index              |         ✓          |
+| Detail↔Type M2M join table                                    |         ✓          |
+| Relationship model + FKs + `current_detail` + details         |         ✓          |
+| Detail model + `<rel>` + SPR + M2M types                      |         ✓          |
+| Type model + reverse M2M                                      |         ✓          |
+| Join model                                                    |         ✓          |
+| Endpoints' `has_many :<rel>s` + `has_many :<other>, through:` |         ✓          |
+| `SourceProcessingReport.has_many :<rel>_details`              |         ✓          |
+| `<Rel>TypesController` full CRUD + form                       |         ·          |
+| Endpoint show pages list the other side via this relationship |         ✓          |
+| Seed: one `<Rel>` + details + real report + current populated |         ✓          |
+| Seed: at least one `<Rel>Type` attached to each detail        |         ✓          |
+| Runtime: `current_detail_id` auto-maintained on new Detail    |         ·          |

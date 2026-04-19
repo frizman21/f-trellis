@@ -46,6 +46,9 @@ gem "rubyzip", "~> 2.3"
 # Pagination for index views.
 gem "kaminari"
 
+# Random name/company/job generators for synthetic seed data.
+gem "faker"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
@@ -63,6 +66,11 @@ end
 group :development do
   # Use console on exceptions pages [https://github.com/rails/web-console]
   gem "web-console"
+
+  # Auto-restart the Rails server when Gemfile.lock or db/schema.rb changes,
+  # so newly installed gems and new tables don't require a manual container
+  # restart. See docker-compose.yml `web.command`.
+  gem "rerun"
 end
 
 group :test do

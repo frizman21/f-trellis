@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_18_150022) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_19_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -123,6 +123,49 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_18_150022) do
     t.index ["source_processing_report_id"], name: "index_person_details_on_source_processing_report_id"
   end
 
+  create_table "person_organization_detail_person_organization_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "person_organization_detail_id", null: false
+    t.bigint "person_organization_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["person_organization_detail_id", "person_organization_type_id"], name: "index_podpot_on_detail_and_type", unique: true
+    t.index ["person_organization_detail_id"], name: "index_podpot_on_detail_id"
+    t.index ["person_organization_type_id"], name: "index_podpot_on_type_id"
+  end
+
+  create_table "person_organization_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "person_organization_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["person_organization_id"], name: "index_person_organization_details_on_person_organization_id"
+    t.index ["source_processing_report_id"], name: "idx_on_source_processing_report_id_9448e6535f"
+  end
+
+  create_table "person_organization_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_person_organization_types_on_name", unique: true
+  end
+
+  create_table "person_organizations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "organization_id", null: false
+    t.bigint "person_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_person_organizations_on_current_detail_id"
+    t.index ["organization_id"], name: "index_person_organizations_on_organization_id"
+    t.index ["person_id", "organization_id"], name: "index_person_organizations_on_person_id_and_organization_id", unique: true
+    t.index ["person_id"], name: "index_person_organizations_on_person_id"
+  end
+
   create_table "person_types", force: :cascade do |t|
     t.text "additional_attribute_keys", default: [], null: false, array: true
     t.datetime "created_at", null: false
@@ -193,6 +236,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_18_150022) do
   add_foreign_key "person_detail_person_types", "person_types"
   add_foreign_key "person_details", "people"
   add_foreign_key "person_details", "source_processing_reports"
+  add_foreign_key "person_organization_detail_person_organization_types", "person_organization_details"
+  add_foreign_key "person_organization_detail_person_organization_types", "person_organization_types"
+  add_foreign_key "person_organization_details", "person_organizations"
+  add_foreign_key "person_organization_details", "source_processing_reports"
+  add_foreign_key "person_organizations", "organizations"
+  add_foreign_key "person_organizations", "people"
+  add_foreign_key "person_organizations", "person_organization_details", column: "current_detail_id"
   add_foreign_key "skill_revisions", "skills"
   add_foreign_key "source_data", "sources"
   add_foreign_key "source_processing_reports", "skill_revisions"

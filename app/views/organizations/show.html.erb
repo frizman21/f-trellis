@@ -55,4 +55,31 @@
   </table>
 <% end %>
 
+<% people_links = @organization.person_organizations.includes(:person, current_detail: :person_organization_types) %>
+<% if people_links.any? %>
+  <h2>People</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Person</th>
+        <th>Types</th>
+        <th>As of</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% people_links.each do |po| %>
+        <% person_detail = po.person.current_detail %>
+        <% rel_detail = po.current_detail %>
+        <tr>
+          <td>
+            <%= link_to (person_detail ? "#{person_detail.first_name} #{person_detail.last_name}" : "Person ##{po.person_id}"), po.person %>
+          </td>
+          <td><%= rel_detail&.person_organization_types&.map(&:name)&.join(", ") %></td>
+          <td><%= rel_detail&.as_of&.to_date %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
 <p><%= link_to "Back to organizations", organizations_path %></p>
