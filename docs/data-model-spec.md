@@ -241,8 +241,8 @@ pattern already in the codebase.
 **Routes, controllers, views**
 
 - [ ] Routes: `resources :<entity>s, only: [:index, :show]` and
-      `resources :<entity>_types, only: [:index]` (extend as needed for
-      create/edit flows).
+      `resources :<entity>_types, only: [:index, :new, :create, :edit, :update]`
+      (extend entity routes as needed for create/edit flows).
 - [ ] `<Entity>Controller#index` view with:
       - a search form (GET `q`) that case-insensitively matches against
         all typed Detail columns *and* every value in
@@ -259,8 +259,12 @@ pattern already in the codebase.
       - a "Prior details" table of non-current details ordered by
         `as_of desc`, including name, `as_of`, confidence, and a summary
         of each detail's `additional_attributes`.
-- [ ] `<Entity>TypesController#index` listing types with name,
-      description, and `additional_attribute_keys`.
+- [ ] `<Entity>TypesController` with `index`, `new`, `create`, `edit`,
+      `update` — the type index lists name, description, and
+      `additional_attribute_keys`, links each row to edit, and has a
+      top-right "New type" button. The form controls `name` (required,
+      unique), `description`, and `additional_attribute_keys` (entered
+      comma-separated and split into a text[] array in the controller).
 - [ ] Sidebar wiring in `app/views/layouts/application.html.erb`:
       entity index link under **Knowledge**; type index link under
       **Types**.

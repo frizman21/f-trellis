@@ -273,3 +273,109 @@ organization_entries.each do |entry|
   )
   organization.update!(current_detail: latest_detail) unless organization.current_detail_id == latest_detail.id
 end
+
+facility_types = {
+  "Office Building" => { description: "Commercial office tower.",        keys: [ "floors", "year_built" ] },
+  "Government"      => { description: "Government-operated facility.",   keys: [ "agency", "year_built" ] },
+  "Research Lab"    => { description: "Scientific research campus.",     keys: [ "discipline", "year_built" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = FacilityType.find_or_create_by!(name: name) do |ft|
+    ft.description = attrs[:description]
+    ft.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+facility_entries = [
+  {
+    types: [ "Office Building" ],
+    details: [
+      {
+        address: "350 Fifth Avenue, New York, NY 10118",
+        as_of: Time.zone.parse("1931-05-01"), confidence_tenths: 1000,
+        additional_attributes: { "floors" => "102", "year_built" => "1931" },
+        source_url: "https://en.wikipedia.org/wiki/Empire_State_Building",
+        source_description: "Wikipedia: Empire State Building."
+      },
+      {
+        address: "20 W 34th St, New York, NY 10001",
+        as_of: Time.zone.parse("2019-01-01"), confidence_tenths: 900,
+        additional_attributes: { "floors" => "102", "year_built" => "1931", "renovated" => "2019" },
+        source_url: "https://en.wikipedia.org/wiki/Empire_State_Building_renovation",
+        source_description: "Wikipedia: Empire State Building renovation (informal)."
+      }
+    ]
+  },
+  {
+    types: [ "Government" ],
+    details: [
+      {
+        address: "1000 Defense Pentagon, Washington, DC 20301",
+        as_of: Time.zone.parse("1943-01-15"), confidence_tenths: 1000,
+        additional_attributes: { "agency" => "U.S. Department of Defense", "year_built" => "1943" },
+        source_url: "https://en.wikipedia.org/wiki/The_Pentagon",
+        source_description: "Wikipedia: The Pentagon."
+      }
+    ]
+  },
+  {
+    types: [ "Research Lab" ],
+    details: [
+      {
+        address: "Espl. des Particules 1, 1211 Meyrin, Switzerland",
+        as_of: Time.zone.parse("1954-09-29"), confidence_tenths: 950,
+        additional_attributes: { "discipline" => "Particle Physics", "year_built" => "1954" },
+        source_url: "https://en.wikipedia.org/wiki/CERN",
+        source_description: "Wikipedia: CERN."
+      },
+      {
+        address: "Espl. des Particules 1, 1211 Meyrin, Switzerland",
+        as_of: Time.zone.parse("2008-09-10"), confidence_tenths: 1000,
+        additional_attributes: { "discipline" => "Particle Physics", "year_built" => "1954", "notable_facility" => "Large Hadron Collider" },
+        source_url: "https://en.wikipedia.org/wiki/Large_Hadron_Collider",
+        source_description: "Wikipedia: Large Hadron Collider."
+      }
+    ]
+  }
+]
+
+facility_entries.each do |entry|
+  existing_detail = entry[:details]
+    .map { |d| FacilityDetail.find_by(address: d[:address], as_of: d[:as_of]) }
+    .find(&:present?)
+
+  facility = existing_detail&.facility || Facility.create!
+
+  entry[:details].each do |d|
+    source = Source.find_or_create_by!(url: d[:source_url]) do |s|
+      s.description = d[:source_description]
+    end
+
+    report = SourceProcessingReport.find_or_create_by!(source: source, skill_revision: summarize_revision) do |r|
+      r.facts = {
+        "address" => d[:address],
+        "confidence_tenths" => d[:confidence_tenths],
+        "additional_attributes" => d[:additional_attributes]
+      }
+    end
+
+    detail = FacilityDetail.find_or_create_by!(
+      facility: facility,
+      address: d[:address],
+      as_of: d[:as_of]
+    ) do |fd|
+      fd.confidence_tenths = d[:confidence_tenths]
+      fd.additional_attributes = d[:additional_attributes]
+      fd.source_processing_report = report
+    end
+
+    detail.facility_types = entry[:types].map { |n| facility_types.fetch(n) }
+  end
+
+  latest = entry[:details].max_by { |d| d[:as_of] }
+  latest_detail = FacilityDetail.find_by!(
+    facility: facility,
+    address: latest[:address],
+    as_of: latest[:as_of]
+  )
+  facility.update!(current_detail: latest_detail) unless facility.current_detail_id == latest_detail.id
+end

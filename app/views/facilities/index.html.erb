@@ -1,0 +1,56 @@
+<h1>Facilities</h1>
+
+<%= form_with url: facilities_path, method: :get, local: true, class: "mb-3" do |f| %>
+  <div class="input-group">
+    <%= f.text_field :q, value: @query, placeholder: "Search address or attribute values...", class: "form-control" %>
+    <%= f.submit "Search", class: "btn btn-primary" %>
+    <% if @query.present? %>
+      <%= link_to "Clear", facilities_path, class: "btn btn-outline-secondary" %>
+    <% end %>
+  </div>
+<% end %>
+
+<% searching = @query.present? %>
+
+<% if @facilities.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Address</th>
+        <th><%= searching ? "Matched on" : "Types" %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @facilities.each do |facility| %>
+        <% detail = facility.current_detail %>
+        <tr>
+          <td>
+            <%= link_to (detail ? detail.address : "Unlocated facility ##{facility.id}"), facility %>
+          </td>
+          <td>
+            <% if searching %>
+              <% reasons = @match_reasons[facility.id] || [] %>
+              <% if reasons.any? %>
+                <ul class="mb-0">
+                  <% reasons.each do |r| %>
+                    <li><%= r %></li>
+                  <% end %>
+                </ul>
+              <% end %>
+            <% else %>
+              <%= detail&.facility_types&.map(&:name)&.join(", ") %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>
+    <% if searching %>
+      No facilities matched <em><%= @query %></em>.
+    <% else %>
+      No facilities yet.
+    <% end %>
+  </p>
+<% end %>

@@ -10,9 +10,48 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_18_150017) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_18_150022) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "facilities", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_facilities_on_current_detail_id"
+  end
+
+  create_table "facility_detail_facility_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "facility_detail_id", null: false
+    t.bigint "facility_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["facility_detail_id", "facility_type_id"], name: "index_fdft_on_detail_and_type", unique: true
+    t.index ["facility_detail_id"], name: "index_facility_detail_facility_types_on_facility_detail_id"
+    t.index ["facility_type_id"], name: "index_facility_detail_facility_types_on_facility_type_id"
+  end
+
+  create_table "facility_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.string "address", null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "facility_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["facility_id"], name: "index_facility_details_on_facility_id"
+    t.index ["source_processing_report_id"], name: "index_facility_details_on_source_processing_report_id"
+  end
+
+  create_table "facility_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_facility_types_on_name", unique: true
+  end
 
   create_table "organization_detail_organization_types", force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -139,6 +178,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_18_150017) do
     t.index ["status"], name: "index_sources_on_status"
   end
 
+  add_foreign_key "facilities", "facility_details", column: "current_detail_id"
+  add_foreign_key "facility_detail_facility_types", "facility_details"
+  add_foreign_key "facility_detail_facility_types", "facility_types"
+  add_foreign_key "facility_details", "facilities"
+  add_foreign_key "facility_details", "source_processing_reports"
   add_foreign_key "organization_detail_organization_types", "organization_details"
   add_foreign_key "organization_detail_organization_types", "organization_types"
   add_foreign_key "organization_details", "organizations"
