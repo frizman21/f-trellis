@@ -1,0 +1,24 @@
+<h1>Organization Types</h1>
+
+<% if @organization_types.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Additional attribute keys</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @organization_types.each do |ot| %>
+        <tr>
+          <td><%= ot.name %></td>
+          <td><%= ot.description %></td>
+          <td><%= ot.additional_attribute_keys.join(", ") %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>No organization types defined.</p>
+<% end %>

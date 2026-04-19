@@ -1,0 +1,56 @@
+<h1>Organizations</h1>
+
+<%= form_with url: organizations_path, method: :get, local: true, class: "mb-3" do |f| %>
+  <div class="input-group">
+    <%= f.text_field :q, value: @query, placeholder: "Search names or attribute values...", class: "form-control" %>
+    <%= f.submit "Search", class: "btn btn-primary" %>
+    <% if @query.present? %>
+      <%= link_to "Clear", organizations_path, class: "btn btn-outline-secondary" %>
+    <% end %>
+  </div>
+<% end %>
+
+<% searching = @query.present? %>
+
+<% if @organizations.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th><%= searching ? "Matched on" : "Types" %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @organizations.each do |organization| %>
+        <% detail = organization.current_detail %>
+        <tr>
+          <td>
+            <%= link_to (detail ? detail.name : "Unnamed organization ##{organization.id}"), organization %>
+          </td>
+          <td>
+            <% if searching %>
+              <% reasons = @match_reasons[organization.id] || [] %>
+              <% if reasons.any? %>
+                <ul class="mb-0">
+                  <% reasons.each do |r| %>
+                    <li><%= r %></li>
+                  <% end %>
+                </ul>
+              <% end %>
+            <% else %>
+              <%= detail&.organization_types&.map(&:name)&.join(", ") %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>
+    <% if searching %>
+      No organizations matched <em><%= @query %></em>.
+    <% else %>
+      No organizations yet.
+    <% end %>
+  </p>
+<% end %>

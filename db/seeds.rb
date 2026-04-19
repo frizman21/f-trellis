@@ -168,3 +168,108 @@ people_entries.each do |entry|
   )
   person.update!(current_detail: latest_detail) unless person.current_detail_id == latest_detail.id
 end
+
+organization_types = {
+  "Corporation"        => { description: "A legally incorporated business entity.",  keys: [ "industry", "headquarters" ] },
+  "Technology Company" => { description: "Corporation in the tech industry.",        keys: [ "industry", "headquarters", "ticker" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = OrganizationType.find_or_create_by!(name: name) do |ot|
+    ot.description = attrs[:description]
+    ot.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+organization_entries = [
+  {
+    types: [ "Corporation", "Technology Company" ],
+    details: [
+      {
+        name: "Facebook, Inc.",
+        as_of: Time.zone.parse("2004-02-04"), confidence_tenths: 950,
+        additional_attributes: { "industry" => "Social Media", "headquarters" => "Cambridge, MA", "ticker" => "FB" },
+        source_url: "https://en.wikipedia.org/wiki/History_of_Facebook",
+        source_description: "Wikipedia: History of Facebook."
+      },
+      {
+        name: "Meta Platforms, Inc.",
+        as_of: Time.zone.parse("2021-10-28"), confidence_tenths: 1000,
+        additional_attributes: { "industry" => "Technology", "headquarters" => "Menlo Park, CA", "ticker" => "META" },
+        source_url: "https://en.wikipedia.org/wiki/Meta_Platforms",
+        source_description: "Wikipedia: Meta Platforms."
+      }
+    ]
+  },
+  {
+    types: [ "Corporation", "Technology Company" ],
+    details: [
+      {
+        name: "Google Inc.",
+        as_of: Time.zone.parse("1998-09-04"), confidence_tenths: 950,
+        additional_attributes: { "industry" => "Internet", "headquarters" => "Menlo Park, CA", "ticker" => "GOOG" },
+        source_url: "https://en.wikipedia.org/wiki/Google",
+        source_description: "Wikipedia: Google."
+      },
+      {
+        name: "Alphabet Inc.",
+        as_of: Time.zone.parse("2015-10-02"), confidence_tenths: 1000,
+        additional_attributes: { "industry" => "Technology", "headquarters" => "Mountain View, CA", "ticker" => "GOOGL" },
+        source_url: "https://en.wikipedia.org/wiki/Alphabet_Inc.",
+        source_description: "Wikipedia: Alphabet Inc."
+      }
+    ]
+  },
+  {
+    types: [ "Corporation" ],
+    details: [
+      {
+        name: "National Aeronautics and Space Administration",
+        as_of: Time.zone.parse("1958-07-29"), confidence_tenths: 1000,
+        additional_attributes: { "industry" => "Aerospace", "headquarters" => "Washington, D.C." },
+        source_url: "https://en.wikipedia.org/wiki/NASA",
+        source_description: "Wikipedia: NASA."
+      }
+    ]
+  }
+]
+
+organization_entries.each do |entry|
+  existing_detail = entry[:details]
+    .map { |d| OrganizationDetail.find_by(name: d[:name], as_of: d[:as_of]) }
+    .find(&:present?)
+
+  organization = existing_detail&.organization || Organization.create!
+
+  entry[:details].each do |d|
+    source = Source.find_or_create_by!(url: d[:source_url]) do |s|
+      s.description = d[:source_description]
+    end
+
+    report = SourceProcessingReport.find_or_create_by!(source: source, skill_revision: summarize_revision) do |r|
+      r.facts = {
+        "name" => d[:name],
+        "confidence_tenths" => d[:confidence_tenths],
+        "additional_attributes" => d[:additional_attributes]
+      }
+    end
+
+    detail = OrganizationDetail.find_or_create_by!(
+      organization: organization,
+      name: d[:name],
+      as_of: d[:as_of]
+    ) do |od|
+      od.confidence_tenths = d[:confidence_tenths]
+      od.additional_attributes = d[:additional_attributes]
+      od.source_processing_report = report
+    end
+
+    detail.organization_types = entry[:types].map { |n| organization_types.fetch(n) }
+  end
+
+  latest = entry[:details].max_by { |d| d[:as_of] }
+  latest_detail = OrganizationDetail.find_by!(
+    organization: organization,
+    name: latest[:name],
+    as_of: latest[:as_of]
+  )
+  organization.update!(current_detail: latest_detail) unless organization.current_detail_id == latest_detail.id
+end

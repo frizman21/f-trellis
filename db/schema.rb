@@ -10,9 +10,48 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_18_150012) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_18_150017) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "organization_detail_organization_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "organization_detail_id", null: false
+    t.bigint "organization_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_detail_id", "organization_type_id"], name: "index_odot_on_detail_and_type", unique: true
+    t.index ["organization_detail_id"], name: "idx_on_organization_detail_id_f963e63125"
+    t.index ["organization_type_id"], name: "idx_on_organization_type_id_d221367eaf"
+  end
+
+  create_table "organization_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id"], name: "index_organization_details_on_organization_id"
+    t.index ["source_processing_report_id"], name: "index_organization_details_on_source_processing_report_id"
+  end
+
+  create_table "organization_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_organization_types_on_name", unique: true
+  end
+
+  create_table "organizations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_organizations_on_current_detail_id"
+  end
 
   create_table "people", force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -100,6 +139,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_18_150012) do
     t.index ["status"], name: "index_sources_on_status"
   end
 
+  add_foreign_key "organization_detail_organization_types", "organization_details"
+  add_foreign_key "organization_detail_organization_types", "organization_types"
+  add_foreign_key "organization_details", "organizations"
+  add_foreign_key "organization_details", "source_processing_reports"
+  add_foreign_key "organizations", "organization_details", column: "current_detail_id"
   add_foreign_key "people", "person_details", column: "current_detail_id"
   add_foreign_key "person_detail_person_types", "person_details"
   add_foreign_key "person_detail_person_types", "person_types"

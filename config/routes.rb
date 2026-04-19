@@ -7,6 +7,8 @@ Rails.application.routes.draw do
 
   resources :people, only: [:index, :show]
   resources :person_types, only: [:index]
+  resources :organizations, only: [:index, :show]
+  resources :organization_types, only: [:index]
   resources :sources, only: [:index, :show, :new, :create] do
     member do
       post :fetch
