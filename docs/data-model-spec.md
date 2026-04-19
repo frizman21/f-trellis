@@ -468,6 +468,10 @@ the two singular snake-case entity names in alphabetical order
       The `<b>` show view does the symmetric thing. Use eager loading
       (`includes(:<other>, current_detail: :<rel>_types)`) to keep the
       query count flat.
+- [ ] Sidebar wiring: add a link to the `<Rel>TypesController#index`
+      under the **Types** section in
+      `app/views/layouts/application.html.erb`, alongside the tier 1
+      type links.
 - [ ] (Optional, on demand) Browseable `<Rel>` index/show. Often a
       relationship is reached *through* one of its endpoints — these
       views can be added later as the UI calls for them.
@@ -516,7 +520,8 @@ Legend: **✓** done · **⚬** partial · **·** not started.
 | Join model                                                    |         ✓          |
 | Endpoints' `has_many :<rel>s` + `has_many :<other>, through:` |         ✓          |
 | `SourceProcessingReport.has_many :<rel>_details`              |         ✓          |
-| `<Rel>TypesController` full CRUD + form                       |         ·          |
+| `<Rel>TypesController` full CRUD + form                       |         ✓          |
+| Sidebar link to `<Rel>TypesController#index` under Types      |         ✓          |
 | Endpoint show pages list the other side via this relationship |         ✓          |
 | Seed: one `<Rel>` + details + real report + current populated |         ✓          |
 | Seed: at least one `<Rel>Type` attached to each detail        |         ✓          |
