@@ -1,5 +1,8 @@
 <% a_detail = @organization_a.current_detail %>
 <% b_detail = @organization_b.current_detail %>
+<% a_label = a_detail ? a_detail.name : "Organization ##{@organization_a.id}" %>
+<% b_label = b_detail ? b_detail.name : "Organization ##{@organization_b.id}" %>
+<% content_for :title, "#{a_label} ↔ #{b_label}" %>
 
 <h1>
   <%= a_detail ? a_detail.name : "Organization ##{@organization_a.id}" %>

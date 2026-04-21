@@ -1,5 +1,8 @@
 <% person_detail = @person.current_detail %>
 <% org_detail   = @organization.current_detail %>
+<% person_label = person_detail ? "#{person_detail.first_name} #{person_detail.last_name}" : "Person ##{@person.id}" %>
+<% org_label    = org_detail ? org_detail.name : "Organization ##{@organization.id}" %>
+<% content_for :title, "#{person_label} ↔ #{org_label}" %>
 
 <h1>
   <%= person_detail ? "#{person_detail.first_name} #{person_detail.last_name}" : "Person ##{@person.id}" %>

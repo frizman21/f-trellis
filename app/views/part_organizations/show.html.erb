@@ -1,5 +1,8 @@
 <% part_detail = @part.current_detail %>
 <% org_detail  = @organization.current_detail %>
+<% part_label = part_detail ? part_detail.name : "Part ##{@part.id}" %>
+<% org_label  = org_detail ? org_detail.name : "Organization ##{@organization.id}" %>
+<% content_for :title, "#{part_label} ↔ #{org_label}" %>
 
 <h1>
   <%= part_detail ? part_detail.name : "Part ##{@part.id}" %>
