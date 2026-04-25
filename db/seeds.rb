@@ -24,6 +24,17 @@ skills.each do |attrs|
   SkillRevision.create!(skill: skill, content: "Initial draft of #{skill.name}.")
 end
 
+# Mark the Summarize skill as promotable so `rails fixtures:promote` has
+# something to materialize into a fixture on a fresh dev DB.
+Skill.where(name: "Summarize").update_all(is_promotable: true, is_fixtured: false)
+
+# A handful of seed sources are marked promotable so the fixture-promotion
+# flow is demoable end-to-end out of the box.
+Source.where(url: [
+  "https://en.wikipedia.org/wiki/Ada_Lovelace",
+  "https://en.wikipedia.org/wiki/NASA"
+]).update_all(is_promotable: true, is_fixtured: false)
+
 summarize_revision = Skill.find_by(name: "Summarize").skill_revisions.first
 
 people_entries = [

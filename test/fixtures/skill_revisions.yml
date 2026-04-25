@@ -1,0 +1,6 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+# Entries prefixed `promoted_<id>` are written by `rails fixtures:promote`.
+promoted_1:
+  skill: promoted_1
+  sequence: 0
+  content: Initial draft of Summarize.

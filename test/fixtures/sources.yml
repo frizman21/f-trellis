@@ -1,9 +1,20 @@
 # Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
-
+# Entries prefixed `promoted_<id>` are written by `rails fixtures:promote`.
 one:
   url: MyString
   description: MyText
-
 two:
   url: MyString
   description: MyText
+promoted_1:
+  url: https://en.wikipedia.org/wiki/Ada_Lovelace
+  description: 'Wikipedia: Ada Lovelace.'
+  status: new
+  is_promotable: true
+  is_fixtured: true
+promoted_15:
+  url: https://en.wikipedia.org/wiki/NASA
+  description: 'Wikipedia: NASA.'
+  status: new
+  is_promotable: true
+  is_fixtured: true

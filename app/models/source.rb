@@ -6,4 +6,6 @@ class Source < ApplicationRecord
 
   validates :url, presence: true
   validates :status, inclusion: { in: STATUSES }
+
+  scope :promotable_pending, -> { where(is_promotable: true, is_fixtured: false) }
 end

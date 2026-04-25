@@ -35,6 +35,9 @@ Rails.application.routes.draw do
   resources :source_processing_reports, only: [:index, :new, :create]
   get "source_data/:id/download", to: "source_data#download", as: :download_source_datum
 
+  get   "fixture_promotions",                     to: "fixture_promotions#index",  as: :fixture_promotions, defaults: { format: :json }
+  patch "fixture_promotions/:resource/:id",       to: "fixture_promotions#update", as: :fixture_promotion,  defaults: { format: :json }
+
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker

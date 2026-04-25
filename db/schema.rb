@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_25_163959) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_25_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -478,10 +478,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_163959) do
   create_table "skills", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.boolean "is_active", default: false, null: false
+    t.boolean "is_fixtured", default: false, null: false
+    t.boolean "is_promotable", default: false, null: false
     t.string "name"
     t.bigint "preferred_model_id"
     t.string "purpose"
     t.datetime "updated_at", null: false
+    t.index ["is_promotable", "is_fixtured"], name: "index_skills_on_is_promotable_and_is_fixtured"
     t.index ["preferred_model_id"], name: "index_skills_on_preferred_model_id"
   end
 
@@ -513,9 +516,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_163959) do
   create_table "sources", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "description"
+    t.boolean "is_fixtured", default: false, null: false
+    t.boolean "is_promotable", default: false, null: false
     t.string "status", default: "new", null: false
     t.datetime "updated_at", null: false
     t.string "url"
+    t.index ["is_promotable", "is_fixtured"], name: "index_sources_on_is_promotable_and_is_fixtured"
     t.index ["status"], name: "index_sources_on_status"
   end
 
