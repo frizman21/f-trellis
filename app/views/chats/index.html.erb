@@ -1,0 +1,35 @@
+<% content_for :title, "Chats" %>
+
+<h1 class="mb-3">Chats</h1>
+
+<% if @chats.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Model</th>
+        <th>Messages</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @chats.each do |chat| %>
+        <tr>
+          <td><%= chat.id %></td>
+          <td><%= chat.model&.model_id || "—" %></td>
+          <td><%= chat.messages.count %></td>
+          <td><%= chat.created_at %></td>
+          <td><%= link_to "Inspect", chat_path(chat) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= paginate @chats %>
+  <p class="text-muted small">
+    Showing <%= @chats.size %> of <%= @chats.total_count %>.
+  </p>
+<% else %>
+  <p>No chats yet.</p>
+<% end %>

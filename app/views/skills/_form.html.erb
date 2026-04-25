@@ -30,6 +30,18 @@
   </div>
 
   <div class="mb-3">
+    <%= f.label :preferred_model_id, "Preferred model", class: "form-label" %>
+    <%= f.select :preferred_model_id,
+                 grouped_options_for_select(
+                   models.group_by(&:provider).transform_values { |ms| ms.map { |m| [ model_dropdown_label(m), m.id ] } },
+                   skill.preferred_model_id
+                 ),
+                 { include_blank: "— none —" },
+                 { class: "form-select" } %>
+    <div class="form-text">Auto-selected when this skill is chosen on a new processing report.</div>
+  </div>
+
+  <div class="mb-3">
     <%= f.label :revision_content, "Revision content (Markdown)", class: "form-label" %>
     <%= f.text_area :revision_content,
                     value: revision_content,

@@ -808,3 +808,28 @@ Part.find_each do |part|
   detail.part_organization_types = [ manufacturer_type ]
   po.update!(current_detail: detail)
 end
+
+# Synthetic Chat for the inspection UI. Idempotent via a sentinel content
+# string in the user message — re-running seeds will not create duplicates.
+seed_chat_marker = "[seed:inspection-demo]"
+unless Message.exists?(content: seed_chat_marker)
+  demo_model = Model.find_by(provider: "anthropic", model_id: "claude-sonnet-4-5") ||
+               Model.find_by(model_id: "gpt-5-nano") ||
+               Model.first
+
+  demo_chat = Chat.create!(model: demo_model)
+  Message.create!(
+    chat: demo_chat,
+    role: "user",
+    content: seed_chat_marker,
+    input_tokens: 8
+  )
+  Message.create!(
+    chat: demo_chat,
+    role: "assistant",
+    model: demo_model,
+    content: "Synthetic reply seeded for the chat inspection UI. Replace by exercising RubyLLM with a real prompt.",
+    input_tokens: 8,
+    output_tokens: 22
+  )
+end

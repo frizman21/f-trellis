@@ -15,6 +15,7 @@ class SkillsController < ApplicationController
   def new
     @skill = Skill.new
     @revision_content = ""
+    load_models
   end
 
   def create
@@ -28,12 +29,14 @@ class SkillsController < ApplicationController
 
     redirect_to skill_path(@skill), notice: "Skill ##{@skill.id} created with initial revision."
   rescue ActiveRecord::RecordInvalid
+    load_models
     render :new, status: :unprocessable_entity
   end
 
   def edit
     @skill = Skill.find(params[:id])
     @revision_content = @skill.skill_revisions.order(created_at: :desc).first&.content.to_s
+    load_models
   end
 
   def update
@@ -47,16 +50,21 @@ class SkillsController < ApplicationController
 
     redirect_to skill_path(@skill), notice: "Skill ##{@skill.id} updated; new revision added."
   rescue ActiveRecord::RecordInvalid
+    load_models
     render :edit, status: :unprocessable_entity
   end
 
   private
 
   def skill_params
-    params.require(:skill).permit(:name, :purpose, :is_active)
+    params.require(:skill).permit(:name, :purpose, :is_active, :preferred_model_id)
   end
 
   def revision_content_param
     params.dig(:skill, :revision_content).to_s
+  end
+
+  def load_models
+    @models = Model.where(provider: %w[anthropic openai]).order(:provider, :model_id)
   end
 end

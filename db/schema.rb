@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_25_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_25_163959) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -479,8 +479,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_160000) do
     t.datetime "created_at", null: false
     t.boolean "is_active", default: false, null: false
     t.string "name"
+    t.bigint "preferred_model_id"
     t.string "purpose"
     t.datetime "updated_at", null: false
+    t.index ["preferred_model_id"], name: "index_skills_on_preferred_model_id"
   end
 
   create_table "source_data", force: :cascade do |t|
@@ -493,13 +495,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_160000) do
   end
 
   create_table "source_processing_reports", force: :cascade do |t|
+    t.bigint "chat_id"
     t.datetime "created_at", null: false
     t.jsonb "facts", default: {}, null: false
+    t.bigint "model_id"
     t.bigint "skill_revision_id", null: false
     t.bigint "source_id", null: false
+    t.string "status", default: "new", null: false
     t.datetime "updated_at", null: false
+    t.index ["chat_id"], name: "index_source_processing_reports_on_chat_id"
+    t.index ["model_id"], name: "index_source_processing_reports_on_model_id"
     t.index ["skill_revision_id"], name: "index_source_processing_reports_on_skill_revision_id"
     t.index ["source_id"], name: "index_source_processing_reports_on_source_id"
+    t.index ["status"], name: "index_source_processing_reports_on_status"
   end
 
   create_table "sources", force: :cascade do |t|
@@ -586,7 +594,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_160000) do
   add_foreign_key "person_person_details", "person_people"
   add_foreign_key "person_person_details", "source_processing_reports"
   add_foreign_key "skill_revisions", "skills"
+  add_foreign_key "skills", "models", column: "preferred_model_id"
   add_foreign_key "source_data", "sources"
+  add_foreign_key "source_processing_reports", "chats"
+  add_foreign_key "source_processing_reports", "models"
   add_foreign_key "source_processing_reports", "skill_revisions"
   add_foreign_key "source_processing_reports", "sources"
   add_foreign_key "tool_calls", "messages"

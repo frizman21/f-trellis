@@ -30,6 +30,9 @@ Rails.application.routes.draw do
   end
   resources :skills, only: [:index, :show, :new, :create, :edit, :update]
   resources :skill_revisions, only: [:show]
+  resources :chats, only: [:index, :show]
+  resources :models, only: [:index]
+  resources :source_processing_reports, only: [:index, :new, :create]
   get "source_data/:id/download", to: "source_data#download", as: :download_source_datum
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)

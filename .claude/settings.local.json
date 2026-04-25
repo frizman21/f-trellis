@@ -8,7 +8,16 @@
       "Skill(update-config)",
       "Edit(/Users/mike/projects/f-dod/**)",
       "Write(/Users/mike/projects/f-dod/**)",
-      "Bash(docker-compose restart *)"
+      "Bash(docker-compose restart *)",
+      "Bash(curl -s -o /dev/null -w \"index: %{http_code}\\\\n\" http://localhost:3000/chats)",
+      "Bash(curl -s -o /dev/null -w \"show#1: %{http_code}\\\\n\" http://localhost:3000/chats/1)",
+      "Bash(curl -s -o /dev/null -w \"show#2: %{http_code}\\\\n\" http://localhost:3000/chats/2)",
+      "Bash(curl -s -o /dev/null -w \"show#3: %{http_code}\\\\n\" http://localhost:3000/chats/3)",
+      "Bash(curl -s http://localhost:3000/chats/3)",
+      "Bash(curl -s http://localhost:3000/source_processing_reports)",
+      "Bash(curl -s -o /dev/null -w \"new: %{http_code}\\\\n\" http://localhost:3000/source_processing_reports/new)",
+      "Bash(curl -s -o /dev/null -w \"index: %{http_code}\\\\n\" http://localhost:3000/source_processing_reports)",
+      "Bash(curl -s http://localhost:3000/source_processing_reports/new)"
     ]
   }
 }
