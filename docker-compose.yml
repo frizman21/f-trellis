@@ -20,6 +20,8 @@ services:
     tty: true
     stdin_open: true
     command: bash -c "bundle install && bin/rails db:prepare && bundle exec rerun --pattern '{Gemfile.lock,db/schema.rb}' --signal SIGTERM -- bin/rails server -b 0.0.0.0 -p 3000"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432
       RAILS_ENV: development

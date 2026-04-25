@@ -49,6 +49,9 @@ gem "kaminari"
 # Random name/company/job generators for synthetic seed data.
 gem "faker"
 
+# Unified Ruby interface to LLM providers (OpenAI, Anthropic, Gemini, etc.).
+gem "ruby_llm"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
