@@ -1,41 +1,44 @@
-class LinkEmploymentTool < RubyLLM::Tool
+class LinkPersonOrganizationTool < RubyLLM::Tool
   description <<~DESC
-    Link a Person to an Organization with the "Employment" relationship type.
-    Creates the PersonOrganization edge if one doesn't already exist, then
-    inserts a new PersonOrganizationDetail attached to the active
-    SourceProcessingReport, attaches the "Employment" type, and updates the
-    edge's current detail pointer. Use after upsert_person and
-    upsert_organization to record that the person worked at the organization.
+    Link a Person to an Organization with a named relationship type (e.g.
+    "Employment", "Affiliation"). Creates the PersonOrganization edge if one
+    doesn't already exist, then inserts a new PersonOrganizationDetail
+    attached to the active SourceProcessingReport, attaches the named
+    PersonOrganizationType, and updates the edge's current detail pointer.
+    Use after upsert_person and upsert_organization.
   DESC
 
   param :person_id, type: "integer", desc: "Person.id from upsert_person."
   param :organization_id, type: "integer", desc: "Organization.id from upsert_organization."
+  param :type, type: "string",
+        desc: "Name of the PersonOrganizationType to attach (e.g. 'Employment'). Must already exist."
   param :as_of, type: "string",
-        desc: "ISO 8601 datetime the employment was effective. Defaults to now.",
+        desc: "ISO 8601 datetime the relationship was effective. Defaults to now.",
         required: false
   param :confidence_tenths, type: "integer",
         desc: "Confidence 0–1000 (1000 = 100%). Defaults to 800.",
         required: false
   param :additional_attributes, type: "object",
-        desc: "Flat map of string keys to scalar values (e.g. role, title, department).",
+        desc: "Flat map of string keys to scalar values (e.g. role, title, department, start_date, end_date).",
         required: false
-
-  EMPLOYMENT_TYPE_NAME = "Employment".freeze
 
   def initialize(report)
     super()
     @report = report
   end
 
-  def execute(person_id:, organization_id:, as_of: nil, confidence_tenths: 800, additional_attributes: {})
+  def execute(person_id:, organization_id:, type:, as_of: nil, confidence_tenths: 800, additional_attributes: {})
     person = Person.find_by(id: person_id)
     return { error: "no person ##{person_id}" } unless person
 
     organization = Organization.find_by(id: organization_id)
     return { error: "no organization ##{organization_id}" } unless organization
 
-    employment_type = PersonOrganizationType.find_by(name: EMPLOYMENT_TYPE_NAME)
-    return { error: "PersonOrganizationType '#{EMPLOYMENT_TYPE_NAME}' is not configured" } unless employment_type
+    type_name = type.to_s.strip
+    return { error: "type is required" } if type_name.empty?
+
+    relationship_type = PersonOrganizationType.find_by(name: type_name)
+    return { error: "PersonOrganizationType '#{type_name}' is not configured" } unless relationship_type
 
     po = PersonOrganization.find_or_create_by!(person: person, organization: organization)
 
@@ -47,14 +50,15 @@ class LinkEmploymentTool < RubyLLM::Tool
       additional_attributes: sanitize_attrs(additional_attributes)
     )
 
-    detail.person_organization_types = [ employment_type ]
+    detail.person_organization_types = [ relationship_type ]
     po.update!(current_detail: detail)
 
     {
       person_organization_id: po.id,
       detail_id: detail.id,
       person_id: person.id,
-      organization_id: organization.id
+      organization_id: organization.id,
+      type: relationship_type.name
     }
   rescue ActiveRecord::RecordInvalid => e
     { error: e.message }

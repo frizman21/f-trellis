@@ -23,8 +23,8 @@ class ProcessReportJob < ApplicationJob
     chat.with_tools(
       UpsertPersonTool.new(report),
       UpsertOrganizationTool.new(report),
-      LinkEmploymentTool.new(report),
-      LinkSubsidiaryTool.new(report)
+      LinkPersonOrganizationTool.new(report),
+      LinkOrganizationOrganizationTool.new(report)
     )
     chat.ask(source_text)
 

@@ -17,7 +17,9 @@
       "Bash(curl -s http://localhost:3000/source_processing_reports)",
       "Bash(curl -s -o /dev/null -w \"new: %{http_code}\\\\n\" http://localhost:3000/source_processing_reports/new)",
       "Bash(curl -s -o /dev/null -w \"index: %{http_code}\\\\n\" http://localhost:3000/source_processing_reports)",
-      "Bash(curl -s http://localhost:3000/source_processing_reports/new)"
+      "Bash(curl -s http://localhost:3000/source_processing_reports/new)",
+      "Bash(curl -s -o /tmp/oo_show.html -w \"HTTP %{http_code}\\\\n\" \"http://localhost:3000/organization_organizations/12\")",
+      "Bash(curl -s -o /tmp/ood_show.html -w \"HTTP %{http_code}\\\\n\" \"http://localhost:3000/organization_organization_details/13\")"
     ]
   }
 }
