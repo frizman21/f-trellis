@@ -31,6 +31,7 @@ Rails.application.routes.draw do
   resources :sources, only: [:index, :show, :new, :create] do
     member do
       post :fetch
+      post :crawl
     end
   end
   resources :domains, only: [:index, :edit, :update]
