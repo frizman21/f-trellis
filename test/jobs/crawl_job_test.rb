@@ -1,0 +1,118 @@
+require "test_helper"
+require "zip"
+require "stringio"
+
+class CrawlJobTest < ActiveJob::TestCase
+  def zip(html, name = "page.html")
+    buf = Zip::OutputStream.write_buffer do |zos|
+      zos.put_next_entry(name)
+      zos.write(html)
+    end
+    buf.rewind
+    buf.read
+  end
+
+  def install_data(source, html)
+    source.update_columns(status: "complete")
+    SourceDatum.create!(source: source, content_type: "application/zip", data: zip(html))
+  end
+
+  def make_seed(url, html)
+    source = Source.create!(url: url, description: "seed")
+    install_data(source, html)
+    source
+  end
+
+  def with_fake_fetcher(pages = {})
+    test = self
+    FetchSourceJob.define_singleton_method(:perform_now) do |source|
+      html = pages[source.url]
+      test.install_data(source, html) if html
+    end
+    yield
+  ensure
+    FetchSourceJob.singleton_class.send(:remove_method, :perform_now)
+  end
+
+  test "crawls seed only when depth is zero" do
+    seed = make_seed("https://depth-zero.test/start", '<a href="/a">a</a>')
+
+    with_fake_fetcher do
+      assert_difference -> { CrawlRecord.count } => 1, -> { Source.count } => 0 do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 0)
+      end
+    end
+  end
+
+  test "stay-in-domain follows internal links and skips external" do
+    seed = make_seed(
+      "https://stay.test/start",
+      '<a href="/internal">in</a><a href="https://other.test/elsewhere">out</a>'
+    )
+
+    with_fake_fetcher("https://stay.test/internal" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert Source.exists?(url: "https://stay.test/internal")
+    assert_not Source.exists?(url: "https://other.test/elsewhere")
+  end
+
+  test "follow-external-links includes external urls" do
+    seed = make_seed(
+      "https://follow.test/start",
+      '<a href="/internal">in</a><a href="https://elsewhere.test/page">out</a>'
+    )
+
+    with_fake_fetcher(
+      "https://follow.test/internal" => "<p>leaf</p>",
+      "https://elsewhere.test/page" => "<p>leaf</p>"
+    ) do
+      CrawlJob.perform_now(seed, crawl_type: "follow_external_links", max_depth: 1)
+    end
+
+    assert Source.exists?(url: "https://follow.test/internal")
+    assert Source.exists?(url: "https://elsewhere.test/page")
+  end
+
+  test "deduplicates against existing sources without re-creating them" do
+    seed = make_seed("https://dedup.test/start", '<a href="/known">known</a>')
+    Source.create!(url: "https://dedup.test/known", description: "preexisting")
+
+    with_fake_fetcher do
+      assert_no_difference -> { Source.where(url: "https://dedup.test/known").count } do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+      end
+    end
+  end
+
+  test "logs a CrawlRecord for every page processed" do
+    seed = make_seed("https://log.test/start", '<a href="/leaf">leaf</a>')
+
+    with_fake_fetcher("https://log.test/leaf" => "<p>leaf</p>") do
+      assert_difference -> { CrawlRecord.count }, 2 do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+      end
+    end
+  end
+
+  test "respects max_pages cap" do
+    links = (1..10).map { |i| %(<a href="/p#{i}">#{i}</a>) }.join
+    seed = make_seed("https://cap.test/start", links)
+    pages = (1..10).each_with_object({}) { |i, h| h["https://cap.test/p#{i}"] = "<p>leaf</p>" }
+
+    with_fake_fetcher(pages) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1, max_pages: 3)
+    end
+
+    crawled = CrawlRecord.where("url LIKE ?", "https://cap.test/%").count
+    assert crawled <= 3, "expected at most 3 pages crawled, got #{crawled}"
+  end
+
+  test "raises on invalid crawl_type" do
+    seed = make_seed("https://invalid.test/x", "")
+    assert_raises ArgumentError do
+      CrawlJob.perform_now(seed, crawl_type: "bogus", max_depth: 1)
+    end
+  end
+end

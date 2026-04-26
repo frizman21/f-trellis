@@ -4,8 +4,6 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -30,7 +28,7 @@ services:
       - .:/app
       - bundle:/bundle
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       postgres:
         condition: service_healthy

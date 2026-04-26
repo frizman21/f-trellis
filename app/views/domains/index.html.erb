@@ -1,0 +1,49 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Domains</h1>
+</div>
+
+<%= form_with url: domains_path, method: :get, local: true, class: "mb-3" do |f| %>
+  <div class="input-group">
+    <%= f.text_field :q, value: @query, class: "form-control", placeholder: "Filter by host (e.g. example.com)" %>
+    <%= f.submit "Search", class: "btn btn-primary" %>
+    <% if @query.present? %>
+      <%= link_to "Clear", domains_path, class: "btn btn-outline-secondary" %>
+    <% end %>
+  </div>
+<% end %>
+
+<% if @domains.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Host</th>
+        <th>Min crawl delay (s)</th>
+        <th>Sources</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @domains.each do |domain| %>
+        <tr>
+          <td><%= domain.host %></td>
+          <td><%= domain.min_crawl_delay_seconds.presence || "—" %></td>
+          <td><%= domain.sources_count %></td>
+          <td><%= link_to "Edit", edit_domain_path(domain), class: "btn btn-sm btn-outline-primary" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= paginate @domains %>
+  <p class="text-muted small">
+    Showing <%= @domains.size %> of <%= @domains.total_count %>.
+  </p>
+<% else %>
+  <p>
+    <% if @query.present? %>
+      No domains match "<%= @query %>".
+    <% else %>
+      No domains yet.
+    <% end %>
+  </p>
+<% end %>

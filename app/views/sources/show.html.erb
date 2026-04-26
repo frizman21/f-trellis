@@ -26,6 +26,35 @@
   <dd><%= @source.updated_at %></dd>
 </dl>
 
+<h2>Crawl from this source</h2>
+
+<%= form_with url: crawl_source_path(@source), method: :post, local: true, class: "mb-4" do |f| %>
+  <div class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <%= f.label :crawl_type, "Crawl type", class: "form-label" %>
+      <%= f.select :crawl_type,
+                   [["Stay in domain", "stay_in_domain"], ["Follow external links", "follow_external_links"]],
+                   {},
+                   class: "form-select" %>
+    </div>
+    <div class="col-md-2">
+      <%= f.label :max_depth, "Depth", class: "form-label" %>
+      <%= f.number_field :max_depth, value: 1, min: 0, max: 10, step: 1, class: "form-control" %>
+    </div>
+    <div class="col-md-3">
+      <%= f.label :max_pages, "Max pages", class: "form-label" %>
+      <%= f.number_field :max_pages, value: CrawlJob::DEFAULT_MAX_PAGES, min: 1, max: CrawlJob::MAX_MAX_PAGES, step: 1, class: "form-control" %>
+    </div>
+    <div class="col-md-3">
+      <%= f.submit "Start crawl", class: "btn btn-primary" %>
+    </div>
+  </div>
+  <div class="form-text">
+    Depth 0 only fetches this page. Stay-in-domain follows links only on
+    <code><%= @source.domain&.host %></code>. Already-known URLs are skipped.
+  </div>
+<% end %>
+
 <h2>Source Data</h2>
 
 <% if @source.source_data.any? %>

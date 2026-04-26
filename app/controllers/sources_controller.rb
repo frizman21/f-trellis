@@ -33,6 +33,23 @@ class SourcesController < ApplicationController
     end
   end
 
+  def crawl
+    source = Source.find(params[:id])
+    crawl_type = params[:crawl_type].to_s
+
+    unless CrawlJob::CRAWL_TYPES.include?(crawl_type)
+      redirect_to source_path(source), alert: "Invalid crawl type." and return
+    end
+
+    max_depth = params[:max_depth].to_i.clamp(0, 10)
+    max_pages = (params[:max_pages].presence || CrawlJob::DEFAULT_MAX_PAGES).to_i
+
+    CrawlJob.perform_later(source, crawl_type: crawl_type, max_depth: max_depth, max_pages: max_pages)
+
+    redirect_to source_path(source),
+                notice: "Crawl queued (type: #{crawl_type}, depth: #{max_depth}, max pages: #{max_pages})."
+  end
+
   private
 
   def source_params
