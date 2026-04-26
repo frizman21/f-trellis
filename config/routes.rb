@@ -33,6 +33,7 @@ Rails.application.routes.draw do
       post :fetch
     end
   end
+  resources :domains, only: [:index, :edit, :update]
   resources :skills, only: [:index, :show, :new, :create, :edit, :update]
   resources :skill_revisions, only: [:show]
   resources :chats, only: [:index, :show]
