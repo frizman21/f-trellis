@@ -23,6 +23,7 @@ Rails.application.routes.draw do
   resources :organization_organization_details, only: [:show]
   resources :organization_organization_types,   only: [:index, :new, :create, :edit, :update]
   resources :part_organizations,              only: [:show]
+  resources :part_organization_details,       only: [:show]
   resources :part_organization_types,         only: [:index, :new, :create, :edit, :update]
   resources :part_parts,                      only: [:show]
   resources :part_part_types,                 only: [:index, :new, :create, :edit, :update]

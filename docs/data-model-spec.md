@@ -677,7 +677,7 @@ Column abbreviations: **PO** PersonOrganization · **PP** PersonPerson · **OO**
 | Endpoint show pages list the other side via this relationship | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | `<Rel>Controller#show` + per-edge link from both endpoints    | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | Show: contributing-details table (badge + View link)          | ✓  | ✓  | ✓  |   ·   |   ·   |
-| `<Rel>DetailsController#show` per-detail provenance page      | ✓  | ✓  | ✓  |   ·   |   ·   |
+| `<Rel>DetailsController#show` per-detail provenance page      | ✓  | ✓  | ✓  |   ✓   |   ·   |
 | Seed: one `<Rel>` + details + real report + current populated | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | Seed: at least one `<Rel>Type` attached to each detail        | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | Runtime: `current_detail_id` auto-maintained on new Detail    | ·  | ·  | ·  |   ·   |   ·   |
