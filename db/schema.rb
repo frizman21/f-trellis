@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_25_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_26_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -47,6 +47,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_170000) do
     t.bigint "model_id"
     t.datetime "updated_at", null: false
     t.index ["model_id"], name: "index_chats_on_model_id"
+  end
+
+  create_table "crawl_records", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["created_at"], name: "index_crawl_records_on_created_at"
+    t.index ["url"], name: "index_crawl_records_on_url"
+  end
+
+  create_table "domains", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "host", null: false
+    t.integer "min_crawl_delay_seconds"
+    t.datetime "updated_at", null: false
+    t.index ["host"], name: "index_domains_on_host", unique: true
   end
 
   create_table "facilities", force: :cascade do |t|
@@ -516,11 +532,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_170000) do
   create_table "sources", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "description"
+    t.bigint "domain_id", null: false
     t.boolean "is_fixtured", default: false, null: false
     t.boolean "is_promotable", default: false, null: false
     t.string "status", default: "new", null: false
     t.datetime "updated_at", null: false
     t.string "url"
+    t.index ["domain_id"], name: "index_sources_on_domain_id"
     t.index ["is_promotable", "is_fixtured"], name: "index_sources_on_is_promotable_and_is_fixtured"
     t.index ["status"], name: "index_sources_on_status"
   end
@@ -606,5 +624,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_25_170000) do
   add_foreign_key "source_processing_reports", "models"
   add_foreign_key "source_processing_reports", "skill_revisions"
   add_foreign_key "source_processing_reports", "sources"
+  add_foreign_key "sources", "domains"
   add_foreign_key "tool_calls", "messages"
 end
