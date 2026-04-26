@@ -1,0 +1,9 @@
+example_com:
+  host: example.com
+  min_crawl_delay_seconds: 1
+
+other_com:
+  host: other.com
+
+wikipedia:
+  host: en.wikipedia.org
