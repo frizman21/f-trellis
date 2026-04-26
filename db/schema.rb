@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_26_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_26_100103) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -479,6 +479,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_26_000002) do
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_person_types_on_name", unique: true
+  end
+
+  create_table "research_starting_points", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "frequency", null: false
+    t.boolean "is_enabled", default: true, null: false
+    t.datetime "last_run_at"
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["frequency"], name: "index_research_starting_points_on_frequency"
+    t.index ["is_enabled"], name: "index_research_starting_points_on_is_enabled"
   end
 
   create_table "skill_revisions", force: :cascade do |t|

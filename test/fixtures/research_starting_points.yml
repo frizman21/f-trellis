@@ -1,0 +1,15 @@
+weekly_one:
+  url: https://example.com/weekly
+  frequency: weekly
+  description: Sample weekly starting point.
+  is_enabled: true
+daily_one:
+  url: https://example.com/daily
+  frequency: daily
+  description: Sample daily starting point.
+  is_enabled: true
+disabled_one:
+  url: https://example.com/disabled
+  frequency: monthly
+  description: Sample disabled starting point.
+  is_enabled: false

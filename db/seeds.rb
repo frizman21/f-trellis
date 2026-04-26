@@ -844,3 +844,31 @@ unless Message.exists?(content: seed_chat_marker)
     output_tokens: 22
   )
 end
+
+# Research starting points — URLs the system should poll on a schedule to
+# kick off research. Wiring is added later; for now we just seed a few.
+[
+  { url: "https://en.wikipedia.org/wiki/Special:RecentChanges", frequency: "four_times_daily",
+    description: "Wikipedia recent changes — high-churn sample feed.",
+    is_enabled: true,  last_run_at: 2.hours.ago },
+  { url: "https://news.ycombinator.com/",                       frequency: "daily",
+    description: "Hacker News front page.",
+    is_enabled: true,  last_run_at: 1.day.ago },
+  { url: "https://www.nasa.gov/news-release/",                  frequency: "weekly",
+    description: "NASA news releases.",
+    is_enabled: true,  last_run_at: nil },
+  { url: "https://www.federalregister.gov/documents/current",   frequency: "monthly",
+    description: "U.S. Federal Register, current documents.",
+    is_enabled: false, last_run_at: nil },
+  { url: "https://example.com/one-time-report",                 frequency: "one_off",
+    description: "Stand-in for a single-shot research target.",
+    is_enabled: true,  last_run_at: nil }
+].each do |attrs|
+  ResearchStartingPoint.find_or_create_by!(url: attrs[:url]) do |rsp|
+    rsp.frequency   = attrs[:frequency]
+    rsp.description = attrs[:description]
+    rsp.is_enabled  = attrs[:is_enabled]
+    rsp.last_run_at = attrs[:last_run_at]
+  end
+end
+

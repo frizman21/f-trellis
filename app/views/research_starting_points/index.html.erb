@@ -1,0 +1,48 @@
+<% content_for :title, "Research Starting Points" %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Research Starting Points</h1>
+  <%= link_to "New starting point", new_research_starting_point_path, class: "btn btn-primary" %>
+</div>
+
+<% if @research_starting_points.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>URL</th>
+        <th>Frequency</th>
+        <th>Enabled</th>
+        <th>Last run</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @research_starting_points.each do |rsp| %>
+        <tr>
+          <td>
+            <%= external_link_to truncate(rsp.url.to_s, length: 60), rsp.url %>
+          </td>
+          <td><%= rsp.frequency_label %></td>
+          <td>
+            <% if rsp.is_enabled %>
+              <span class="badge bg-success">Yes</span>
+            <% else %>
+              <span class="badge bg-secondary">No</span>
+            <% end %>
+          </td>
+          <td><%= rsp.last_run_at&.to_fs(:short) || "—" %></td>
+          <td><%= rsp.created_at&.to_date %></td>
+          <td><%= link_to "Details", research_starting_point_path(rsp) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= paginate @research_starting_points %>
+  <p class="text-muted small">
+    Showing <%= @research_starting_points.size %> of <%= @research_starting_points.total_count %>.
+  </p>
+<% else %>
+  <p>No research starting points yet.</p>
+<% end %>
