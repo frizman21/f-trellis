@@ -17,6 +17,7 @@ Rails.application.routes.draw do
   resources :person_organization_details,     only: [:show]
   resources :person_organization_types,       only: [:index, :new, :create, :edit, :update]
   resources :person_people,                   only: [:show]
+  resources :person_person_details,           only: [:show]
   resources :person_person_types,             only: [:index, :new, :create, :edit, :update]
   resources :organization_organizations,        only: [:show]
   resources :organization_organization_details, only: [:show]
