@@ -14,6 +14,7 @@ Rails.application.routes.draw do
   resources :parts, only: [:index, :show]
   resources :part_types, only: [:index, :new, :create, :edit, :update]
   resources :person_organizations,            only: [:show]
+  resources :person_organization_details,     only: [:show]
   resources :person_organization_types,       only: [:index, :new, :create, :edit, :update]
   resources :person_people,                   only: [:show]
   resources :person_person_types,             only: [:index, :new, :create, :edit, :update]
