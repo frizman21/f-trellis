@@ -1,0 +1,80 @@
+<% content_for :title, "New Source Processing Report" %>
+
+<h1 class="mb-3">New Source Processing Report</h1>
+
+<%= form_with model: @report, url: source_processing_reports_path, local: true do |f| %>
+  <% if @report.errors.any? %>
+    <div class="alert alert-warning">
+      <%= pluralize(@report.errors.count, "error") %> prevented this report from being saved:
+      <ul class="mb-0">
+        <% @report.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :source_id, "Source", class: "form-label" %>
+    <% if @sources.any? %>
+      <%= f.select :source_id,
+                   @sources.map { |s| [ "##{s.id} #{truncate(s.url.to_s, length: 60)}", s.id ] },
+                   { prompt: "Select a fetched source" },
+                   { class: "form-select", required: true } %>
+    <% else %>
+      <p class="text-muted small mb-0">
+        No fetched sources available. Fetch a source first via
+        <%= link_to "Sources", sources_path %>.
+      </p>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :skill_id, "Skill", class: "form-label" %>
+    <%= f.select :skill_id,
+                 options_for_select(
+                   @skills.map { |s| [ s.name, s.id, { "data-preferred-model-id" => s.preferred_model_id } ] }
+                 ),
+                 { prompt: "Select a skill" },
+                 { class: "form-select", required: true, id: "report-skill-select" } %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :model_id, "Model", class: "form-label" %>
+    <%= f.select :model_id,
+                 grouped_options_for_select(
+                   @models.group_by(&:provider).transform_values { |ms| ms.map { |m| [ model_dropdown_label(m), m.id ] } }
+                 ),
+                 { prompt: "Select a model" },
+                 { class: "form-select", required: true, id: "report-model-select" } %>
+  </div>
+
+  <%= f.submit "Queue for processing", class: "btn btn-primary", disabled: @sources.empty? %>
+  <%= link_to "Cancel", source_processing_reports_path, class: "btn btn-link" %>
+<% end %>
+
+<script>
+  (function () {
+    function initializeReportForm() {
+      var skill = document.getElementById('report-skill-select');
+      var model = document.getElementById('report-model-select');
+      if (!skill || !model) return;
+
+      var fresh = skill.cloneNode(true);
+      skill.parentNode.replaceChild(fresh, skill);
+
+      fresh.addEventListener('change', function () {
+        var opt = fresh.options[fresh.selectedIndex];
+        var preferred = opt && opt.dataset ? opt.dataset.preferredModelId : null;
+        if (preferred) {
+          model.value = preferred;
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeReportForm);
+    document.addEventListener('turbo:load', initializeReportForm);
+    document.addEventListener('turbo:frame-load', initializeReportForm);
+  })();
+</script>
+

@@ -1,0 +1,57 @@
+<% content_for :title, "Models" %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Models</h1>
+  <form method="get" action="<%= models_path %>" class="d-flex align-items-center gap-2">
+    <label for="provider" class="form-label mb-0 small text-muted">Provider</label>
+    <select name="provider" id="provider" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All</option>
+      <% @providers.each do |p| %>
+        <option value="<%= p %>" <%= "selected" if @provider == p %>><%= p %></option>
+      <% end %>
+    </select>
+  </form>
+</div>
+
+<% if @models.any? %>
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Provider</th>
+        <th>Model ID</th>
+        <th>Family</th>
+        <th class="text-end">Context</th>
+        <th class="text-end">Max output</th>
+        <th class="text-end">Input $/M</th>
+        <th class="text-end">Output $/M</th>
+        <th class="text-end">Cached input $/M</th>
+        <th>Capabilities</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @models.each do |m| %>
+        <% standard = m.pricing&.dig("text_tokens", "standard") || {} %>
+        <tr>
+          <td><%= m.provider %></td>
+          <td><code><%= m.model_id %></code></td>
+          <td><%= m.family || "—" %></td>
+          <td class="text-end"><%= m.context_window ? number_with_delimiter(m.context_window) : "—" %></td>
+          <td class="text-end"><%= m.max_output_tokens ? number_with_delimiter(m.max_output_tokens) : "—" %></td>
+          <td class="text-end"><%= standard["input_per_million"]  ? format("$%g", standard["input_per_million"].to_f)  : "—" %></td>
+          <td class="text-end"><%= standard["output_per_million"] ? format("$%g", standard["output_per_million"].to_f) : "—" %></td>
+          <td class="text-end"><%= standard["cached_input_per_million"] ? format("$%g", standard["cached_input_per_million"].to_f) : "—" %></td>
+          <td class="small text-muted">
+            <%= Array(m.capabilities).join(", ").presence || "—" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= paginate @models %>
+  <p class="text-muted small">
+    Showing <%= @models.size %> of <%= @models.total_count %>.
+  </p>
+<% else %>
+  <p>No models loaded. Run <code>bundle exec rails ruby_llm:load_models</code>.</p>
+<% end %>

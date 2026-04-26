@@ -24,6 +24,17 @@ skills.each do |attrs|
   SkillRevision.create!(skill: skill, content: "Initial draft of #{skill.name}.")
 end
 
+# Mark the Summarize skill as promotable so `rails fixtures:promote` has
+# something to materialize into a fixture on a fresh dev DB.
+Skill.where(name: "Summarize").update_all(is_promotable: true, is_fixtured: false)
+
+# A handful of seed sources are marked promotable so the fixture-promotion
+# flow is demoable end-to-end out of the box.
+Source.where(url: [
+  "https://en.wikipedia.org/wiki/Ada_Lovelace",
+  "https://en.wikipedia.org/wiki/NASA"
+]).update_all(is_promotable: true, is_fixtured: false)
+
 summarize_revision = Skill.find_by(name: "Summarize").skill_revisions.first
 
 people_entries = [
@@ -807,4 +818,29 @@ Part.find_each do |part|
   )
   detail.part_organization_types = [ manufacturer_type ]
   po.update!(current_detail: detail)
+end
+
+# Synthetic Chat for the inspection UI. Idempotent via a sentinel content
+# string in the user message — re-running seeds will not create duplicates.
+seed_chat_marker = "[seed:inspection-demo]"
+unless Message.exists?(content: seed_chat_marker)
+  demo_model = Model.find_by(provider: "anthropic", model_id: "claude-sonnet-4-5") ||
+               Model.find_by(model_id: "gpt-5-nano") ||
+               Model.first
+
+  demo_chat = Chat.create!(model: demo_model)
+  Message.create!(
+    chat: demo_chat,
+    role: "user",
+    content: seed_chat_marker,
+    input_tokens: 8
+  )
+  Message.create!(
+    chat: demo_chat,
+    role: "assistant",
+    model: demo_model,
+    content: "Synthetic reply seeded for the chat inspection UI. Replace by exercising RubyLLM with a real prompt.",
+    input_tokens: 8,
+    output_tokens: 22
+  )
 end

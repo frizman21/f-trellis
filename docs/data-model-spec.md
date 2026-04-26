@@ -418,6 +418,29 @@ pattern already in the codebase.
       created (callback, service object, or DB trigger — pick one and
       apply it consistently).
 
+**LLM tools**
+
+- [ ] `app/tools/upsert_<entity>_tool.rb` —
+      `Upsert<Entity>Tool < RubyLLM::Tool`:
+      - Required params: the entity's typed key field(s) (e.g.
+        `first_name` / `last_name` for Person, `name` for Organization).
+        Optional params: `confidence_tenths` (integer, default 800) and
+        `additional_attributes` (object, flat string→scalar map).
+      - Initialized with the active `SourceProcessingReport`; stored on
+        `@report`.
+      - Look up the entity case-insensitively by joining
+        `<entity>_details` against the typed key column(s) on the
+        current detail. When no match, create a fresh entity row.
+      - Always insert a new `<Entity>Detail` attached to `@report`,
+        set `as_of: Time.current`, clamp confidence to 0–1000, sanitize
+        the property bag to scalar-only values, and update the entity's
+        `current_detail`.
+      - Return `{ <entity>_id:, detail_id:, created: }`. Rescue
+        `ActiveRecord::RecordInvalid` and return `{ error: e.message }`
+        rather than raising.
+- [ ] Tool registered in `app/jobs/process_report_job.rb` inside the
+      `chat.with_tools(...)` call so every chat run can use it.
+
 ---
 
 ## 6. Tier 1 entities
@@ -467,6 +490,7 @@ Legend: **✓** done · **⚬** partial · **·** not started.
 | Seed: multi-detail + real reports + types + current      |   ✓    |      ✓       |    ✓     |  ⚬   |
 | Runtime: views use `entity.current_detail`               |   ✓    |      ✓       |    ✓     |  ✓   |
 | Runtime: `current_detail_id` auto-maintained on new Detail |  ·   |      ·       |    ·     |  ·   |
+| LLM `Upsert<Entity>Tool` + registered in ProcessReportJob |   ✓    |      ✓       |    ·     |  ·   |
 
 ---
 
@@ -528,15 +552,32 @@ the two singular snake-case entity names in alphabetical order
       `app/views/layouts/application.html.erb`, alongside the tier 1
       type links.
 - [ ] `<Rel>Controller#show` view that renders both parties (each
-      linked to its own show page), the current detail's
-      `as_of` / confidence / types / linked Source, the property bag as
-      a key/value table, and a prior-details table. The "other side"
-      tables on each endpoint's show page each get a per-row link to
-      this relationship show. **Self-referential relationships need
-      this too**: both parties are still distinct records, and the
-      per-edge view exposes relationship-only state (the relationship's
-      types, `as_of`, confidence, and property bag for *this* edge) that
-      doesn't fit cleanly on either endpoint's show page.
+      linked to its own show page), a summary of the current detail
+      (`as_of` / confidence / types / linked Source / property-bag
+      table), and a **Contributing details** table at the bottom that
+      lists *every* `<Rel>Detail` on this edge — current and prior — in
+      one chronological list (`order(as_of: :desc, created_at: :desc)`).
+      Columns: a "current" badge marking the row whose id matches
+      `current_detail_id`, `as_of`, confidence, types, source link, a
+      one-line summary of `additional_attributes`, and a per-row "View"
+      link to the per-detail show page (next bullet). Eager-load with
+      `includes(:<rel>_types, source_processing_report: :source)` to
+      keep the query count flat. The "other side" tables on each
+      endpoint's show page each get a per-row link to this relationship
+      show. **Self-referential relationships need this too**: both
+      parties are still distinct records, and the per-edge view exposes
+      relationship-only state (the relationship's types, `as_of`,
+      confidence, and property bag for *this* edge) that doesn't fit
+      cleanly on either endpoint's show page.
+- [ ] `<Rel>DetailsController#show` — per-detail provenance page,
+      reached from the "View" links in the contributing-details table.
+      Route: `resources :<rel>_details, only: [:show]`. The view shows
+      the detail id, a "current" badge when this row is the edge's
+      current detail, a link back to the relationship show, the
+      `as_of` / confidence / types / `created_at`, the linked Source
+      and Skill revision (via `source_processing_report.source` and
+      `source_processing_report.skill_revision`), and the full
+      `additional_attributes` as a key/value table.
 - [ ] (Optional, on demand) Browseable `<Rel>` index. Often a
       relationship is reached *through* one of its endpoints; the index
       can be added later as the UI calls for it.
@@ -553,6 +594,40 @@ the two singular snake-case entity names in alphabetical order
 - [ ] `current_detail_id` on the relationship is maintained whenever a
       newer Detail is created — same callback/service/trigger choice as
       §5.
+
+**LLM tools**
+
+- [ ] `app/tools/link_<rel>_tool.rb` — `Link<Rel>Tool < RubyLLM::Tool`.
+      One generic tool per relationship; the relationship type is
+      passed as a parameter rather than baked into the tool.
+      - Required params: the two endpoint id params (`<a>_id`, `<b>_id`
+        for cross-entity relationships; `<entity>_a_id`,
+        `<entity>_b_id` for self-referential ones), and a `type` string
+        naming a `<Rel>Type` that must already exist. Optional params:
+        `as_of` (ISO 8601 string, defaults to now),
+        `confidence_tenths` (integer, default 800), and
+        `additional_attributes` (object, flat string→scalar map).
+      - Initialized with the active `SourceProcessingReport`; stored on
+        `@report`.
+      - For self-referential relationships: store the edge with sorted
+        ids so the unordered pair dedupes regardless of caller argument
+        order; reject same-id calls with an error. For asymmetric types
+        (e.g. `Subsidiary`), document the direction-coding keys callers
+        must put in `additional_attributes` (e.g.
+        `parent_organization_id`, `subsidiary_organization_id`) — the
+        edge schema is symmetric, so direction lives in the property
+        bag.
+      - Look up the named `<Rel>Type` by `name` and return
+        `{ error: "<Rel>Type '<name>' is not configured" }` when
+        missing. Use `find_or_create_by!` on the edge, create a new
+        `<Rel>Detail` attached to `@report`, attach the type via the
+        M2M (`detail.<rel>_types = [ relationship_type ]`), and update
+        the edge's `current_detail`.
+      - Return `{ <rel>_id:, detail_id:, ...endpoint ids..., type: }`.
+        Rescue `ActiveRecord::RecordInvalid` and return
+        `{ error: e.message }`.
+- [ ] Tool registered in `app/jobs/process_report_job.rb` inside the
+      `chat.with_tools(...)` call.
 
 ---
 
@@ -601,6 +676,9 @@ Column abbreviations: **PO** PersonOrganization · **PP** PersonPerson · **OO**
 | Sidebar link to `<Rel>TypesController#index` under Types      | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | Endpoint show pages list the other side via this relationship | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | `<Rel>Controller#show` + per-edge link from both endpoints    | ✓  | ✓  | ✓  |   ✓   |   ✓   |
+| Show: contributing-details table (badge + View link)          | ✓  | ✓  | ✓  |   ✓   |   ✓   |
+| `<Rel>DetailsController#show` per-detail provenance page      | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | Seed: one `<Rel>` + details + real report + current populated | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | Seed: at least one `<Rel>Type` attached to each detail        | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | Runtime: `current_detail_id` auto-maintained on new Detail    | ·  | ·  | ·  |   ·   |   ·   |
+| LLM `Link<Rel>Tool` (generic, type-as-param) + registered     | ✓  | ·  | ✓  |   ·   |   ·   |

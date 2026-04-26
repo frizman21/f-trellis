@@ -1,0 +1,75 @@
+<% content_for :title, "Chat ##{@chat.id}" %>
+
+<h1>Chat #<%= @chat.id %></h1>
+
+<dl>
+  <dt>Model</dt>
+  <dd><%= @chat.model&.model_id || "—" %><% if @chat.model&.provider %> <span class="text-muted">(<%= @chat.model.provider %>)</span><% end %></dd>
+
+  <dt>Messages</dt>
+  <dd><%= @messages.size %></dd>
+
+  <dt>Created</dt>
+  <dd><%= @chat.created_at %></dd>
+
+  <dt>Updated</dt>
+  <dd><%= @chat.updated_at %></dd>
+</dl>
+
+<h2>Messages</h2>
+
+<% if @messages.any? %>
+  <% @messages.each do |message| %>
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <span class="badge bg-secondary text-uppercase me-2"><%= message.role %></span>
+          <% if message.model %>
+            <span class="text-muted small"><%= message.model.model_id %></span>
+          <% end %>
+        </div>
+        <div class="text-muted small">
+          <% if message.input_tokens || message.output_tokens %>
+            in <%= message.input_tokens || 0 %> / out <%= message.output_tokens || 0 %>
+            <% if message.cached_tokens.to_i > 0 %> · cached <%= message.cached_tokens %><% end %>
+            ·
+          <% end %>
+          <%= message.created_at %>
+        </div>
+      </div>
+      <div class="card-body">
+        <% if message.content.present? %>
+          <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;"><%= message.content %></pre>
+        <% else %>
+          <p class="text-muted mb-0">(no content)</p>
+        <% end %>
+
+        <% if message.thinking_text.present? %>
+          <details class="mt-3">
+            <summary class="text-muted small">Thinking</summary>
+            <pre class="mt-2 mb-0" style="white-space: pre-wrap; font-family: inherit;"><%= message.thinking_text %></pre>
+          </details>
+        <% end %>
+
+        <% if message.parent_tool_call %>
+          <div class="mt-3 small text-muted">
+            Responding to tool call: <code><%= message.parent_tool_call.name %></code>
+          </div>
+        <% end %>
+
+        <% if message.tool_calls.any? %>
+          <div class="mt-3 small text-muted">
+            Tool calls:
+            <% message.tool_calls.each do |tc| %>
+              <code><%= tc.name %></code>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <p>No messages.</p>
+<% end %>
+
+<p><%= link_to "Back to chats", chats_path %></p>

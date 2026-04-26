@@ -4,8 +4,8 @@ class PartPartsController < ApplicationController
     @part_a   = @part_part.part_a
     @part_b   = @part_part.part_b
     @current  = @part_part.current_detail
-    @prior    = @part_part.part_part_details
-                  .where.not(id: @current&.id)
-                  .order(as_of: :desc)
+    @details  = @part_part.part_part_details
+                  .includes(:part_part_types, source_processing_report: :source)
+                  .order(as_of: :desc, created_at: :desc)
   end
 end

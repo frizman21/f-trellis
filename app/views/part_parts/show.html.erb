@@ -1,5 +1,8 @@
 <% a_detail = @part_a.current_detail %>
 <% b_detail = @part_b.current_detail %>
+<% a_label = a_detail ? a_detail.name : "Part ##{@part_a.id}" %>
+<% b_label = b_detail ? b_detail.name : "Part ##{@part_b.id}" %>
+<% content_for :title, "#{a_label} ↔ #{b_label}" %>
 
 <h1>
   <%= a_detail ? a_detail.name : "Part ##{@part_a.id}" %>
@@ -52,21 +55,43 @@
   <p class="text-muted">No current detail set on this relationship.</p>
 <% end %>
 
-<% if @prior.any? %>
-  <h2>Prior relationship details</h2>
+<% if @details.any? %>
+  <h2>Contributing details</h2>
   <table class="table">
-    <thead><tr><th>As of</th><th>Confidence</th><th>Types</th><th>Additional attributes</th></tr></thead>
+    <thead>
+      <tr>
+        <th></th>
+        <th>As of</th>
+        <th>Confidence</th>
+        <th>Types</th>
+        <th>Source</th>
+        <th>Additional attributes</th>
+        <th></th>
+      </tr>
+    </thead>
     <tbody>
-      <% @prior.each do |d| %>
+      <% @details.each do |d| %>
         <tr>
+          <td>
+            <% if d.id == @current&.id %>
+              <span class="badge bg-primary">current</span>
+            <% end %>
+          </td>
           <td><%= d.as_of&.to_date %></td>
           <td><%= d.confidence_tenths.to_i / 10.0 %>%</td>
           <td><%= d.part_part_types.map(&:name).join(", ") %></td>
+          <td>
+            <% src = d.source_processing_report&.source %>
+            <% if src %>
+              <%= link_to src.url, src %>
+            <% end %>
+          </td>
           <td>
             <% if d.additional_attributes.any? %>
               <%= d.additional_attributes.map { |k, v| "#{k.humanize}: #{v}" }.join("; ") %>
             <% end %>
           </td>
+          <td><%= link_to "View", part_part_detail_path(d) %></td>
         </tr>
       <% end %>
     </tbody>

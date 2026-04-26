@@ -1,0 +1,8 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+# Entries prefixed `promoted_<id>` are written by `rails fixtures:promote`.
+promoted_1:
+  name: Summarize
+  purpose: Condense a long document into a short brief.
+  is_active: false
+  is_promotable: true
+  is_fixtured: true

@@ -1,4 +1,5 @@
 <% current = @facility.current_detail %>
+<% content_for :title, (current ? current.address : "Unlocated facility ##{@facility.id}") %>
 
 <h1><%= current ? current.address : "Unlocated facility ##{@facility.id}" %></h1>
 
