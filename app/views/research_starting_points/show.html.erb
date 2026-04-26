@@ -1,0 +1,42 @@
+<% content_for :title, "Research Starting Point ##{@research_starting_point.id}" %>
+<h1>Research Starting Point #<%= @research_starting_point.id %></h1>
+
+<dl>
+  <dt>URL</dt>
+  <dd><%= external_link_to @research_starting_point.url, @research_starting_point.url %></dd>
+
+  <dt>Frequency</dt>
+  <dd><%= @research_starting_point.frequency_label %></dd>
+
+  <dt>Enabled</dt>
+  <dd>
+    <% if @research_starting_point.is_enabled %>
+      <span class="badge bg-success">Yes</span>
+    <% else %>
+      <span class="badge bg-secondary">No</span>
+    <% end %>
+  </dd>
+
+  <dt>Last run</dt>
+  <dd><%= @research_starting_point.last_run_at&.to_fs(:long) || "Never" %></dd>
+
+  <dt>Description</dt>
+  <dd><%= @research_starting_point.description.presence || "—" %></dd>
+
+  <dt>Created</dt>
+  <dd><%= @research_starting_point.created_at %></dd>
+
+  <dt>Updated</dt>
+  <dd><%= @research_starting_point.updated_at %></dd>
+</dl>
+
+<div class="d-flex gap-2">
+  <%= link_to "Edit", edit_research_starting_point_path(@research_starting_point), class: "btn btn-outline-primary" %>
+  <%= button_to "Delete",
+                research_starting_point_path(@research_starting_point),
+                method: :delete,
+                form: { data: { turbo_confirm: "Are you sure?" } },
+                class: "btn btn-outline-danger" %>
+</div>
+
+<p class="mt-3"><%= link_to "Back to research starting points", research_starting_points_path %></p>
