@@ -41,7 +41,7 @@ gem "thruster", require: false
 gem "image_processing", "~> 1.2"
 
 # Zip archive creation for storing fetched source content as SourceDatum payloads.
-gem "rubyzip", "~> 2.3"
+gem "rubyzip", "~> 3.3"
 
 # Pagination for index views.
 gem "kaminari"
