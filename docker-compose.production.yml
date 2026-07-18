@@ -1,0 +1,131 @@
+# Production compose for single-host deployment.
+#
+# Prerequisites:
+#   1. Copy `.env.production.example` to `.env.production` and fill in the secrets.
+#   2. `docker compose -f docker-compose.production.yml --env-file .env.production build`
+#   3. `docker compose -f docker-compose.production.yml --env-file .env.production up -d`
+#
+# Topology:
+#   nginx (host port APP_HTTP_PORT) -> app (Thruster, container port 80) -> Puma
+#   worker  (Solid Queue) runs alongside, sharing the same image as app.
+#
+# TLS:
+#   The bundled nginx terminates plain HTTP. For TLS, either (a) put a TLS
+#   terminator in front of nginx (Cloudflare Tunnel, an external LB), or
+#   (b) extend `docker/nginx/default.conf` with a 443 server block and mount
+#   certs into the nginx container.
+#
+# Database persistence:
+#   Postgres data lives in the `postgres_data` named volume — it survives
+#   `docker compose down` (without `-v`), container rebuilds, and host reboots.
+#   Back it up before destructive ops. See README "Production deployment"
+#   for backup/restore commands.
+#
+# Database migrations on every start:
+#   The `app` service runs `bin/rails db:prepare` before starting the web
+#   server. db:prepare runs `db:migrate` against an existing database (picking
+#   up any new migrations after a deploy) and creates+loads schema if the
+#   database is empty. The Dockerfile's entrypoint also runs db:prepare; the
+#   explicit command override here makes the behavior visible at the compose
+#   layer and survives entrypoint changes.
+
+x-app-env: &app-env
+  RAILS_ENV: production
+  RAILS_LOG_TO_STDOUT: "true"
+  RAILS_SERVE_STATIC_FILES: "true"
+  RAILS_MASTER_KEY: ${RAILS_MASTER_KEY:?RAILS_MASTER_KEY must be set in .env.production}
+  RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-5}
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+  DATABASE_URL: postgres://app:${APP_DATABASE_PASSWORD}@postgres:5432/app_production
+  CACHE_DATABASE_URL: postgres://app:${APP_DATABASE_PASSWORD}@postgres:5432/app_production_cache
+  QUEUE_DATABASE_URL: postgres://app:${APP_DATABASE_PASSWORD}@postgres:5432/app_production_queue
+  CABLE_DATABASE_URL: postgres://app:${APP_DATABASE_PASSWORD}@postgres:5432/app_production_cable
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${APP_DATABASE_PASSWORD:?APP_DATABASE_PASSWORD must be set in .env.production}
+      POSTGRES_DB: app_production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: f-dod:${APP_VERSION:-latest}
+    restart: unless-stopped
+    # Run db:prepare on every start to pick up new migrations (and to
+    # create+load schema on a fresh deployment), then start the web server.
+    command: >
+      sh -c "./bin/rails db:prepare && exec ./bin/thrust ./bin/rails server"
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "80"
+    volumes:
+      - app_storage:/rails/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging: *default-logging
+
+  worker:
+    image: f-dod:${APP_VERSION:-latest}
+    restart: unless-stopped
+    command: ["./bin/jobs"]
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    volumes:
+      - app_storage:/rails/storage
+    logging: *default-logging
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${APP_HTTP_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/up >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+
+volumes:
+  postgres_data:
+  app_storage:
