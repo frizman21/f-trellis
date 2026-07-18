@@ -37,6 +37,23 @@ docker-compose exec web bundle exec rails db:schema:load RAILS_ENV=test
 docker-compose exec web bundle exec rails db:seed
 ```
 
+### 5. Create a user
+
+The app requires sign-in for every page. Public sign-up is disabled — users
+are created from the Rails console:
+
+```sh
+docker-compose exec web bundle exec rails console
+```
+
+Then in the console:
+
+```ruby
+User.create!(email: "you@example.com", password: "set-a-good-one")
+```
+
+Sign in at <http://localhost:3001/users/sign_in>.
+
 ## Running the test suite
 
 ```sh
