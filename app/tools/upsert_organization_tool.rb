@@ -3,11 +3,15 @@ class UpsertOrganizationTool < RubyLLM::Tool
     Find an existing Organization by name — matched case-insensitively on the
     current detail — or create a new one. Always inserts a new
     OrganizationDetail attached to the active SourceProcessingReport, updating
-    the Organization's current detail pointer. Returns the organization_id,
-    the new detail_id, and whether the Organization was newly created.
+    the Organization's current detail pointer. Pass the acronym whenever the
+    source states one or you know it. Returns the organization_id, the new
+    detail_id, and whether the Organization was newly created.
   DESC
 
   param :name, type: "string", desc: "The organization's name as written on the source."
+  param :acronym, type: "string",
+        desc: "The organization's acronym or initialism, e.g. NASA. Omit if unknown.",
+        required: false
   param :confidence_tenths, type: "integer",
         desc: "Confidence 0–1000 (1000 = 100%). Defaults to 800.",
         required: false
@@ -20,7 +24,7 @@ class UpsertOrganizationTool < RubyLLM::Tool
     @report = report
   end
 
-  def execute(name:, confidence_tenths: 800, additional_attributes: {})
+  def execute(name:, acronym: nil, confidence_tenths: 800, additional_attributes: {})
     canonical = name.to_s.strip
     return { error: "name is required" } if canonical.empty?
 
@@ -30,6 +34,7 @@ class UpsertOrganizationTool < RubyLLM::Tool
       organization: organization,
       source_processing_report: @report,
       name: canonical,
+      acronym: acronym.to_s.strip.presence,
       as_of: Time.current,
       confidence_tenths: clamp_confidence(confidence_tenths),
       additional_attributes: sanitize_attrs(additional_attributes)

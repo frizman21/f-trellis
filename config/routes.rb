@@ -8,7 +8,7 @@ Rails.application.routes.draw do
 
   resources :people, only: [:index, :show]
   resources :person_types, only: [:index, :new, :create, :edit, :update]
-  resources :organizations, only: [:index, :show]
+  resources :organizations, only: [:index, :show, :edit, :update]
   resources :organization_types, only: [:index, :new, :create, :edit, :update]
   resources :facilities, only: [:index, :show]
   resources :facility_types, only: [:index, :new, :create, :edit, :update]
