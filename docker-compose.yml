@@ -24,11 +24,16 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432
       RAILS_ENV: development
       BUNDLE_PATH: /bundle
+      # Mirrored into the container so generated URLs (e.g. mailer links)
+      # point at the host port this instance is actually published on.
+      WEB_PORT: ${WEB_PORT:-3001}
     volumes:
       - .:/app
       - bundle:/bundle
     ports:
-      - "3001:3000"
+      # Host port is configurable so two checkouts can run side by side.
+      # Set WEB_PORT in .env (or the shell) to override the 3001 default.
+      - "${WEB_PORT:-3001}:3000"
     depends_on:
       postgres:
         condition: service_healthy

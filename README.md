@@ -14,6 +14,28 @@ cp .env.example .env
 
 `.env` is gitignored. The default `docker-compose.yml` works without any overrides.
 
+#### Running two checkouts at once
+
+The web container always listens on port 3000 internally; `WEB_PORT` controls
+the **host** port it is published on (default `3001`). To run a second checkout
+alongside this one, give it a different port — either in its `.env`:
+
+```sh
+WEB_PORT=3002
+```
+
+or per-command:
+
+```sh
+WEB_PORT=3002 docker-compose up -d
+```
+
+Compose derives its project name from the directory name, so two checkouts in
+differently-named directories already get separate containers, networks, and
+volumes. If both live in identically-named directories, set
+`COMPOSE_PROJECT_NAME` in one of them as well. Postgres is not published to the
+host, so it needs no deconfliction.
+
 ### 2. Start the containers
 
 ```sh
@@ -45,7 +67,7 @@ creates a development login:
 - **Email:** `admin@example.com`
 - **Password:** `Password1`
 
-Sign in at <http://localhost:3001/users/sign_in>.
+Sign in at <http://localhost:3001/users/sign_in> (or whatever `WEB_PORT` you set).
 
 This user is only seeded in development and test. To create additional users —
 or any user in production — use the Rails console:
