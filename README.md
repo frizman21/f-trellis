@@ -166,9 +166,26 @@ Requirements:
 
 - **`ANTHROPIC_API_KEY`** must be set as a repository secret
   (Settings → Secrets and variables → Actions).
+- **`id-token: write`** must stay in the job's permissions. The action mints a
+  GitHub OIDC token to obtain its app token, and fails the job without it even
+  though Anthropic auth uses the static API key.
 - The marketplace is **pinned by tag** (`#v0.1.0`). Leave it pinned — unpinned,
   an edit to the plugin silently changes what every open PR is judged against.
   Bumping the gate is a deliberate edit to this file.
+
+#### A PR that edits `ci.yml` is not reviewed
+
+The action compares this workflow file against the copy on the default branch
+and refuses to run when they differ, so a PR cannot rewrite the gate that judges
+it. That check is why the gate is trustworthy, but note how it fails:
+
+> Workflow validation failed. The workflow file must exist and have identical
+> content to the version on the repository's default branch.
+
+**It skips with a green check, not a red one.** Any PR touching `ci.yml` will
+show `quality` passing without a review having happened. Read the job log rather
+than the check mark when the diff includes this file, and expect the gate to be
+inactive until the change is merged to `main`.
 
 ## Production deployment
 
