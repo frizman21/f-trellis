@@ -137,6 +137,39 @@ docker-compose exec web bundle exec rails test:db
 
 See `CLAUDE.md` for the full command reference.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs three jobs on every pull request:
+
+| Job | What it does |
+| --- | --- |
+| `test` | `bin/rails db:test:prepare test` |
+| `system-test` | `bin/rails db:test:prepare test:system`, uploading screenshots on failure |
+| `quality` | Change-request traceability gate (pull requests only) |
+
+### The quality gate
+
+`quality` runs the `sw-factory` quality agent from
+[software-factory-plugin](https://github.com/frizman21/software-factory-plugin)
+via `anthropics/claude-code-action`. It checks that the PR body links a change
+request with a GitHub closing keyword (`Closes #123`), that the change request
+defines a scope and a test approach, and that the diff and its tests are
+consistent with both. It then posts a review or a comment on the PR.
+
+It is **not** a bug hunter or a style reviewer — the two test jobs own
+everything a deterministic check can decide. That is also why `quality` declares
+`needs: [test, system-test]`: a branch whose tests fail is never reviewed, so no
+tokens are spent on it. GitHub Actions has no cross-workflow `needs:`, which is
+why this job lives in `ci.yml` rather than its own workflow file.
+
+Requirements:
+
+- **`ANTHROPIC_API_KEY`** must be set as a repository secret
+  (Settings → Secrets and variables → Actions).
+- The marketplace is **pinned by tag** (`#v0.1.0`). Leave it pinned — unpinned,
+  an edit to the plugin silently changes what every open PR is judged against.
+  Bumping the gate is a deliberate edit to this file.
+
 ## Production deployment
 
 The repo includes `docker-compose.production.yml` for single-host production
