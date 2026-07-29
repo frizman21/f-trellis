@@ -12,6 +12,20 @@
   <dt>Active</dt>
   <dd><%= @skill.is_active? ? "Yes" : "No" %></dd>
 
+  <dt>Preferred model</dt>
+  <dd>
+    <% if @skill.preferred_model %>
+      <span class="text-muted"><%= @skill.preferred_model.provider %> /</span>
+      <code><%= @skill.preferred_model.model_id %></code>
+      <% pricing = model_pricing_label(@skill.preferred_model) %>
+      <% if pricing %>
+        <span class="text-muted small"><%= pricing %></span>
+      <% end %>
+    <% else %>
+      —
+    <% end %>
+  </dd>
+
   <dt>Revisions</dt>
   <dd><%= @revisions.size %></dd>
 </dl>

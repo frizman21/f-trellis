@@ -19,15 +19,22 @@ module ApplicationHelper
     link_to(url, **options) { safe_join([ text.to_s, EXTERNAL_LINK_ICON ]) }
   end
 
-  # Label used in model dropdowns: "<model_id> — $<in>/$<out> per Mtok".
-  # Falls back to bare model_id when pricing is missing.
-  def model_dropdown_label(model)
+  # Standard text-token pricing as "$<in> in / $<out> out per Mtok",
+  # or nil when the model carries no pricing at all.
+  def model_pricing_label(model)
     standard = model.pricing&.dig("text_tokens", "standard") || {}
     input  = standard["input_per_million"]
     output = standard["output_per_million"]
-    return model.model_id if input.nil? && output.nil?
+    return nil if input.nil? && output.nil?
 
     fmt = ->(v) { v.nil? ? "?" : format("$%g", v.to_f) }
-    "#{model.model_id} — #{fmt.call(input)} in / #{fmt.call(output)} out per Mtok"
+    "#{fmt.call(input)} in / #{fmt.call(output)} out per Mtok"
+  end
+
+  # Label used in model dropdowns: "<model_id> — $<in> in / $<out> out per Mtok".
+  # Falls back to bare model_id when pricing is missing.
+  def model_dropdown_label(model)
+    pricing = model_pricing_label(model)
+    pricing ? "#{model.model_id} — #{pricing}" : model.model_id
   end
 end
