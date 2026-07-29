@@ -32,6 +32,28 @@ skills.each do |attrs|
   SkillRevision.create!(skill: skill, content: "Initial draft of #{skill.name}.")
 end
 
+# "Pull Organization Names" carries real prompt content rather than a stub
+# draft. A new revision is added only when the content below actually changes,
+# so re-running seeds is idempotent.
+pull_organization_names_content = <<~MARKDOWN.strip
+  Parse the entire website. Pull out Organization names. And create Organizations from those that you find.
+
+  For every Organization, also determine its acronym or initialism — for example
+  NASA for "National Aeronautics and Space Administration". Use the acronym the
+  source states. If the source does not state one but the organization has a
+  well-established acronym you know, use that. Leave it blank when you are not
+  confident; do not invent one. Pass it as the `acronym` argument of the
+  upsert organization tool, not inside additional_attributes.
+MARKDOWN
+
+pull_organization_names = Skill.find_or_create_by!(name: "Pull Organization Names") do |s|
+  s.purpose = "Read a website and pull all orgs out."
+end
+
+if pull_organization_names.skill_revisions.order(:sequence).last&.content != pull_organization_names_content
+  SkillRevision.create!(skill: pull_organization_names, content: pull_organization_names_content)
+end
+
 # Mark the Summarize skill as promotable so `rails fixtures:promote` has
 # something to materialize into a fixture on a fresh dev DB.
 Skill.where(name: "Summarize").update_all(is_promotable: true, is_fixtured: false)
@@ -241,7 +263,7 @@ organization_entries = [
     types: [ "Corporation" ],
     details: [
       {
-        name: "National Aeronautics and Space Administration",
+        name: "National Aeronautics and Space Administration", acronym: "NASA",
         as_of: Time.zone.parse("1958-07-29"), confidence_tenths: 1000,
         additional_attributes: { "industry" => "Aerospace", "headquarters" => "Washington, D.C." },
         source_url: "https://en.wikipedia.org/wiki/NASA",
@@ -276,10 +298,14 @@ organization_entries.each do |entry|
       name: d[:name],
       as_of: d[:as_of]
     ) do |od|
+      od.acronym = d[:acronym]
       od.confidence_tenths = d[:confidence_tenths]
       od.additional_attributes = d[:additional_attributes]
       od.source_processing_report = report
     end
+
+    # Backfills acronyms onto details seeded before the column existed.
+    detail.update!(acronym: d[:acronym]) if detail.acronym != d[:acronym]
 
     detail.organization_types = entry[:types].map { |n| organization_types.fetch(n) }
   end
@@ -449,14 +475,27 @@ synthetic_report = SourceProcessingReport.find_or_create_by!(
   r.facts = { "synthetic" => true }
 end
 
+# Initials of the significant words in a company name — "Kohler, Predovic and
+# Sons" => "KPS". Used to give synthetic organizations a plausible acronym so
+# the acronym column and acronym search have data to exercise.
+def synthetic_acronym(name)
+  initials = name.to_s.scan(/[A-Za-z][A-Za-z'-]*/)
+                 .reject { |w| %w[and the of for a an].include?(w.downcase) }
+                 .map { |w| w[0].upcase }
+                 .join
+  initials.length.between?(2, 5) ? initials : nil
+end
+
 corporation_type = organization_types.fetch("Corporation")
 synthetic_org_count = synthetic_report.organization_details.count
 
 (12 - synthetic_org_count).clamp(0, 12).times do
   organization = Organization.create!
+  name = Faker::Company.unique.name
   detail = OrganizationDetail.create!(
     organization: organization,
-    name: Faker::Company.unique.name,
+    name: name,
+    acronym: synthetic_acronym(name),
     as_of: Time.zone.now,
     confidence_tenths: 800,
     additional_attributes: {
@@ -469,7 +508,13 @@ synthetic_org_count = synthetic_report.organization_details.count
   organization.update!(current_detail: detail)
 end
 
-person_type_pool = [ person_types.fetch("Engineer"), person_types.fetch("Computer Scientist"), person_types.fetch("Mathematician") ]
+# Backfills synthetic organizations created before the acronym column existed.
+synthetic_report.organization_details.where(acronym: nil).find_each do |detail|
+  acronym = synthetic_acronym(detail.name)
+  detail.update!(acronym: acronym) if acronym
+end
+
+person_type_pool =[ person_types.fetch("Engineer"), person_types.fetch("Computer Scientist"), person_types.fetch("Mathematician") ]
 synthetic_person_count = synthetic_report.person_details.count
 
 (200 - synthetic_person_count).clamp(0, 200).times do

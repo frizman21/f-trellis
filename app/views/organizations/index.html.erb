@@ -3,7 +3,7 @@
 
 <%= form_with url: organizations_path, method: :get, local: true, class: "mb-3" do |f| %>
   <div class="input-group">
-    <%= f.text_field :q, value: @query, placeholder: "Search names or attribute values...", class: "form-control" %>
+    <%= f.text_field :q, value: @query, placeholder: "Search names, acronyms, or attribute values...", class: "form-control" %>
     <%= f.submit "Search", class: "btn btn-primary" %>
     <% if @query.present? %>
       <%= link_to "Clear", organizations_path, class: "btn btn-outline-secondary" %>
@@ -22,6 +22,7 @@
     <thead>
       <tr>
         <th>Name</th>
+        <th>Acronym</th>
         <th><%= searching ? "Matched on" : "Types" %></th>
       </tr>
     </thead>
@@ -32,6 +33,7 @@
           <td>
             <%= link_to (detail ? detail.name : "Unnamed organization ##{organization.id}"), organization %>
           </td>
+          <td><%= detail&.acronym %></td>
           <td>
             <% if searching %>
               <% reasons = @match_reasons[organization.id] || [] %>

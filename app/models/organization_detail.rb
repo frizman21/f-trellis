@@ -5,4 +5,8 @@ class OrganizationDetail < ApplicationRecord
   has_many :organization_types, through: :organization_detail_organization_types
 
   validates :name, presence: true
+
+  # Acronyms are stored trimmed; an empty submission clears the field rather
+  # than storing "".
+  normalizes :acronym, with: ->(value) { value.strip.presence }
 end
