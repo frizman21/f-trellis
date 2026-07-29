@@ -116,6 +116,9 @@ jobs:
       contents: read
       pull-requests: write   # post the review / comment
       issues: read           # read the linked change request
+      id-token: write        # claude-code-action mints an OIDC token; without
+                             # this it retries 3x and fails the job, even when
+                             # anthropic_api_key is set
 
     steps:
       - name: Checkout code
