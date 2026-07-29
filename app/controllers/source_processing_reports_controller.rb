@@ -10,7 +10,7 @@ class SourceProcessingReportsController < ApplicationController
     @report = SourceProcessingReport.new
     @sources = Source.where(status: "complete").order(created_at: :desc)
     @skills  = Skill.includes(:skill_revisions, :preferred_model).order(:name)
-    @models  = Model.where(provider: %w[anthropic openai]).order(:provider, :model_id)
+    @models  = Model.selectable
   end
 
   def create
@@ -38,7 +38,7 @@ class SourceProcessingReportsController < ApplicationController
     else
       @sources = Source.where(status: "complete").order(created_at: :desc)
       @skills  = Skill.includes(:skill_revisions, :preferred_model).order(:name)
-      @models  = Model.where(provider: %w[anthropic openai]).order(:provider, :model_id)
+      @models  = Model.selectable
       render :new, status: :unprocessable_entity
     end
   end

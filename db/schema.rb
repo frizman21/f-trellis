@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_26_171039) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_29_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -132,6 +132,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_26_171039) do
     t.datetime "created_at", null: false
     t.string "family"
     t.date "knowledge_cutoff"
+    t.datetime "last_seen_at"
     t.integer "max_output_tokens"
     t.jsonb "metadata", default: {}
     t.jsonb "modalities", default: {}
@@ -143,6 +144,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_26_171039) do
     t.datetime "updated_at", null: false
     t.index ["capabilities"], name: "index_models_on_capabilities", using: :gin
     t.index ["family"], name: "index_models_on_family"
+    t.index ["last_seen_at"], name: "index_models_on_last_seen_at"
     t.index ["modalities"], name: "index_models_on_modalities", using: :gin
     t.index ["provider", "model_id"], name: "index_models_on_provider_and_model_id", unique: true
     t.index ["provider"], name: "index_models_on_provider"

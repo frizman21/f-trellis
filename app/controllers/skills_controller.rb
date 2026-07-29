@@ -65,6 +65,6 @@ class SkillsController < ApplicationController
   end
 
   def load_models
-    @models = Model.where(provider: %w[anthropic openai]).order(:provider, :model_id)
+    @models = Model.selectable
   end
 end

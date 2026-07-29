@@ -1,17 +1,41 @@
 <% content_for :title, "Models" %>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-2">
   <h1 class="mb-0">Models</h1>
-  <form method="get" action="<%= models_path %>" class="d-flex align-items-center gap-2">
-    <label for="provider" class="form-label mb-0 small text-muted">Provider</label>
-    <select name="provider" id="provider" class="form-select form-select-sm" onchange="this.form.submit()">
-      <option value="">All</option>
-      <% @providers.each do |p| %>
-        <option value="<%= p %>" <%= "selected" if @provider == p %>><%= p %></option>
-      <% end %>
-    </select>
-  </form>
+  <div class="d-flex align-items-center gap-3">
+    <form method="get" action="<%= models_path %>" class="d-flex align-items-center gap-2">
+      <label for="provider" class="form-label mb-0 small text-muted">Provider</label>
+      <select name="provider" id="provider" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All</option>
+        <% @providers.each do |p| %>
+          <option value="<%= p %>" <%= "selected" if @provider == p %>><%= p %></option>
+        <% end %>
+      </select>
+      <% if @show_stale %><input type="hidden" name="show_stale" value="1"><% end %>
+    </form>
+    <%= button_to "Refresh from providers",
+                  refresh_models_path(provider: @provider),
+                  class: "btn btn-sm btn-primary",
+                  form: { data: { turbo_confirm: "Fetch the current model list from every configured provider?" } } %>
+  </div>
 </div>
+
+<p class="text-muted small mb-3">
+  <% if @last_refreshed_at %>
+    Last refreshed <%= time_ago_in_words(@last_refreshed_at) %> ago
+    (<%= @last_refreshed_at.strftime("%Y-%m-%d %H:%M UTC") %>).
+  <% else %>
+    Never refreshed from providers.
+  <% end %>
+  <% if @stale_count.positive? %>
+    <%= @stale_count %> model<%= "s" unless @stale_count == 1 %> no longer returned by their provider
+    <% if @show_stale %>
+      (shown below) &middot; <%= link_to "hide", models_path(provider: @provider) %>.
+    <% else %>
+      &middot; <%= link_to "show", models_path(provider: @provider, show_stale: 1) %>.
+    <% end %>
+  <% end %>
+</p>
 
 <% if @models.any? %>
   <table class="table table-sm">
@@ -20,6 +44,7 @@
         <th>Provider</th>
         <th>Model ID</th>
         <th>Family</th>
+        <th>Last seen</th>
         <th class="text-end">Context</th>
         <th class="text-end">Max output</th>
         <th class="text-end">Input $/M</th>
@@ -31,10 +56,20 @@
     <tbody>
       <% @models.each do |m| %>
         <% standard = m.pricing&.dig("text_tokens", "standard") || {} %>
-        <tr>
+        <% stale = @last_refreshed_at.present? && (m.last_seen_at.nil? || m.last_seen_at < @last_refreshed_at) %>
+        <tr class="<%= "text-muted" if stale %>">
           <td><%= m.provider %></td>
           <td><code><%= m.model_id %></code></td>
           <td><%= m.family || "—" %></td>
+          <td class="small">
+            <% if stale %>
+              <span class="badge text-bg-warning">retired</span>
+            <% elsif m.last_seen_at %>
+              <%= m.last_seen_at.strftime("%Y-%m-%d") %>
+            <% else %>
+              —
+            <% end %>
+          </td>
           <td class="text-end"><%= m.context_window ? number_with_delimiter(m.context_window) : "—" %></td>
           <td class="text-end"><%= m.max_output_tokens ? number_with_delimiter(m.max_output_tokens) : "—" %></td>
           <td class="text-end"><%= standard["input_per_million"]  ? format("$%g", standard["input_per_million"].to_f)  : "—" %></td>
@@ -53,5 +88,8 @@
     Showing <%= @models.size %> of <%= @models.total_count %>.
   </p>
 <% else %>
-  <p>No models loaded. Run <code>bundle exec rails ruby_llm:load_models</code>.</p>
+  <p>
+    No models loaded. Use <strong>Refresh from providers</strong> above to fetch the live list,
+    or seed the gem's bundled snapshot with <code>bundle exec rails ruby_llm:load_models</code>.
+  </p>
 <% end %>

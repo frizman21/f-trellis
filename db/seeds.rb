@@ -1,3 +1,11 @@
+# Development login. Idempotent — re-running seeds will not duplicate the user
+# or reset an existing password. Never seeded in production.
+if Rails.env.local?
+  User.find_or_create_by!(email: "admin@example.com") do |user|
+    user.password = "Password1"
+  end
+end
+
 person_types = {
   "Mathematician"      => { description: "Researcher in mathematics.",       keys: [ "field", "institution" ] },
   "Engineer"           => { description: "Designs and builds systems.",      keys: [ "specialty", "company" ] },

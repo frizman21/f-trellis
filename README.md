@@ -37,22 +37,69 @@ docker-compose exec web bundle exec rails db:schema:load RAILS_ENV=test
 docker-compose exec web bundle exec rails db:seed
 ```
 
-### 5. Create a user
+### 5. Sign in
 
-The app requires sign-in for every page. Public sign-up is disabled — users
-are created from the Rails console:
+The app requires sign-in for every page and public sign-up is disabled. Seeding
+creates a development login:
+
+- **Email:** `admin@example.com`
+- **Password:** `Password1`
+
+Sign in at <http://localhost:3001/users/sign_in>.
+
+This user is only seeded in development and test. To create additional users —
+or any user in production — use the Rails console:
 
 ```sh
 docker-compose exec web bundle exec rails console
 ```
 
-Then in the console:
-
 ```ruby
 User.create!(email: "you@example.com", password: "set-a-good-one")
 ```
 
-Sign in at <http://localhost:3001/users/sign_in>.
+## The LLM model registry
+
+Model pickers (skills, source processing reports) read from the `models` table,
+not from a hardcoded list. `app/models/model.rb` is RubyLLM's `acts_as_model`,
+so this table *is* the registry RubyLLM resolves against — it only falls back to
+the JSON snapshot bundled in the gem when the table is empty.
+
+There are two ways to populate it:
+
+| Command | Source | Network |
+| --- | --- | --- |
+| `rails ruby_llm:load_models` | The snapshot bundled inside the installed `ruby_llm` gem. Only advances when you bump the gem. | none |
+| `rails llm:models:refresh` | The **live** `/models` endpoint of every configured provider, plus models.dev metadata. | yes |
+
+The refresh is also wired to the **Refresh from providers** button on `/models`,
+which enqueues `RefreshModelsJob`.
+
+### How retired models are handled
+
+A refresh never deletes rows — `Chat`, `SourceProcessingReport` and `Skill`
+records referencing an old model must keep resolving. Instead every model a
+provider returned is stamped with one shared `last_seen_at`. `Model.current`
+selects the rows carrying the newest stamp, and `Model.selectable` narrows that
+to the providers offered in pickers, so retired models drop out of dropdowns
+while remaining in the table. `/models` hides them behind a "show" toggle.
+
+This is fail-safe by design: if a provider is unconfigured or its API errors,
+RubyLLM preserves that provider's existing models, so they get stamped and are
+never falsely marked retired.
+
+### Requirements and known issues
+
+- A provider is only fetched if its key is configured (see
+  `config/initializers/ruby_llm.rb`). With no `ANTHROPIC_API_KEY`, Anthropic
+  models are preserved as-is and new ones never appear.
+- **ruby_llm 1.14.1 cannot ingest models.dev.** 173 models across 35 providers
+  publish `release_date`/`last_updated` as `YYYY-MM`; the gem interpolates that
+  into `"2026-01 00:00:00 UTC"` and `Utils.to_time` raises an unrescued
+  `ArgumentError: argument out of range`, aborting the whole feed. The refresh
+  logs `Failed to fetch models.dev` and continues with provider data only.
+  Until this is fixed upstream, a provider's models can only be refreshed by
+  configuring that provider's API key.
 
 ## Running the test suite
 
