@@ -5,6 +5,12 @@ on:
   push:
     branches: [ main ]
 
+# Three quick pushes to a PR would otherwise bill three full agent runs, two of
+# them already stale. Pushes to main are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -91,3 +97,46 @@ jobs:
           name: screenshots
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
+
+  # Change-request traceability gate. Judges whether this PR is linked to an
+  # approved change request and whether its diff and tests match that request's
+  # scope and test approach. It is not a bug hunter or a style reviewer — the
+  # deterministic jobs above own everything they can decide on their own, which
+  # is why this job `needs` them: a branch whose tests fail is never reviewed.
+  #
+  # Sourced from https://github.com/frizman21/software-factory-plugin
+  # (examples/agent-review.yml). Lives in this workflow rather than its own file
+  # because Actions has no cross-workflow `needs:`.
+  quality:
+    needs: [ test, system-test ]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write   # post the review / comment
+      issues: read           # read the linked change request
+      id-token: write        # claude-code-action mints an OIDC token; without
+                             # this it retries 3x and fails the job, even when
+                             # anthropic_api_key is set
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # The full anthropics/claude-code-action, not the base action: it applies
+      # actor permission checks and restores project configuration from the base
+      # ref, so a PR branch cannot rewrite the gate that judges it.
+      - name: Quality review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Pinned by tag. Unpinned, a plugin edit silently changes what every
+          # open PR is reviewed against.
+          plugin_marketplaces: "https://github.com/frizman21/software-factory-plugin.git#v0.1.0"
+          plugins: "sw-factory@software-factory"
+          prompt: "/sw-factory:pr-quality-review ${{ github.event.pull_request.html_url }}"
+          claude_args: |
+            --max-turns 15
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
