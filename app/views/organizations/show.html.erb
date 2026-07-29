@@ -1,10 +1,18 @@
 <% current = @organization.current_detail %>
 <% content_for :title, (current ? current.name : "Unnamed organization ##{@organization.id}") %>
 
-<h1><%= current ? current.name : "Unnamed organization ##{@organization.id}" %></h1>
+<h1>
+  <%= current ? current.name : "Unnamed organization ##{@organization.id}" %>
+  <% if current&.acronym.present? %>
+    <small class="text-muted">(<%= current.acronym %>)</small>
+  <% end %>
+</h1>
+
+<p><%= link_to "Edit", edit_organization_path(@organization), class: "btn btn-sm btn-outline-primary" %></p>
 
 <% if current %>
   <dl>
+    <dt>Acronym</dt><dd><%= current.acronym.presence || "—" %></dd>
     <dt>As of</dt><dd><%= current.as_of&.to_date %></dd>
     <dt>Confidence</dt><dd><%= current.confidence_tenths.to_i / 10.0 %>%</dd>
     <% if current.organization_types.any? %>
@@ -34,6 +42,7 @@
     <thead>
       <tr>
         <th>Name</th>
+        <th>Acronym</th>
         <th>As of</th>
         <th>Confidence</th>
         <th>Attributes</th>
@@ -43,6 +52,7 @@
       <% prior.each do |d| %>
         <tr>
           <td><%= d.name %></td>
+          <td><%= d.acronym %></td>
           <td><%= d.as_of&.to_date %></td>
           <td><%= d.confidence_tenths.to_i / 10.0 %>%</td>
           <td>

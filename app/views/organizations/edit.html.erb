@@ -1,0 +1,31 @@
+<% detail = @organization.current_detail %>
+<% heading = detail ? detail.name : "Unnamed organization ##{@organization.id}" %>
+<% content_for :title, "Edit #{heading}" %>
+
+<h1>Edit <%= heading %></h1>
+
+<% if detail %>
+  <%= form_with model: @organization, url: organization_path(@organization), method: :patch, local: true do |f| %>
+    <% if detail.errors.any? %>
+      <div class="alert alert-danger">
+        <ul class="mb-0">
+          <% detail.errors.full_messages.each do |m| %>
+            <li><%= m %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="mb-3">
+      <%= label_tag "organization[acronym]", "Acronym", class: "form-label" %>
+      <%= text_field_tag "organization[acronym]", detail.acronym, class: "form-control" %>
+      <div class="form-text">Short form the organization is commonly known by, e.g. NASA. Saved on the current detail.</div>
+    </div>
+
+    <%= f.submit "Save changes", class: "btn btn-primary" %>
+    <%= link_to "Cancel", organization_path(@organization), class: "btn btn-outline-secondary" %>
+  <% end %>
+<% else %>
+  <p>This organization has no current detail, so there is nothing to edit yet.</p>
+  <p><%= link_to "Back to organization", organization_path(@organization), class: "btn btn-outline-secondary" %></p>
+<% end %>
