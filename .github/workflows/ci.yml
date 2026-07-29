@@ -124,19 +124,75 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      # Pinning happens HERE, not in the marketplace string. There is no ref
+      # syntax for `claude plugin marketplace add`, and the action validates
+      # URLs against /^https:\/\/....\.git$/ — a trailing `#v0.1.0` is rejected
+      # outright with "Invalid marketplace URL format". Check the marketplace
+      # out at the pinned ref and hand the action the resulting local path
+      # instead; local paths skip URL validation and go straight to the CLI.
+      - name: Check out the sw-factory marketplace at the pinned ref
+        uses: actions/checkout@v6
+        with:
+          repository: frizman21/software-factory-plugin
+          # The pin: bump deliberately, never float. A commit rather than a tag
+          # because the instructions this workflow follows — the local-path
+          # marketplace, the failure-report step below, and the skill's
+          # never-exit-silently rule — landed after v0.1.0 was cut. Move this to
+          # the tag once the plugin tags that commit.
+          ref: bfd2b718ea78fa9d4ce2da381aac35dd8476a2af
+          path: .sw-factory-plugin
+
       # The full anthropics/claude-code-action, not the base action: it applies
       # actor permission checks and restores project configuration from the base
       # ref, so a PR branch cannot rewrite the gate that judges it.
       - name: Quality review
+        id: quality
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Pinned by tag. Unpinned, a plugin edit silently changes what every
-          # open PR is reviewed against.
-          plugin_marketplaces: "https://github.com/frizman21/software-factory-plugin.git#v0.1.0"
+          plugin_marketplaces: "./.sw-factory-plugin"
           plugins: "sw-factory@software-factory"
           prompt: "/sw-factory:pr-quality-review ${{ github.event.pull_request.html_url }}"
           claude_args: |
             --max-turns 15
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The agent comments on what it finds. It cannot comment on its own death:
+      # a bad plugin ref, an expired key, or exhausting --max-turns kills the
+      # step before the skill ever posts. Without this the PR shows a red X and
+      # no reason, which reads like "the code is bad" instead of "nobody looked."
+      # Same marker and same --edit-last as the skill, so a failure replaces the
+      # previous verdict rather than stacking under it.
+      - name: Report gate failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          OUTCOME: ${{ steps.quality.outcome || 'did not run' }}
+          # The PR head, not GITHUB_SHA — on pull_request that's the merge commit,
+          # which is not a commit the author can find in their branch.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/gate-failure.md <<EOF
+          **Quality gate did not complete — this PR has not been reviewed.**
+
+          The \`quality\` job failed before a verdict could be posted, so nothing
+          here says whether the change is traceable to an approved change request.
+          Treat this as *unreviewed*, not as *approved*.
+
+          - Agent step: \`${OUTCOME}\`
+          - Commit: \`${HEAD_SHA}\`
+          - Logs: ${RUN_URL}
+
+          Re-run the job once the cause is fixed. Common causes: the pinned
+          marketplace ref does not exist, \`ANTHROPIC_API_KEY\` is missing or
+          expired, or the agent hit \`--max-turns\`.
+
+          <!-- sw-factory:quality -->
+          EOF
+          gh pr comment "$PR" -R "$REPO" \
+            --edit-last --create-if-none --body-file /tmp/gate-failure.md
