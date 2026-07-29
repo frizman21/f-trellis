@@ -169,9 +169,19 @@ Requirements:
 - **`id-token: write`** must stay in the job's permissions. The action mints a
   GitHub OIDC token to obtain its app token, and fails the job without it even
   though Anthropic auth uses the static API key.
-- The marketplace is **pinned by tag** (`#v0.1.0`). Leave it pinned — unpinned,
-  an edit to the plugin silently changes what every open PR is judged against.
-  Bumping the gate is a deliberate edit to this file.
+- The marketplace is **pinned by a second `actions/checkout`** that clones the
+  plugin repo at a fixed ref into `.sw-factory-plugin`, which is then passed to
+  `plugin_marketplaces` as a local path. `plugin_marketplaces` has no ref syntax
+  of its own and rejects anything that is not a bare `https://….git` URL — a
+  trailing `#v0.1.0` fails with *Invalid marketplace URL format* — so checking
+  the ref out is the pin. Leave it pinned: unpinned, an edit to the plugin
+  silently changes what every open PR is judged against. Bumping the gate is a
+  deliberate edit to this file.
+- The **`Report gate failure` step must stay.** The agent comments on what it
+  finds, but it cannot comment on its own death — a bad ref, an expired key, or
+  exhausting `--max-turns` kills the step before the skill posts anything. That
+  step leaves a comment saying the PR is *unreviewed* (not approved), with a
+  link to the logs.
 
 #### A PR that edits `ci.yml` is not reviewed
 
