@@ -7,7 +7,6 @@
       "Bash(git -C /Users/mike/projects/f-dod log --oneline --all -- .env .env.example)",
       "Skill(update-config)",
       "Edit(/Users/mike/projects/f-dod/**)",
-      "Write(/Users/mike/projects/f-dod/**)",
       "Bash(docker-compose restart *)",
       "Bash(curl -s -o /dev/null -w \"index: %{http_code}\\\\n\" http://localhost:3000/chats)",
       "Bash(curl -s -o /dev/null -w \"show#1: %{http_code}\\\\n\" http://localhost:3000/chats/1)",
