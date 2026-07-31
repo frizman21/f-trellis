@@ -1,8 +1,11 @@
 require "zip"
 require "stringio"
+require "digest"
 
 class SourceDatum < ApplicationRecord
   belongs_to :source
+
+  before_save :assign_content_hash
 
   def html
     return nil if data.blank?
@@ -29,5 +32,23 @@ class SourceDatum < ApplicationRecord
     return LinkExtractor::Result.new(internal: [], external: []) if content.blank?
 
     LinkExtractor.call(content, base_url: source.url)
+  end
+
+  private
+
+  def assign_content_hash
+    return unless data_changed? || content_hash.nil?
+
+    self.content_hash = computed_content_hash
+  end
+
+  # Hashed over the *extracted text*, not the stored bytes: two fetches of a page
+  # whose markup, ad slots or session ids shifted but whose content did not
+  # should collapse to the same hash and not earn a second processing run.
+  def computed_content_hash
+    content = text
+    return nil if content.blank?
+
+    Digest::SHA256.hexdigest(content)
   end
 end

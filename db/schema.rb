@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_30_120100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_30_130100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -520,11 +520,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_30_120100) do
   end
 
   create_table "source_data", force: :cascade do |t|
+    t.string "content_hash"
     t.string "content_type"
     t.datetime "created_at", null: false
     t.binary "data"
     t.bigint "source_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["content_hash"], name: "index_source_data_on_content_hash"
     t.index ["source_id"], name: "index_source_data_on_source_id"
   end
 
@@ -540,6 +542,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_30_120100) do
 
   create_table "source_processing_reports", force: :cascade do |t|
     t.bigint "chat_id"
+    t.string "content_hash"
     t.datetime "created_at", null: false
     t.jsonb "facts", default: {}, null: false
     t.bigint "model_id"
@@ -550,6 +553,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_30_120100) do
     t.index ["chat_id"], name: "index_source_processing_reports_on_chat_id"
     t.index ["model_id"], name: "index_source_processing_reports_on_model_id"
     t.index ["skill_revision_id"], name: "index_source_processing_reports_on_skill_revision_id"
+    t.index ["source_id", "skill_revision_id", "content_hash"], name: "index_reports_on_source_skill_revision_and_content", unique: true
     t.index ["source_id"], name: "index_source_processing_reports_on_source_id"
     t.index ["status"], name: "index_source_processing_reports_on_status"
   end

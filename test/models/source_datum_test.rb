@@ -60,6 +60,47 @@ class SourceDatumTest < ActiveSupport::TestCase
                     "https://example.com/x"
   end
 
+  test "content_hash is set on create" do
+    datum = zipped("<html><body><p>hashed</p></body></html>")
+
+    assert_match(/\A[0-9a-f]{64}\z/, datum.content_hash)
+  end
+
+  test "identical text produces the same hash" do
+    a = zipped("<html><body><p>same</p></body></html>")
+    b = zipped("<html><body><p>same</p></body></html>")
+
+    assert_equal a.content_hash, b.content_hash
+  end
+
+  test "different text produces different hashes" do
+    a = zipped("<html><body><p>one</p></body></html>")
+    b = zipped("<html><body><p>two</p></body></html>")
+
+    assert_not_equal a.content_hash, b.content_hash
+  end
+
+  test "markup-only changes do not change the hash" do
+    a = zipped("<html><body><p>Acme Corp</p></body></html>")
+    b = zipped('<html><body><p class="promo" data-session="abc123">Acme Corp</p>' \
+               "<script>track(1)</script></body></html>")
+
+    assert_equal a.content_hash, b.content_hash,
+      "hashing the extracted text should ignore markup and script churn"
+  end
+
+  test "content_hash is nil when there is no extractable text" do
+    datum = zipped("<html><head><title>t</title></head></html>")
+
+    assert_nil datum.content_hash
+  end
+
+  test "content_hash is nil when data is blank" do
+    datum = SourceDatum.create!(source: sources(:one), content_type: "application/zip", data: nil)
+
+    assert_nil datum.content_hash
+  end
+
   private
 
   def zipped(html)
