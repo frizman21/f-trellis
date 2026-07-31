@@ -7,6 +7,21 @@ class SourcesController < ApplicationController
     @source = Source.find(params[:id])
     @links_from_count = @source.links_to.count
     @links_to_count   = @source.linked_from.count
+    @learning_sets = LearningSet.order(:name)
+  end
+
+  # File a page into a learning set from the page itself, so a source found
+  # while browsing does not have to be re-entered by URL.
+  def add_to_learning_set
+    source = Source.find(params[:id])
+    learning_set = LearningSet.find_by(id: params[:learning_set_id])
+
+    if learning_set.nil?
+      redirect_to source_path(source), alert: "Select a learning set first." and return
+    end
+
+    outcome = learning_set.add_source(source)
+    redirect_to source_path(source), notice: outcome.message
   end
 
   # Sources this one's content links out to.

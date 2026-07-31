@@ -82,6 +82,29 @@ Rails inflection note: the model class is `SourceDatum`, the table is
 
 Active Storage is **not** used. Binary data lives in this table only.
 
+### `LearningSet` and `LearningSetSource`
+
+A named collection of sources — the pages you keep coming back to when you want
+to know whether something works. A set only groups pages; nothing about it
+fetches, crawls or processes them.
+
+| Column        | Type     | Notes                                        |
+|---------------|----------|----------------------------------------------|
+| `name`        | `string`, NOT NULL, unique | What the set is for.       |
+| `description` | `text`   | Why these pages belong together.             |
+| `created_at` / `updated_at` | `datetime` | Standard timestamps.       |
+
+`LearningSetSource` joins a set to a source, unique on
+`[learning_set_id, source_id]`; `learning_set_id` cascades on delete, so
+deleting a set drops its memberships and leaves every source in place.
+
+Pages are added **by URL** through `LearningSet#add_url`, which resolves the URL
+with `Source.for_url` — normalising whitespace, a missing scheme and a trailing
+`#fragment`, then reusing the existing source when one already has that URL. A
+page's identity in this app is its URL; a second row for the same page would
+split its fetched content and its processing history in two. Adding a page the
+set already has is a reported no-op, not an error.
+
 ---
 
 ## 2. Skill family
@@ -96,8 +119,19 @@ revisions so it can evolve without losing history.
 |-------------|-----------|----------------------------------------------------|
 | `name`      | `string`  | Short identifier.                                  |
 | `purpose`   | `string`  | What the skill does, in plain language.            |
+| `applicability` | `text` | Which pages the skill is worth a call on, and which it is not. Read by triage. Required once `is_active`. |
+| `url_patterns` | `text[]`, NOT NULL, default `[]` | Regex sources that claim a URL outright. |
 | `is_active` | `boolean`, NOT NULL, default `false` | Only active skills should be executed. New skills start inactive until explicitly enabled. |
 | `created_at` / `updated_at` | `datetime` | Standard timestamps.         |
+
+Two fields decide when a skill runs, and they answer different questions.
+`applicability` is prose for the model to judge against a page's text —
+"exhibitor lists and member directories; not prose articles". `url_patterns` is
+a list of Ruby regex sources matched against the source's URL, unanchored and
+case insensitively (`linkedin\.com/in/`). A pattern match is a fact rather than
+a judgement, so it wins outright: `SkillTriage` runs the matching skills, skips
+every other skill for that page, and makes no model call at all. Most skills
+have no patterns and route by their statement alone.
 
 Associations:
 
@@ -152,7 +186,8 @@ parent skill's newer revisions supersede it.
 Source ─┬─< SourceDatum
         ├─< SourceProcessingReport >─ SkillRevision >─ Skill
         ├─< Source (child_sources, via parent_source_id)
-        └─< SourceLink >─ Source   (from_source / to_source)
+        ├─< SourceLink >─ Source   (from_source / to_source)
+        └─< LearningSetSource >─ LearningSet
 ```
 
 - A `Source` has zero-or-more `SourceDatum` rows (raw payload chunks) and

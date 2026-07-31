@@ -118,6 +118,78 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_match "Directory pages and exhibitor lists.", @response.body
   end
 
+  # --- url patterns -------------------------------------------------------
+
+  test "the new form offers a url patterns field" do
+    get new_skill_path
+
+    assert_response :success
+    assert_select "textarea[name=?]", "skill[url_patterns_text]"
+  end
+
+  test "the edit form prefills url patterns one per line" do
+    @skill.update!(url_patterns: [ 'linkedin\.com/in/', 'x\.com/status/' ])
+
+    get edit_skill_path(@skill)
+
+    assert_response :success
+    assert_select "textarea[name=?]", "skill[url_patterns_text]",
+                  text: %r{linkedin\\\.com/in/\nx\\\.com/status/}
+  end
+
+  test "create splits the submitted lines into patterns" do
+    post skills_path, params: {
+      skill: {
+        name: "LinkedIn-Person",
+        applicability: "LinkedIn profiles.",
+        url_patterns_text: "linkedin\\.com/in/\r\n\r\n  x\\.com/status/  ",
+        revision_content: "Do it."
+      }
+    }
+
+    assert_equal [ 'linkedin\.com/in/', 'x\.com/status/' ],
+                 Skill.find_by(name: "LinkedIn-Person").url_patterns
+  end
+
+  test "update clears url patterns when the field is emptied" do
+    @skill.update!(url_patterns: [ 'linkedin\.com/in/' ])
+
+    patch skill_path(@skill), params: {
+      skill: { name: @skill.name, url_patterns_text: "", revision_content: "Do it." }
+    }
+
+    assert_equal [], @skill.reload.url_patterns
+  end
+
+  test "an invalid regular expression is rejected rather than stored" do
+    patch skill_path(@skill), params: {
+      skill: { name: @skill.name, url_patterns_text: "linkedin(", revision_content: "Do it." }
+    }
+
+    assert_response :unprocessable_entity
+    assert_equal [], @skill.reload.url_patterns
+    assert_match(/invalid regular expression/, @response.body)
+  end
+
+  test "show lists the url patterns" do
+    @skill.update!(url_patterns: [ 'linkedin\.com/in/' ])
+
+    get skill_path(@skill)
+
+    assert_response :success
+    assert_select "code", text: 'linkedin\.com/in/'
+  end
+
+  test "the skills index shows a url patterns column" do
+    @skill.update!(url_patterns: [ 'linkedin\.com/in/' ])
+
+    get skills_path
+
+    assert_response :success
+    assert_select "th", text: "URL patterns"
+    assert_select "td code", text: 'linkedin\.com/in/'
+  end
+
   test "show requires authentication" do
     sign_out users(:admin)
 

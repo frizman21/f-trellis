@@ -18,7 +18,7 @@ class SkillTriage
 
   Verdict = Struct.new(:skill, :applies, :reason, keyword_init: true)
 
-  Result = Struct.new(:verdicts, :failed, :error, keyword_init: true) do
+  Result = Struct.new(:verdicts, :failed, :error, :routed_by_url, keyword_init: true) do
     def recommended = verdicts.select(&:applies)
     def skipped     = verdicts.reject(&:applies)
     def failed?     = failed
@@ -37,6 +37,9 @@ class SkillTriage
   def call
     return Result.new(verdicts: [], failed: false) if @skills.empty?
 
+    claimed = url_claim_verdicts
+    return Result.new(verdicts: claimed, failed: false, routed_by_url: true) if claimed
+
     excerpt = page_excerpt
     return fail_open("the source has no extractable text") if excerpt.blank?
 
@@ -47,6 +50,38 @@ class SkillTriage
   end
 
   private
+
+  # A skill can claim a URL outright with a regex. A claim states a fact about
+  # the page — a LinkedIn profile is a LinkedIn profile — where applicability
+  # only invites a guess, so a match wins and costs nothing: the whole triage
+  # call is skipped. Everything else is left unchecked rather than removed, so
+  # an operator who disagrees can still queue it.
+  #
+  # Returns nil when nothing claims the URL, meaning "ask the model".
+  def url_claim_verdicts
+    url = @source&.url.to_s
+    return nil if url.blank?
+
+    claims = @skills.each_with_object({}) do |skill, memo|
+      pattern = skill.url_pattern_matching(url)
+      memo[skill.id] = pattern if pattern
+    end
+    return nil if claims.empty?
+
+    claimants = @skills.select { |s| claims.key?(s.id) }.map(&:name).to_sentence
+    Rails.logger.info("SkillTriage: #{claimants} claim(s) #{url} by URL pattern; no triage call made")
+
+    @skills.map do |skill|
+      pattern = claims[skill.id]
+      reason = if pattern
+        "URL matches /#{pattern}/ — claimed by pattern, no triage call needed."
+      else
+        "Skipped: #{claimants} claim#{'s' if claims.size == 1} this URL by pattern."
+      end
+
+      Verdict.new(skill: skill, applies: !pattern.nil?, reason: reason)
+    end
+  end
 
   def page_excerpt
     @source&.source_data&.order(:created_at)&.last&.text.to_s.strip.truncate(EXCERPT_LIMIT)

@@ -1,0 +1,71 @@
+<% content_for :title, @learning_set.name %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0"><%= @learning_set.name %></h1>
+  <div class="d-flex gap-2">
+    <%= link_to "Edit", edit_learning_set_path(@learning_set), class: "btn btn-outline-primary" %>
+    <%= button_to "Delete", learning_set_path(@learning_set), method: :delete,
+                  class: "btn btn-outline-danger", form: { class: "m-0" },
+                  data: { turbo_confirm: "Delete #{@learning_set.name}? Its sources are kept." } %>
+  </div>
+</div>
+
+<% if @learning_set.description.present? %>
+  <p><%= @learning_set.description %></p>
+<% end %>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h2 class="h5 card-title">Add a page by URL</h2>
+    <%= form_with url: add_source_learning_set_path(@learning_set), method: :post, local: true do %>
+      <div class="input-group">
+        <%= text_field_tag :url, nil, class: "form-control",
+                           placeholder: "https://example.com/exhibitors", required: true %>
+        <%= submit_tag "Add source", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+    <div class="form-text">
+      A URL already known to the app is linked to this set rather than added
+      again — the same page must not end up as two sources. Adding does not
+      fetch the page; use Fetch on the source for that.
+    </div>
+  </div>
+</div>
+
+<h2 class="h4">Sources <span class="text-muted">(<%= @sources.size %>)</span></h2>
+
+<% if @sources.any? %>
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>URL</th>
+        <th>Status</th>
+        <th>Fetched</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @sources.each do |source| %>
+        <tr>
+          <td><%= link_to source.id, source_path(source) %></td>
+          <td>
+            <%= link_to truncate(source.url.to_s, length: 80), source_path(source) %>
+            <%= external_link_to "", source.url %>
+          </td>
+          <td><%= source.status %></td>
+          <td><%= source.source_data.any? ? "Yes" : "No" %></td>
+          <td>
+            <%= button_to "Remove", remove_source_learning_set_path(@learning_set, source_id: source.id),
+                          method: :delete, class: "btn btn-sm btn-outline-secondary",
+                          form: { class: "m-0" } %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="text-muted">No sources in this set yet. Add one by URL above, or from any source's page.</p>
+<% end %>
+
+<p><%= link_to "Back to learning sets", learning_sets_path %></p>

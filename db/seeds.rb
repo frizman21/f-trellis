@@ -92,6 +92,29 @@ skill_applicability.each do |name, statement|
   skill.update!(applicability: statement)
 end
 
+# URL patterns — where the URL alone settles which skill reads the page, saying
+# so costs nothing and beats asking the model. Only the skills whose pages are
+# predictable by URL get patterns; the rest route by their statement. Kept
+# narrow on purpose: a matching pattern excludes every other skill from the
+# page. Written only when currently empty, so edits in the UI survive re-seeding.
+skill_url_patterns = {
+  "LinkedIn-Person" => [
+    'linkedin\.com/in/'
+  ],
+  "Acquisition News" => [
+    'prnewswire\.com/news-releases/',
+    'businesswire\.com/news/',
+    'globenewswire\.com/news-release/'
+  ]
+}
+
+skill_url_patterns.each do |name, patterns|
+  skill = Skill.find_by(name: name)
+  next if skill.nil? || skill.url_patterns.present?
+
+  skill.update!(url_patterns: patterns)
+end
+
 # Mark the Summarize skill as promotable so `rails fixtures:promote` has
 # something to materialize into a fixture on a fresh dev DB.
 Skill.where(name: "Summarize").update_all(is_promotable: true, is_fixtured: false)
@@ -1023,4 +1046,18 @@ SourceLink.record(from: link_sample_source, to: apollo_source)
 # And a link back the other way, so at least one source shows both inbound and
 # outbound edges.
 SourceLink.record(from: link_sample_children.first, to: link_sample_source)
+
+# An example learning set, so the list, the show page and the source page's
+# "add to a learning set" dropdown all have something to work with. `add_url`
+# reuses the source already seeded above rather than creating a second row for
+# the same page, which is the behaviour worth demonstrating.
+learning_set = LearningSet.find_or_create_by!(name: "Org extraction regression") do |ls|
+  ls.description = "Pages we re-run organization extraction against when a skill changes."
+end
+
+[
+  link_sample_source.url,
+  apollo_source.url,
+  "https://en.wikipedia.org/wiki/NASA"
+].each { |url| learning_set.add_url(url) }
 

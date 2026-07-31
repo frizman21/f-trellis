@@ -194,6 +194,87 @@ class SkillTriageTest < ActiveSupport::TestCase
     assert_includes prompt, @source.url
   end
 
+  # --- url patterns -------------------------------------------------------
+
+  test "a skill whose pattern matches the url is picked without any call" do
+    linkedin = make_skill("LinkedIn-Person", "LinkedIn profiles.")
+    linkedin.update!(url_patterns: [ 'triage\.test/exhibitors' ])
+
+    result = with_fake_chat(response: verdicts_json) { SkillTriage.call(source: @source) }
+
+    assert_equal 0, FakeChat.created, "the URL settles it; paying to ask is waste"
+    assert_not result.failed?
+    assert result.routed_by_url
+    assert_equal [ linkedin ], result.recommended.map(&:skill)
+  end
+
+  test "a url claim excludes every other candidate skill" do
+    linkedin = make_skill("LinkedIn-Person", "LinkedIn profiles.")
+    linkedin.update!(url_patterns: [ 'triage\.test/exhibitors' ])
+
+    result = with_fake_chat(response: verdicts_json) { SkillTriage.call(source: @source) }
+
+    assert_equal [ @news, @orgs ].map(&:name).sort, result.skipped.map { |v| v.skill.name }.sort
+    assert_match(/LinkedIn-Person/, result.skipped.first.reason)
+  end
+
+  test "the claiming verdict names the pattern that matched" do
+    linkedin = make_skill("LinkedIn-Person", "LinkedIn profiles.")
+    linkedin.update!(url_patterns: [ 'triage\.test/exhibitors' ])
+
+    result = with_fake_chat(response: verdicts_json) { SkillTriage.call(source: @source) }
+
+    assert_match %r{triage\\\.test/exhibitors}, result.recommended.first.reason
+  end
+
+  test "two skills claiming the same url both run" do
+    a = make_skill("Claim A", "Somewhere.")
+    b = make_skill("Claim B", "Somewhere.")
+    a.update!(url_patterns: [ 'triage\.test' ])
+    b.update!(url_patterns: [ "/exhibitors" ])
+
+    result = with_fake_chat(response: verdicts_json) { SkillTriage.call(source: @source) }
+
+    assert_equal 0, FakeChat.created
+    assert_equal [ a, b ], result.recommended.map(&:skill)
+  end
+
+  test "a pattern matching no url leaves triage to the model" do
+    make_skill("LinkedIn-Person", "LinkedIn profiles.").update!(url_patterns: [ 'linkedin\.com/in/' ])
+
+    result = with_fake_chat(response: verdicts_json([ @orgs, true, "yes" ])) do
+      SkillTriage.call(source: @source)
+    end
+
+    assert_equal 1, FakeChat.created
+    assert_not result.routed_by_url
+    assert_equal [ @orgs ], result.recommended.map(&:skill)
+  end
+
+  test "a claim only counts among the candidate skills given" do
+    outsider = make_skill("Outsider", "Somewhere.")
+    outsider.update!(url_patterns: [ 'triage\.test' ])
+
+    result = with_fake_chat(response: verdicts_json([ @orgs, true, "yes" ])) do
+      SkillTriage.call(source: @source, skills: [ @orgs, @news ])
+    end
+
+    assert_equal 1, FakeChat.created, "a skill that was not a candidate cannot claim the page"
+    assert_not_includes result.verdicts.map(&:skill), outsider
+  end
+
+  test "a claimed page is routed even when it has no extractable text" do
+    empty = Source.create!(url: "https://triage.test/empty")
+    linkedin = make_skill("LinkedIn-Person", "LinkedIn profiles.")
+    linkedin.update!(url_patterns: [ 'triage\.test/empty' ])
+
+    result = with_fake_chat(response: verdicts_json) { SkillTriage.call(source: empty) }
+
+    assert_equal 0, FakeChat.created
+    assert_not result.failed?, "the URL is enough; there is nothing to fail open about"
+    assert_equal [ linkedin ], result.recommended.map(&:skill)
+  end
+
   test "asks for a structured response rather than scraping prose" do
     with_fake_chat(response: verdicts_json([ @orgs, true, "yes" ])) do
       SkillTriage.call(source: @source)

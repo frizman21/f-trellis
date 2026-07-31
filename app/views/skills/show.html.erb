@@ -18,6 +18,21 @@
     <% end %>
   </dd>
 
+  <dt>URL patterns</dt>
+  <dd>
+    <% if @skill.url_patterns.present? %>
+      <% @skill.url_patterns.each do |pattern| %>
+        <div><code><%= pattern %></code></div>
+      <% end %>
+      <div class="text-muted small">
+        A page whose URL matches any of these is routed to this skill alone,
+        without a triage call.
+      </div>
+    <% else %>
+      — <span class="text-muted">(routed by the applicability statement)</span>
+    <% end %>
+  </dd>
+
   <dt>Active</dt>
   <dd><%= @skill.is_active? ? "Yes" : "No" %></dd>
 

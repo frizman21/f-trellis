@@ -1,0 +1,31 @@
+<%= form_with model: learning_set, local: true do |f| %>
+  <% if learning_set.errors.any? %>
+    <div class="alert alert-warning">
+      <ul class="mb-0">
+        <% learning_set.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :name, class: "form-label" %>
+    <%= f.text_field :name, class: "form-control", required: true %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :description, class: "form-label" %>
+    <%= f.text_area :description, rows: 3, class: "form-control" %>
+    <div class="form-text">What these pages are for — what you learn by running against them.</div>
+  </div>
+
+  <%= f.submit submit_label, class: "btn btn-primary" %>
+  <%= link_to "Cancel",
+              learning_set.persisted? ? learning_set_path(learning_set) : learning_sets_path,
+              class: "btn btn-outline-secondary" %>
+<% end %>
+
+<% if learning_set.persisted? %>
+  <p class="text-muted small mt-3">Sources are added from the set's page.</p>
+<% end %>
