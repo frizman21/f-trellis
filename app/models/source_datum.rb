@@ -10,8 +10,16 @@ class SourceDatum < ApplicationRecord
     Zip::InputStream.open(StringIO.new(data)) do |io|
       entry = io.get_next_entry
       return nil unless entry
-      io.read
+      # +str because an empty entry reads back as a frozen string, and
+      # force_encoding mutates in place.
+      (+io.read.to_s).force_encoding("UTF-8")
     end
+  end
+
+  # The page's visible text, with markup stripped. This is what gets sent to a
+  # model; #html stays available for link extraction, which needs the anchors.
+  def text
+    ContentExtractor.call(html)
   end
 
   # Unzip the stored payload and pull the links out of it. Shared by CrawlJob,
