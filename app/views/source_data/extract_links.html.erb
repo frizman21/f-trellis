@@ -1,0 +1,89 @@
+<% content_for :title, "Links in source datum ##{@datum.id}" %>
+<h1>Links in source datum #<%= @datum.id %></h1>
+
+<dl>
+  <dt>Source</dt>
+  <dd><%= link_to "Source ##{@source.id}", source_path(@source) %></dd>
+
+  <dt>Base URL</dt>
+  <dd><%= external_link_to @source.url, @source.url %></dd>
+
+  <dt>Content type</dt>
+  <dd><%= @datum.content_type %></dd>
+</dl>
+
+<% if @error.present? %>
+  <div class="alert alert-danger"><%= @error %></div>
+<% elsif @links.internal.empty? && @links.external.empty? %>
+  <p>No links found in this payload. No sources created.</p>
+<% else %>
+  <p>
+    Found <%= pluralize(@links.internal.size, "internal link") %> and
+    <%= pluralize(@links.external.size, "external link") %>.
+    Created <strong><%= @created.size %></strong> sources,
+    skipped <strong><%= @skipped.size %></strong> already known, and recorded
+    <strong><%= @new_links %></strong> new
+    <%= "link".pluralize(@new_links) %> in the graph.
+  </p>
+
+  <h2>Sources created (<%= @created.size %>)</h2>
+  <% if @created.any? %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>URL</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @created.each do |source| %>
+          <tr>
+            <td><%= link_to source.id, source_path(source) %></td>
+            <td><%= external_link_to source.url, source.url %></td>
+            <td><%= source.status %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <div class="form-text mb-4">
+      New sources are left in status <code>new</code> — nothing has been
+      fetched. Open one and click "Fetch now", or run a crawl, to pull content.
+    </div>
+  <% else %>
+    <p>None — every link was already a known source.</p>
+  <% end %>
+
+  <% if @failed.any? %>
+    <h2>Could not create (<%= @failed.size %>)</h2>
+    <ul>
+      <% @failed.each do |url, message| %>
+        <li><code><%= url %></code> — <%= message %></li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <h2>Skipped — already known (<%= @skipped.size %>)</h2>
+  <% if @skipped.any? %>
+    <p class="form-text">
+      No source was created for these, but the link itself is still recorded,
+      so they appear under "Links from this source".
+    </p>
+    <ul>
+      <% @skipped.each do |url| %>
+        <li><%= external_link_to url, url %></li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p>None.</p>
+  <% end %>
+
+  <div class="form-text">
+    Internal means the same host as the base URL
+    (<code><%= @source.domain&.host %></code>). Both internal and external
+    links are turned into sources here; the crawl's stay-in-domain mode is the
+    narrower option.
+  </div>
+<% end %>
+
+<p><%= link_to "Back to source", source_path(@source) %></p>

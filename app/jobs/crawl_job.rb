@@ -26,14 +26,24 @@ class CrawlJob < ApplicationJob
       next if depth >= max_depth
 
       discovered_links(current, crawl_type).each do |url|
-        break if processed + queue.size >= max_pages
-        next if seen_urls.include?(url)
+        target = Source.find_by(url: url)
+
+        # Only URLs we have not seen and have no source for get created and
+        # queued; the max_pages cap bounds queueing, not link recording.
+        if target.nil? && !seen_urls.include?(url) && processed + queue.size < max_pages
+          # Parent is the page the link was actually found on, which is only
+          # the seed at depth 1.
+          target = Source.create!(url: url,
+                                  parent_source: current,
+                                  description: "Discovered by crawl from #{seed_source.url}")
+          queue << [target, depth + 1]
+        end
 
         seen_urls << url
-        next if Source.exists?(url: url)
 
-        child = Source.create!(url: url, description: "Discovered by crawl from #{seed_source.url}")
-        queue << [child, depth + 1]
+        # Record the edge either way, so links back to pages we already know
+        # about still show up in the graph.
+        SourceLink.record(from: current, to: target) if target
       end
     end
   end
@@ -51,10 +61,7 @@ class CrawlJob < ApplicationJob
     datum = source.source_data.order(:created_at).last
     return [] unless datum
 
-    html = datum.html
-    return [] if html.blank?
-
-    result = LinkExtractor.call(html, base_url: source.url)
+    result = datum.extract_links
     case crawl_type
     when "stay_in_domain"      then result.internal
     when "follow_external_links" then result.internal + result.external
