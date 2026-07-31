@@ -24,9 +24,24 @@
     <%= f.text_field :purpose, class: "form-control" %>
   </div>
 
+  <div class="mb-3">
+    <%= f.label :applicability, "Applicability", class: "form-label" %>
+    <%= f.text_area :applicability, rows: 4, class: "form-control" %>
+    <div class="form-text">
+      Which pages this skill is worth running on, and which it is not — e.g.
+      "LinkedIn profile pages for individual people; not company pages, not
+      search results." Read by triage to decide which skills to call on a page,
+      so state it the way you would explain it to someone deciding. Required
+      once the skill is active.
+    </div>
+  </div>
+
   <div class="form-check mb-3">
     <%= f.check_box :is_active, class: "form-check-input" %>
     <%= f.label :is_active, "Active", class: "form-check-label" %>
+    <div class="form-text">
+      An active skill must state its applicability.
+    </div>
   </div>
 
   <div class="mb-3">
