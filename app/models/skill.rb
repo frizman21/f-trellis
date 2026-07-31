@@ -1,5 +1,6 @@
 class Skill < ApplicationRecord
   has_many :skill_revisions, dependent: :destroy
+  has_many :skill_evaluations, dependent: :destroy
   belongs_to :preferred_model, class_name: "Model", optional: true
 
   # `applicability` states which pages this skill is worth spending a call on.

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_31_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_31_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -514,6 +514,51 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_130000) do
     t.index ["is_enabled"], name: "index_research_starting_points_on_is_enabled"
   end
 
+  create_table "skill_evaluation_models", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "model_id", null: false
+    t.bigint "skill_evaluation_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["model_id"], name: "index_skill_evaluation_models_on_model_id"
+    t.index ["skill_evaluation_id", "model_id"], name: "index_skill_evaluation_models_on_pair", unique: true
+    t.index ["skill_evaluation_id"], name: "index_skill_evaluation_models_on_skill_evaluation_id"
+  end
+
+  create_table "skill_evaluation_results", force: :cascade do |t|
+    t.bigint "chat_id"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.text "error"
+    t.bigint "model_id", null: false
+    t.text "response"
+    t.decimal "score", precision: 6, scale: 3
+    t.bigint "skill_evaluation_id", null: false
+    t.bigint "skill_revision_id", null: false
+    t.bigint "source_id", null: false
+    t.datetime "started_at"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_id"], name: "index_skill_evaluation_results_on_chat_id"
+    t.index ["model_id"], name: "index_skill_evaluation_results_on_model_id"
+    t.index ["skill_evaluation_id", "source_id", "model_id", "skill_revision_id"], name: "index_skill_evaluation_results_on_run", unique: true
+    t.index ["skill_evaluation_id"], name: "index_skill_evaluation_results_on_skill_evaluation_id"
+    t.index ["skill_revision_id"], name: "index_skill_evaluation_results_on_skill_revision_id"
+    t.index ["source_id"], name: "index_skill_evaluation_results_on_source_id"
+  end
+
+  create_table "skill_evaluations", force: :cascade do |t|
+    t.bigint "base_model_id", null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.bigint "learning_set_id", null: false
+    t.string "name", null: false
+    t.bigint "skill_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["base_model_id"], name: "index_skill_evaluations_on_base_model_id"
+    t.index ["learning_set_id"], name: "index_skill_evaluations_on_learning_set_id"
+    t.index ["skill_id"], name: "index_skill_evaluations_on_skill_id"
+  end
+
   create_table "skill_revisions", force: :cascade do |t|
     t.string "content"
     t.datetime "created_at", null: false
@@ -682,6 +727,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_130000) do
   add_foreign_key "person_person_detail_person_person_types", "person_person_types"
   add_foreign_key "person_person_details", "person_people"
   add_foreign_key "person_person_details", "source_processing_reports"
+  add_foreign_key "skill_evaluation_models", "models"
+  add_foreign_key "skill_evaluation_models", "skill_evaluations", on_delete: :cascade
+  add_foreign_key "skill_evaluation_results", "chats"
+  add_foreign_key "skill_evaluation_results", "models"
+  add_foreign_key "skill_evaluation_results", "skill_evaluations", on_delete: :cascade
+  add_foreign_key "skill_evaluation_results", "skill_revisions"
+  add_foreign_key "skill_evaluation_results", "sources"
+  add_foreign_key "skill_evaluations", "learning_sets"
+  add_foreign_key "skill_evaluations", "models", column: "base_model_id"
+  add_foreign_key "skill_evaluations", "skills"
   add_foreign_key "skill_revisions", "skills"
   add_foreign_key "skills", "models", column: "preferred_model_id"
   add_foreign_key "source_data", "sources"

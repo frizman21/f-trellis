@@ -1061,3 +1061,44 @@ end
   "https://en.wikipedia.org/wiki/NASA"
 ].each { |url| learning_set.add_url(url) }
 
+# An example skill evaluation over that set, so the list, the configuration form
+# and the result detail page all have something to show without spending money
+# on a real run. Skipped entirely when no models have been refreshed yet — the
+# registry is populated from the providers, not from seeds.
+evaluation_models = Model.selectable.first(2)
+evaluation_skill  = Skill.find_by(name: "Pull Organization Names")
+
+if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
+  evaluation = SkillEvaluation.find_or_create_by!(name: "Org extraction — model comparison") do |e|
+    e.description  = "Does a cheaper model pull the same organizations off a page as the baseline?"
+    e.skill        = evaluation_skill
+    e.learning_set = learning_set
+    e.base_model   = evaluation_models.first
+  end
+
+  evaluation.models = evaluation_models
+
+  # One seeded result per model on one page, so the results table and the detail
+  # page render. The response text is obviously synthetic — a seeded row must
+  # never be mistaken for something a model actually said.
+  revision = evaluation_skill.skill_revisions.order(:sequence).last
+
+  evaluation_models.each_with_index do |model, index|
+    next if evaluation.skill_evaluation_results
+                      .exists?(source: link_sample_source, model: model, skill_revision: revision)
+
+    SkillEvaluationResult.create!(
+      skill_evaluation: evaluation,
+      source: link_sample_source,
+      model: model,
+      skill_revision: revision,
+      status: index.zero? ? "complete" : "failed",
+      response: index.zero? ? "[seeded placeholder — not a real model response]\n\n" \
+                              "Organizations found on this page:\n- NASA\n- Example Corp" : nil,
+      error: index.zero? ? nil : "[seeded placeholder] RubyLLM::Error: rate limited",
+      started_at: 2.minutes.ago,
+      completed_at: 1.minute.ago
+    )
+  end
+end
+

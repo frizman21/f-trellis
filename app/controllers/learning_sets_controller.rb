@@ -41,10 +41,16 @@ class LearningSetsController < ApplicationController
 
   def destroy
     learning_set = LearningSet.find(params[:id])
-    learning_set.destroy!
 
-    redirect_to learning_sets_path,
-                notice: "Learning set \"#{learning_set.name}\" deleted. Its sources were left in place."
+    if learning_set.destroy
+      redirect_to learning_sets_path,
+                  notice: "Learning set \"#{learning_set.name}\" deleted. Its sources were left in place."
+    else
+      # An evaluation points at this set; deleting it would leave that evaluation
+      # holding results with no record of which pages produced them.
+      redirect_to learning_set_path(learning_set),
+                  alert: learning_set.errors.full_messages.to_sentence
+    end
   end
 
   # Add a page by URL, reusing the existing source when the URL is already known.

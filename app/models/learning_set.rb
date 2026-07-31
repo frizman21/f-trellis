@@ -5,6 +5,10 @@
 class LearningSet < ApplicationRecord
   has_many :learning_set_sources, dependent: :destroy
   has_many :sources, through: :learning_set_sources
+  # Evaluations run against this set. Restricted rather than cascading: deleting
+  # a set out from under an evaluation would leave it with results and no record
+  # of which pages produced them.
+  has_many :skill_evaluations, dependent: :restrict_with_error
 
   validates :name, presence: true, uniqueness: { case_sensitive: false }
 

@@ -1,0 +1,133 @@
+<%= form_with model: evaluation, local: true do |f| %>
+  <% if evaluation.errors.any? %>
+    <div class="alert alert-warning">
+      <%= pluralize(evaluation.errors.count, "error") %> prevented this evaluation from being saved:
+      <ul class="mb-0">
+        <% evaluation.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :name, class: "form-label" %>
+    <%= f.text_field :name, class: "form-control", required: true %>
+    <div class="form-text">What you are trying to learn, e.g. "Org extraction — cheap models vs 4o".</div>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :description, class: "form-label" %>
+    <%= f.text_area :description, rows: 3, class: "form-control" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :skill_id, "Skill", class: "form-label" %>
+    <%= f.select :skill_id,
+                 options_for_select(
+                   skills.map { |s| [ s.name, s.id, { "data-preferred-model-id" => s.preferred_model_id } ] },
+                   evaluation.skill_id
+                 ),
+                 { prompt: "Select a skill" },
+                 { class: "form-select", required: true, id: "evaluation-skill-select" } %>
+    <div class="form-text">
+      Its most recent revision is what gets run. Editing the skill later creates a
+      new revision, and every pair becomes runnable again against that wording.
+      Picking a skill fills in its preferred model as the baseline.
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :learning_set_id, "Learning set", class: "form-label" %>
+    <% if learning_sets.any? %>
+      <%= f.select :learning_set_id,
+                   learning_sets.map { |ls| [ "#{ls.name} (#{ls.source_count} sources)", ls.id ] },
+                   { prompt: "Select a learning set" },
+                   { class: "form-select", required: true } %>
+      <div class="form-text">
+        The pages to run against. They come from the set rather than being picked
+        here, so two evaluations of the same set stay comparable — and a page
+        added to the set later is simply part of the next run.
+        <%= link_to "Manage learning sets", learning_sets_path %>.
+      </div>
+    <% else %>
+      <p class="text-muted small mb-0">
+        No learning sets yet — <%= link_to "create one", new_learning_set_path %> and add
+        the pages you want to evaluate against.
+      </p>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :base_model_id, "Base model", class: "form-label" %>
+    <%= f.select :base_model_id,
+                 grouped_options_for_select(
+                   models.group_by(&:provider).transform_values { |ms| ms.map { |m| [ model_dropdown_label(m), m.id ] } },
+                   evaluation.base_model_id
+                 ),
+                 { prompt: "Select a baseline" },
+                 { class: "form-select", required: true, id: "evaluation-base-model-select" } %>
+    <div class="form-text">
+      The model the others are judged against. Nothing scores against it yet —
+      tick it below as well if you want its responses produced.
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :model_ids, "Models to run", class: "form-label" %>
+    <div class="border rounded p-2" style="max-height: 16rem; overflow-y: auto;">
+      <% models.group_by(&:provider).each do |provider, provider_models| %>
+        <div class="text-muted text-uppercase small mt-2"><%= provider %></div>
+        <% provider_models.each do |model| %>
+          <div class="form-check">
+            <%= check_box_tag "skill_evaluation[model_ids][]", model.id,
+                              evaluation.model_ids.include?(model.id),
+                              id: "evaluation_model_#{model.id}", class: "form-check-input" %>
+            <%= label_tag "evaluation_model_#{model.id}", model_dropdown_label(model),
+                          class: "form-check-label" %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+    <div class="form-text">Every selected model is run against every selected source.</div>
+  </div>
+
+  <%# Nothing selected must still submit as "none", not as "unchanged". %>
+  <%= hidden_field_tag "skill_evaluation[model_ids][]", "" %>
+
+  <%= f.submit submit_label, class: "btn btn-primary" %>
+  <%= link_to "Cancel",
+              evaluation.persisted? ? skill_evaluation_path(evaluation) : skill_evaluations_path,
+              class: "btn btn-outline-secondary" %>
+<% end %>
+
+<script>
+  (function () {
+    function initializeEvaluationForm() {
+      var skill = document.getElementById('evaluation-skill-select');
+      var baseModel = document.getElementById('evaluation-base-model-select');
+      if (!skill || !baseModel) return;
+
+      // Cloning drops listeners left by a previous Turbo visit, so picking a
+      // skill does not fire the handler several times.
+      var fresh = skill.cloneNode(true);
+      skill.parentNode.replaceChild(fresh, skill);
+
+      fresh.addEventListener('change', function () {
+        var option = fresh.options[fresh.selectedIndex];
+        var preferred = option && option.dataset ? option.dataset.preferredModelId : null;
+        if (!preferred) return;
+
+        // A skill can prefer a model the registry no longer offers; leave the
+        // baseline alone rather than silently clearing it.
+        if (!baseModel.querySelector('option[value="' + preferred + '"]')) return;
+
+        baseModel.value = preferred;
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeEvaluationForm);
+    document.addEventListener('turbo:load', initializeEvaluationForm);
+    document.addEventListener('turbo:frame-load', initializeEvaluationForm);
+  })();
+</script>
