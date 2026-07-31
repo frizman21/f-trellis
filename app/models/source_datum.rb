@@ -10,7 +10,9 @@ class SourceDatum < ApplicationRecord
     Zip::InputStream.open(StringIO.new(data)) do |io|
       entry = io.get_next_entry
       return nil unless entry
-      io.read.force_encoding("UTF-8")
+      # +str because an empty entry reads back as a frozen string, and
+      # force_encoding mutates in place.
+      (+io.read.to_s).force_encoding("UTF-8")
     end
   end
 

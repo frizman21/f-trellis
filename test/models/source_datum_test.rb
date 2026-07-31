@@ -45,6 +45,13 @@ class SourceDatumTest < ActiveSupport::TestCase
     assert_equal "", datum.text
   end
 
+  test "#html handles an empty zip entry" do
+    datum = zipped("")
+
+    assert_equal "", datum.html
+    assert_equal "", datum.text
+  end
+
   test "#html is still available for link extraction after #text exists" do
     datum = zipped(%(<html><body><a href="https://example.com/x">x</a></body></html>))
 
