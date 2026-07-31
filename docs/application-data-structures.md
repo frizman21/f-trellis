@@ -96,8 +96,19 @@ revisions so it can evolve without losing history.
 |-------------|-----------|----------------------------------------------------|
 | `name`      | `string`  | Short identifier.                                  |
 | `purpose`   | `string`  | What the skill does, in plain language.            |
+| `applicability` | `text` | Which pages the skill is worth a call on, and which it is not. Read by triage. Required once `is_active`. |
+| `url_patterns` | `text[]`, NOT NULL, default `[]` | Regex sources that claim a URL outright. |
 | `is_active` | `boolean`, NOT NULL, default `false` | Only active skills should be executed. New skills start inactive until explicitly enabled. |
 | `created_at` / `updated_at` | `datetime` | Standard timestamps.         |
+
+Two fields decide when a skill runs, and they answer different questions.
+`applicability` is prose for the model to judge against a page's text —
+"exhibitor lists and member directories; not prose articles". `url_patterns` is
+a list of Ruby regex sources matched against the source's URL, unanchored and
+case insensitively (`linkedin\.com/in/`). A pattern match is a fact rather than
+a judgement, so it wins outright: `SkillTriage` runs the matching skills, skips
+every other skill for that page, and makes no model call at all. Most skills
+have no patterns and route by their statement alone.
 
 Associations:
 

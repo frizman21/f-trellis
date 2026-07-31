@@ -173,10 +173,10 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     skill
   end
 
-  def stub_triage(recommended:, skipped: [])
+  def stub_triage(recommended:, skipped: [], routed_by_url: false)
     verdicts = recommended.map { |s| SkillTriage::Verdict.new(skill: s, applies: true, reason: "yes") } +
                skipped.map { |s| SkillTriage::Verdict.new(skill: s, applies: false, reason: "no") }
-    result = SkillTriage::Result.new(verdicts: verdicts, failed: false)
+    result = SkillTriage::Result.new(verdicts: verdicts, failed: false, routed_by_url: routed_by_url)
 
     original = SkillTriage.method(:call)
     SkillTriage.define_singleton_method(:call) { |**| result }
@@ -206,6 +206,21 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "input[name='skill_ids[]'][value=?][checked]", yes.id.to_s
     assert_select "input[name='skill_ids[]'][value=?]:not([checked])", no.id.to_s
+  end
+
+  test "triage says so when a url pattern picked the skill instead of a call" do
+    source = triage_source
+    claimed = make_skill("LinkedIn-Person", "LinkedIn profiles.")
+    other   = make_skill("Summarize", "Prose pages.")
+
+    stub_triage(recommended: [ claimed ], skipped: [ other ], routed_by_url: true) do
+      get triage_source_path(source)
+    end
+
+    assert_response :success
+    assert_match(/Routed by URL pattern/, response.body)
+    assert_no_match(/One triage call judged/, response.body)
+    assert_select "input[name='skill_ids[]'][value=?][checked]", claimed.id.to_s
   end
 
   test "triage creates one report and one job per selected skill" do

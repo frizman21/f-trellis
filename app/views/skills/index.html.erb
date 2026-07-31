@@ -12,6 +12,7 @@
         <th>Name</th>
         <th>Purpose</th>
         <th>Applicability</th>
+        <th>URL patterns</th>
         <th>Active</th>
         <th>Revisions</th>
         <th></th>
@@ -25,6 +26,15 @@
           <td>
             <% if skill.applicability.present? %>
               <%= truncate(skill.applicability, length: 90) %>
+            <% else %>
+              <span class="text-muted">—</span>
+            <% end %>
+          </td>
+          <td class="small">
+            <% if skill.url_patterns.present? %>
+              <% skill.url_patterns.each do |pattern| %>
+                <div><code><%= truncate(pattern, length: 40) %></code></div>
+              <% end %>
             <% else %>
               <span class="text-muted">—</span>
             <% end %>

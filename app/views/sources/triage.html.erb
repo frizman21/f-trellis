@@ -19,12 +19,21 @@
     <%= link_to "Review skills", skills_path %>.
   </p>
 <% else %>
-  <p class="text-muted">
-    One triage call judged <%= pluralize(@result.verdicts.size, "skill") %>
-    against this page and recommended <strong><%= @result.recommended.size %></strong>.
-    Running all of them without triage would have cost
-    <%= pluralize(@result.verdicts.size, "call") %>.
-  </p>
+  <% if @result.routed_by_url %>
+    <div class="alert alert-info">
+      <strong>Routed by URL pattern.</strong>
+      <%= pluralize(@result.recommended.size, "skill") %> claims this URL, so it was
+      picked without a triage call — the URL already says what kind of page this is.
+      The rest are listed unchecked; check one if you want it run anyway.
+    </div>
+  <% else %>
+    <p class="text-muted">
+      One triage call judged <%= pluralize(@result.verdicts.size, "skill") %>
+      against this page and recommended <strong><%= @result.recommended.size %></strong>.
+      Running all of them without triage would have cost
+      <%= pluralize(@result.verdicts.size, "call") %>.
+    </p>
+  <% end %>
 
   <%= form_with url: triage_source_path(@source), method: :post, local: true do |f| %>
     <table class="table align-middle">

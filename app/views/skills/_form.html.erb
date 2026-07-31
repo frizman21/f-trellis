@@ -36,6 +36,20 @@
     </div>
   </div>
 
+  <div class="mb-3">
+    <%= f.label :url_patterns_text, "URL patterns", class: "form-label" %>
+    <%= f.text_area :url_patterns_text, rows: 4, class: "form-control font-monospace",
+                    placeholder: "linkedin\\.com/in/" %>
+    <div class="form-text">
+      One regular expression per line. If any of them matches a page's URL, this
+      skill is run on that page and no other skill is — the URL settles it, so
+      triage skips the model call entirely. Matched anywhere in the URL and case
+      insensitively; escape dots (<code>linkedin\.com/in/</code>). Leave blank to
+      route this skill by its applicability statement alone, and keep patterns
+      narrow: a broad one (<code>.*</code>) claims every page from every other skill.
+    </div>
+  </div>
+
   <div class="form-check mb-3">
     <%= f.check_box :is_active, class: "form-check-input" %>
     <%= f.label :is_active, "Active", class: "form-check-label" %>
