@@ -1,0 +1,32 @@
+<%# Shared by the links_from and links_to pages. %>
+<% if sources.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>URL</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% sources.each do |source| %>
+        <tr>
+          <td><%= source.id %></td>
+          <td><%= external_link_to truncate(source.url.to_s, length: 60), source.url %></td>
+          <td><%= source.status %></td>
+          <td><%= source.created_at&.to_date %></td>
+          <td><%= link_to "Details", source_path(source) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= paginate sources %>
+  <p class="text-muted small">
+    Showing <%= sources.size %> of <%= sources.total_count %>.
+  </p>
+<% else %>
+  <p><%= empty_message %></p>
+<% end %>

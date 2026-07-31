@@ -5,6 +5,41 @@ class SourcesController < ApplicationController
 
   def show
     @source = Source.find(params[:id])
+    @links_from_count = @source.links_to.count
+    @links_to_count   = @source.linked_from.count
+  end
+
+  # Sources this one's content links out to.
+  def links_from
+    @source = Source.find(params[:id])
+    @sources = @source.links_to.order(:id).page(params[:page]).per(50)
+  end
+
+  # Sources whose content links here.
+  def links_to
+    @source = Source.find(params[:id])
+    @sources = @source.linked_from.order(:id).page(params[:page]).per(50)
+  end
+
+  # One cheap call decides which skills are worth running on this page.
+  def triage
+    @source = Source.find(params[:id])
+    @result = SkillTriage.call(source: @source)
+    @existing = existing_reports_for(@source, @result.verdicts.map(&:skill))
+  end
+
+  # Queue the skills the operator confirmed.
+  def run_triage
+    source = Source.find(params[:id])
+    skills = Skill.triageable.where(id: Array(params[:skill_ids]).map(&:to_i))
+
+    if skills.empty?
+      redirect_to source_path(source), alert: "No skills selected; nothing queued." and return
+    end
+
+    queued, skipped = queue_reports(source, skills)
+
+    redirect_to source_processing_reports_path, notice: queue_notice(queued, skipped)
   end
 
   def new
@@ -21,16 +56,21 @@ class SourcesController < ApplicationController
     end
   end
 
+  # Grab this one page's content and zip it into a new SourceDatum. Explicitly
+  # requested, so it is allowed whatever the source's current status — unlike a
+  # crawl, which skips pages it has already fetched.
   def fetch
     source = Source.find(params[:id])
 
-    if source.status == "new"
-      FetchSourceJob.perform_later(source)
-      redirect_to source_path(source), notice: "Fetch job queued for source ##{source.id}."
+    FetchSourceJob.perform_later(source, force: true)
+
+    notice = if source.status == "new"
+      "Fetch queued for source ##{source.id}."
     else
-      redirect_to source_path(source),
-                  alert: "Source ##{source.id} is #{source.status}; only sources in status new can be fetched."
+      "Re-fetch queued for source ##{source.id} (was #{source.status})."
     end
+
+    redirect_to source_path(source), notice: notice
   end
 
   def crawl
@@ -51,6 +91,52 @@ class SourcesController < ApplicationController
   end
 
   private
+
+  # Reports that already cover this source's current content, keyed by skill id,
+  # so triage can show what would be a no-op before anything is queued.
+  def existing_reports_for(source, skills)
+    skills.index_with do |skill|
+      revision = skill.skill_revisions.order(:sequence).last
+      revision && SourceProcessingReport.covering(source: source, skill_revision: revision)
+    end.compact
+  end
+
+  def queue_reports(source, skills)
+    queued = []
+    skipped = []
+
+    skills.each do |skill|
+      revision = skill.skill_revisions.order(:sequence).last
+      next skipped << [ skill, "no revisions" ] if revision.nil?
+
+      if SourceProcessingReport.covering(source: source, skill_revision: revision)
+        skipped << [ skill, "already covered" ]
+        next
+      end
+
+      report = SourceProcessingReport.new(source: source, skill_revision: revision,
+                                          model: skill.preferred_model, status: "new", facts: [])
+
+      if report.save
+        ProcessReportJob.perform_later(report)
+        queued << skill
+      else
+        skipped << [ skill, report.errors.full_messages.to_sentence ]
+      end
+    end
+
+    [ queued, skipped ]
+  end
+
+  def queue_notice(queued, skipped)
+    parts = []
+    parts << "Queued #{queued.size} #{'report'.pluralize(queued.size)}: #{queued.map(&:name).to_sentence}." if queued.any?
+    if skipped.any?
+      details = skipped.map { |skill, reason| "#{skill.name} (#{reason})" }.to_sentence
+      parts << "Skipped #{skipped.size}: #{details}."
+    end
+    parts.join(" ")
+  end
 
   def source_params
     params.require(:source).permit(:url, :description)

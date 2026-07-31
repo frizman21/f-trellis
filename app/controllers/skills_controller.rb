@@ -57,7 +57,7 @@ class SkillsController < ApplicationController
   private
 
   def skill_params
-    params.require(:skill).permit(:name, :purpose, :is_active, :preferred_model_id)
+    params.require(:skill).permit(:name, :purpose, :applicability, :is_active, :preferred_model_id)
   end
 
   def revision_content_param

@@ -9,6 +9,15 @@
   <dt>Purpose</dt>
   <dd><%= @skill.purpose.presence || "—" %></dd>
 
+  <dt>Applicability</dt>
+  <dd>
+    <% if @skill.applicability.present? %>
+      <%= simple_format @skill.applicability, {}, sanitize: true %>
+    <% else %>
+      — <span class="text-muted">(not stated; triage cannot route this skill)</span>
+    <% end %>
+  </dd>
+
   <dt>Active</dt>
   <dd><%= @skill.is_active? ? "Yes" : "No" %></dd>
 

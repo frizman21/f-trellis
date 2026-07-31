@@ -23,9 +23,19 @@ class SourceProcessingReportsController < ApplicationController
       return
     end
 
+    source = Source.find_by(id: params.dig(:source_processing_report, :source_id))
+    existing = SourceProcessingReport.covering(source: source, skill_revision: revision)
+
+    if existing
+      redirect_to source_processing_reports_path,
+                  notice: "Report ##{existing.id} already covers this source's current " \
+                          "content for #{skill.name}; nothing queued."
+      return
+    end
+
     @report = SourceProcessingReport.new(
-      source_id: params.dig(:source_processing_report, :source_id),
-      model_id:  params.dig(:source_processing_report, :model_id),
+      source: source,
+      model_id: params.dig(:source_processing_report, :model_id),
       skill_revision: revision,
       status: "new",
       facts: []

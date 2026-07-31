@@ -32,4 +32,29 @@ class SourceTest < ActiveSupport::TestCase
     assert_not source.valid?
     assert_includes source.errors[:domain], "must exist"
   end
+
+  test "parent_source is optional" do
+    source = Source.new(url: "https://example.com/no-parent")
+
+    assert source.valid?
+    assert_nil source.parent_source
+  end
+
+  test "child_sources reports the sources discovered from this one" do
+    parent = sources(:one)
+    child  = Source.create!(url: "https://example.com/child", parent_source: parent)
+
+    assert_equal parent, child.parent_source
+    assert_includes parent.child_sources, child
+  end
+
+  test "destroying a parent nullifies its children rather than deleting them" do
+    parent = Source.create!(url: "https://example.com/parent")
+    child  = Source.create!(url: "https://example.com/child", parent_source: parent)
+
+    parent.destroy
+
+    assert Source.exists?(child.id), "expected the child source to survive"
+    assert_nil child.reload.parent_source_id
+  end
 end

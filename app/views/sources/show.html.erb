@@ -8,15 +8,24 @@
   <dt>Description</dt>
   <dd><%= @source.description.presence || "—" %></dd>
 
+  <dt>Parent source</dt>
+  <dd>
+    <% if @source.parent_source %>
+      <%= link_to "Source ##{@source.parent_source.id}", source_path(@source.parent_source) %>
+      — <%= @source.parent_source.url %>
+    <% else %>
+      — <span class="text-muted">(entered directly, not discovered by a crawl or extraction)</span>
+    <% end %>
+  </dd>
+
   <dt>Status</dt>
   <dd>
     <%= @source.status %>
-    <% if @source.status == "new" %>
-      <%= button_to "Fetch now",
-                    fetch_source_path(@source),
-                    method: :post,
-                    class: "btn btn-sm btn-primary ms-2" %>
-    <% end %>
+    <%= button_to @source.status == "new" ? "Fetch content" : "Re-fetch content",
+                  fetch_source_path(@source),
+                  method: :post,
+                  form_class: "d-inline ms-2",
+                  class: "btn btn-sm btn-primary" %>
   </dd>
 
   <dt>Created</dt>
@@ -25,6 +34,33 @@
   <dt>Updated</dt>
   <dd><%= @source.updated_at %></dd>
 </dl>
+
+<h2>Processing</h2>
+
+<p>
+  <% if @source.source_data.any? %>
+    <%= link_to "Suggest skills", triage_source_path(@source), class: "btn btn-primary" %>
+    <span class="form-text ms-2">
+      One cheap call reads each skill's applicability and picks the ones worth
+      running on this page.
+    </span>
+  <% else %>
+    <span class="text-muted">
+      Fetch this source's content before running skills against it.
+    </span>
+  <% end %>
+</p>
+
+<h2>Link graph</h2>
+
+<p>
+  <%= link_to "Links from this source (#{@links_from_count})",
+              links_from_source_path(@source),
+              class: "btn btn-outline-secondary" %>
+  <%= link_to "Links to this source (#{@links_to_count})",
+              links_to_source_path(@source),
+              class: "btn btn-outline-secondary ms-2" %>
+</p>
 
 <h2>Crawl from this source</h2>
 
@@ -57,6 +93,12 @@
 
 <h2>Source Data</h2>
 
+<p class="form-text">
+  Each fetch adds a new zipped payload rather than replacing the last one, so
+  re-fetching keeps the earlier copies. Extraction and processing always use
+  the most recent.
+</p>
+
 <% if @source.source_data.any? %>
   <table class="table">
     <thead>
@@ -75,7 +117,14 @@
           <td><%= datum.content_type %></td>
           <td><%= number_to_human_size(datum.data&.bytesize.to_i) %></td>
           <td><%= datum.created_at&.to_date %></td>
-          <td><%= link_to "Download", download_source_datum_path(datum) %></td>
+          <td>
+            <%= link_to "Download", download_source_datum_path(datum) %>
+            <%= button_to "Extract links",
+                          extract_links_source_datum_path(datum),
+                          method: :post,
+                          form_class: "d-inline ms-2",
+                          class: "btn btn-sm btn-outline-secondary" %>
+          </td>
         </tr>
       <% end %>
     </tbody>

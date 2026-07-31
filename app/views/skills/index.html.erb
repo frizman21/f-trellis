@@ -11,6 +11,7 @@
       <tr>
         <th>Name</th>
         <th>Purpose</th>
+        <th>Applicability</th>
         <th>Active</th>
         <th>Revisions</th>
         <th></th>
@@ -21,6 +22,13 @@
         <tr>
           <td><%= link_to skill.name, skill_path(skill) %></td>
           <td><%= skill.purpose %></td>
+          <td>
+            <% if skill.applicability.present? %>
+              <%= truncate(skill.applicability, length: 90) %>
+            <% else %>
+              <span class="text-muted">—</span>
+            <% end %>
+          </td>
           <td><%= skill.is_active? ? "Yes" : "No" %></td>
           <td><%= skill.revision_count %></td>
           <td><%= link_to "Edit", edit_skill_path(skill), class: "btn btn-sm btn-outline-primary" %></td>
