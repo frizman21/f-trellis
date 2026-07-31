@@ -5,6 +5,20 @@ class SourcesController < ApplicationController
 
   def show
     @source = Source.find(params[:id])
+    @links_from_count = @source.links_to.count
+    @links_to_count   = @source.linked_from.count
+  end
+
+  # Sources this one's content links out to.
+  def links_from
+    @source = Source.find(params[:id])
+    @sources = @source.links_to.order(:id).page(params[:page]).per(50)
+  end
+
+  # Sources whose content links here.
+  def links_to
+    @source = Source.find(params[:id])
+    @sources = @source.linked_from.order(:id).page(params[:page]).per(50)
   end
 
   def new
@@ -21,16 +35,21 @@ class SourcesController < ApplicationController
     end
   end
 
+  # Grab this one page's content and zip it into a new SourceDatum. Explicitly
+  # requested, so it is allowed whatever the source's current status — unlike a
+  # crawl, which skips pages it has already fetched.
   def fetch
     source = Source.find(params[:id])
 
-    if source.status == "new"
-      FetchSourceJob.perform_later(source)
-      redirect_to source_path(source), notice: "Fetch job queued for source ##{source.id}."
+    FetchSourceJob.perform_later(source, force: true)
+
+    notice = if source.status == "new"
+      "Fetch queued for source ##{source.id}."
     else
-      redirect_to source_path(source),
-                  alert: "Source ##{source.id} is #{source.status}; only sources in status new can be fetched."
+      "Re-fetch queued for source ##{source.id} (was #{source.status})."
     end
+
+    redirect_to source_path(source), notice: notice
   end
 
   def crawl

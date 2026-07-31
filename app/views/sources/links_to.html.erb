@@ -1,0 +1,13 @@
+<% content_for :title, "Links to source ##{@source.id}" %>
+<h1>Links to source #<%= @source.id %></h1>
+
+<p class="text-muted">
+  Sources whose content links to
+  <%= external_link_to truncate(@source.url.to_s, length: 60), @source.url %>.
+</p>
+
+<%= render "link_table",
+           sources: @sources,
+           empty_message: "No other source is known to link here." %>
+
+<p><%= link_to "Back to source", source_path(@source) %></p>

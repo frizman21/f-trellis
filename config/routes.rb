@@ -33,6 +33,8 @@ Rails.application.routes.draw do
     member do
       post :fetch
       post :crawl
+      get :links_from
+      get :links_to
     end
   end
   resources :domains, only: [:index, :edit, :update]
@@ -47,6 +49,7 @@ Rails.application.routes.draw do
   end
   resources :source_processing_reports, only: [:index, :new, :create]
   get "source_data/:id/download", to: "source_data#download", as: :download_source_datum
+  post "source_data/:id/extract_links", to: "source_data#extract_links", as: :extract_links_source_datum
 
   get   "fixture_promotions",                     to: "fixture_promotions#index",  as: :fixture_promotions, defaults: { format: :json }
   patch "fixture_promotions/:resource/:id",       to: "fixture_promotions#update", as: :fixture_promotion,  defaults: { format: :json }

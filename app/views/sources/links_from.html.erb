@@ -1,0 +1,13 @@
+<% content_for :title, "Links from source ##{@source.id}" %>
+<h1>Links from source #<%= @source.id %></h1>
+
+<p class="text-muted">
+  Sources that <%= external_link_to truncate(@source.url.to_s, length: 60), @source.url %>
+  links out to.
+</p>
+
+<%= render "link_table",
+           sources: @sources,
+           empty_message: "No outbound links recorded. Links are recorded when this source's content is crawled or run through \"Extract links\"." %>
+
+<p><%= link_to "Back to source", source_path(@source) %></p>

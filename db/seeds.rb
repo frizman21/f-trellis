@@ -925,3 +925,64 @@ end
   end
 end
 
+# A fetched source with a real zipped payload attached, so the Source Data
+# table on the source show page — and its "Extract links" action — can be
+# exercised in the browser without hitting the network.
+link_sample_html = <<~HTML
+  <html>
+    <head><title>Link sample</title></head>
+    <body>
+      <a href="/about">About (relative, internal)</a>
+      <a href="https://www.nasa.gov/about/">Absolute internal</a>
+      <a href="/about#team">Duplicate of /about once the fragment is stripped</a>
+      <a href="https://en.wikipedia.org/wiki/Apollo_Guidance_Computer">Wikipedia (external)</a>
+      <a href="https://www.federalregister.gov/documents/current">Federal Register (external)</a>
+      <a href="#skip-me">Fragment only — skipped</a>
+      <a href="mailto:someone@example.com">mailto — skipped</a>
+    </body>
+  </html>
+HTML
+
+link_sample_source = Source.find_or_create_by!(url: "https://www.nasa.gov/news-release/") do |s|
+  s.description = "Seeded page with a mix of internal and external links."
+end
+link_sample_source.update!(status: "complete") unless link_sample_source.status == "complete"
+
+if link_sample_source.source_data.none?
+  buffer = Zip::OutputStream.write_buffer do |zos|
+    zos.put_next_entry("link-sample.html")
+    zos.write(link_sample_html)
+  end
+  buffer.rewind
+
+  SourceDatum.create!(
+    source: link_sample_source,
+    content_type: "application/zip",
+    data: buffer.read
+  )
+end
+
+# A small slice of the page-link graph, so the source show page has something
+# in its "Links from" / "Links to" sections and its parent-source row without
+# having to run a crawl first. Mirrors what extraction would produce.
+link_sample_children = [
+  { url: "https://www.nasa.gov/about",  description: "About NASA — discovered from the news release index." },
+  { url: "https://www.nasa.gov/about/", description: "About NASA (trailing slash variant)." }
+].map do |attrs|
+  child = Source.find_or_create_by!(url: attrs[:url]) do |s|
+    s.description   = attrs[:description]
+    s.parent_source = link_sample_source
+  end
+  SourceLink.record(from: link_sample_source, to: child)
+  child
+end
+
+# The Apollo source is linked to from the sample page but was seeded
+# independently, so it keeps its own (absent) parentage — the case where an
+# edge exists without the link having created the target.
+SourceLink.record(from: link_sample_source, to: apollo_source)
+
+# And a link back the other way, so at least one source shows both inbound and
+# outbound edges.
+SourceLink.record(from: link_sample_children.first, to: link_sample_source)
+

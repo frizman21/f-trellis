@@ -6,8 +6,11 @@ class FetchSourceJob < ApplicationJob
 
   class SourceNotFetchable < StandardError; end
 
-  def perform(source)
-    return unless source.status == "new"
+  # Only untouched sources are fetched by default, so a crawl revisiting a page
+  # does not refetch it. `force: true` is for an explicit request from the UI to
+  # grab the content again whatever the current status.
+  def perform(source, force: false)
+    return unless force || source.status == "new"
 
     source.update!(status: "in_work")
 

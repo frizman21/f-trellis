@@ -109,6 +109,73 @@ class CrawlJobTest < ActiveJob::TestCase
     assert crawled <= 3, "expected at most 3 pages crawled, got #{crawled}"
   end
 
+  test "sets parent_source to the page the link was found on" do
+    seed = make_seed("https://parent.test/start", '<a href="/mid">mid</a>')
+
+    with_fake_fetcher("https://parent.test/mid" => '<a href="/leaf">leaf</a>') do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 2)
+    end
+
+    mid  = Source.find_by(url: "https://parent.test/mid")
+    leaf = Source.find_by(url: "https://parent.test/leaf")
+
+    assert_equal seed, mid.parent_source
+    assert_equal mid, leaf.parent_source, "leaf's parent should be mid, not the seed"
+  end
+
+  test "records a SourceLink edge for every link between known sources" do
+    seed = make_seed("https://graph.test/start", '<a href="/a">a</a><a href="/b">b</a>')
+
+    with_fake_fetcher(
+      "https://graph.test/a" => "<p>leaf</p>",
+      "https://graph.test/b" => "<p>leaf</p>"
+    ) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_equal %w[https://graph.test/a https://graph.test/b],
+                 seed.reload.links_to.map(&:url).sort
+  end
+
+  test "records edges back to pages already seen in the crawl" do
+    seed = make_seed("https://cycle.test/start", '<a href="/a">a</a>')
+
+    with_fake_fetcher("https://cycle.test/a" => '<a href="https://cycle.test/start">back</a>') do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 2)
+    end
+
+    a = Source.find_by(url: "https://cycle.test/a")
+
+    assert_includes seed.reload.links_to, a
+    assert_includes a.reload.links_to, seed, "the link back to the seed should be recorded"
+  end
+
+  test "records an edge to a preexisting source without recreating it" do
+    seed = make_seed("https://known.test/start", '<a href="/known">known</a>')
+    known = Source.create!(url: "https://known.test/known", description: "preexisting")
+
+    with_fake_fetcher do
+      assert_no_difference -> { Source.count } do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+      end
+    end
+
+    assert_includes seed.reload.links_to, known
+    assert_nil known.reload.parent_source
+  end
+
+  test "re-crawling does not duplicate link edges" do
+    seed = make_seed("https://rerun.test/start", '<a href="/a">a</a>')
+
+    with_fake_fetcher("https://rerun.test/a" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+
+      assert_no_difference -> { SourceLink.count } do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+      end
+    end
+  end
+
   test "raises on invalid crawl_type" do
     seed = make_seed("https://invalid.test/x", "")
     assert_raises ArgumentError do

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_29_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_30_120100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -528,6 +528,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_130000) do
     t.index ["source_id"], name: "index_source_data_on_source_id"
   end
 
+  create_table "source_links", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "from_source_id", null: false
+    t.bigint "to_source_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["from_source_id", "to_source_id"], name: "index_source_links_on_from_source_id_and_to_source_id", unique: true
+    t.index ["from_source_id"], name: "index_source_links_on_from_source_id"
+    t.index ["to_source_id"], name: "index_source_links_on_to_source_id"
+  end
+
   create_table "source_processing_reports", force: :cascade do |t|
     t.bigint "chat_id"
     t.datetime "created_at", null: false
@@ -550,11 +560,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_130000) do
     t.bigint "domain_id", null: false
     t.boolean "is_fixtured", default: false, null: false
     t.boolean "is_promotable", default: false, null: false
+    t.bigint "parent_source_id"
     t.string "status", default: "new", null: false
     t.datetime "updated_at", null: false
     t.string "url"
     t.index ["domain_id"], name: "index_sources_on_domain_id"
     t.index ["is_promotable", "is_fixtured"], name: "index_sources_on_is_promotable_and_is_fixtured"
+    t.index ["parent_source_id"], name: "index_sources_on_parent_source_id"
     t.index ["status"], name: "index_sources_on_status"
   end
 
@@ -647,10 +659,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_130000) do
   add_foreign_key "skill_revisions", "skills"
   add_foreign_key "skills", "models", column: "preferred_model_id"
   add_foreign_key "source_data", "sources"
+  add_foreign_key "source_links", "sources", column: "from_source_id", on_delete: :cascade
+  add_foreign_key "source_links", "sources", column: "to_source_id", on_delete: :cascade
   add_foreign_key "source_processing_reports", "chats"
   add_foreign_key "source_processing_reports", "models"
   add_foreign_key "source_processing_reports", "skill_revisions"
   add_foreign_key "source_processing_reports", "sources"
   add_foreign_key "sources", "domains"
+  add_foreign_key "sources", "sources", column: "parent_source_id", on_delete: :nullify
   add_foreign_key "tool_calls", "messages"
 end

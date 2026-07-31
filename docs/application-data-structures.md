@@ -26,12 +26,43 @@ A reference to an external artefact the system knows about.
 |---------------|----------|------------------------------------------|
 | `url`         | `string` | Locator for the artefact.                |
 | `description` | `text`   | Human-readable note about the source.    |
+| `parent_source_id` | FK, nullable | The source whose content linked to this one, set at creation time. |
 | `created_at` / `updated_at` | `datetime` | Standard timestamps.       |
 
 Associations:
 
+- `belongs_to :parent_source, class_name: "Source", optional: true`
+- `has_many :child_sources, class_name: "Source", dependent: :nullify`
+- `has_many :outbound_links` / `has_many :inbound_links` (see `SourceLink`)
+- `has_many :links_to` / `has_many :linked_from` (the sources on either end)
 - `has_many :source_data, dependent: :destroy`
 - `has_many :source_processing_reports, dependent: :destroy`
+
+`parent_source` records **origination** — which source caused this one to be
+created. It is written by `CrawlJob` and by the "Extract links" action, is
+`nil` for sources entered by hand, and is never overwritten once set: a link
+to a source that already exists leaves that source's parentage alone. On a
+multi-hop crawl the parent is the page the link was actually found on, not
+the seed.
+
+### `SourceLink` (table: `source_links`)
+
+One directed edge in the page-link graph: `from_source`'s content contained a
+link to `to_source`. Distinct from `parent_source` — parentage is one value
+fixed at creation, whereas an edge is recorded for **every** link resolved to
+a known source, including links between two sources that already existed.
+
+| Column           | Type         | Notes                              |
+|------------------|--------------|------------------------------------|
+| `from_source_id` | FK, NOT NULL | The source whose content has the link. |
+| `to_source_id`   | FK, NOT NULL | The source being linked to.        |
+| `created_at` / `updated_at` | `datetime` | Standard timestamps.  |
+
+A unique index on `[from_source_id, to_source_id]` makes edges idempotent, so
+re-crawling or re-extracting a page adds nothing. Self-links are rejected.
+Use `SourceLink.record(from:, to:)` rather than creating rows directly — it is
+idempotent and returns `nil` for a self-link or a missing end. Both FKs cascade
+on delete, so removing a source removes its edges in both directions.
 
 ### `SourceDatum` (table: `source_data`)
 
@@ -119,7 +150,9 @@ parent skill's newer revisions supersede it.
 
 ```
 Source ─┬─< SourceDatum
-        └─< SourceProcessingReport >─ SkillRevision >─ Skill
+        ├─< SourceProcessingReport >─ SkillRevision >─ Skill
+        ├─< Source (child_sources, via parent_source_id)
+        └─< SourceLink >─ Source   (from_source / to_source)
 ```
 
 - A `Source` has zero-or-more `SourceDatum` rows (raw payload chunks) and
