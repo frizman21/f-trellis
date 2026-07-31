@@ -54,6 +54,44 @@ if pull_organization_names.skill_revisions.order(:sequence).last&.content != pul
   SkillRevision.create!(skill: pull_organization_names, content: pull_organization_names_content)
 end
 
+# Applicability statements — what triage reads to decide which skills are worth
+# calling on a page. Backfilled here rather than in the migration because they
+# are editorial content, not schema. Only written when currently blank, so a
+# statement edited in the UI survives re-seeding.
+skill_applicability = {
+  "Summarize" =>
+    "Any page with a substantial body of prose worth condensing — articles, " \
+    "reports, filings, long announcements. Not index pages, link lists, " \
+    "directories, or tabular data, which have no narrative to summarize.",
+  "Translate" =>
+    "Pages whose main content is written in a language other than English. " \
+    "Not English-language pages, and not pages that are mostly names, numbers, " \
+    "or tables, where there is little language to translate.",
+  "LinkedIn-Person" =>
+    "LinkedIn profile pages for an individual person, showing a name and an " \
+    "employment history. Not LinkedIn company pages, job postings, search " \
+    "results, or feed pages, and not profile pages on other sites.",
+  "Acquisition News" =>
+    "News articles and press releases announcing that one company acquired, " \
+    "merged with, or bought a stake in another. Look for language about a " \
+    "deal between two named companies. Not general business news, not " \
+    "earnings coverage, not product announcements, not exhibitor or member " \
+    "directories, which name many companies but describe no transaction.",
+  "Pull Organization Names" =>
+    "Pages that name many organizations — exhibitor lists, member directories, " \
+    "sponsor pages, attendee lists, supplier indexes, conference programs. " \
+    "Best on pages where organizations are the subject rather than mentioned " \
+    "in passing. Not pages about a single company, and not prose articles, " \
+    "where a general extraction pulls mostly noise."
+}
+
+skill_applicability.each do |name, statement|
+  skill = Skill.find_by(name: name)
+  next if skill.nil? || skill.applicability.present?
+
+  skill.update!(applicability: statement)
+end
+
 # Mark the Summarize skill as promotable so `rails fixtures:promote` has
 # something to materialize into a fixture on a fresh dev DB.
 Skill.where(name: "Summarize").update_all(is_promotable: true, is_fixtured: false)
