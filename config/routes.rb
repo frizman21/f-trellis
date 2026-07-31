@@ -50,6 +50,12 @@ Rails.application.routes.draw do
   resources :research_starting_points
   resources :skills, only: [:index, :show, :new, :create, :edit, :update]
   resources :skill_revisions, only: [:show]
+  resources :skill_evaluations, only: [:index, :show, :new, :create, :edit, :update] do
+    member do
+      post :run
+    end
+  end
+  resources :skill_evaluation_results, only: [:show]
   resources :chats, only: [:index, :show]
   resources :models, only: [:index] do
     collection do

@@ -180,14 +180,74 @@ parent skill's newer revisions supersede it.
 
 ---
 
-## 4. Relationship map
+## 4. Skill evaluation family
+
+An evaluation asks one question: how does this skill do on these pages, across
+these models? It is a rehearsal, not production work — running one never writes
+into the knowledge graph.
+
+### `SkillEvaluation`
+
+| Column            | Type         | Notes                                    |
+|-------------------|--------------|------------------------------------------|
+| `name`            | `string`, NOT NULL | What the comparison is for.        |
+| `description`     | `text`       | Free notes.                              |
+| `skill_id`        | FK, NOT NULL | The skill under test. Its **latest** revision is what a run uses. |
+| `learning_set_id` | FK, NOT NULL | The pages to run against.                |
+| `base_model_id`   | FK to `models`, NOT NULL | The model the others are judged against. |
+
+The pages come from a `LearningSet` rather than a list of the evaluation's own,
+so two evaluations pointed at the same set stay comparable and a set curated
+once stays curated. A page added to the set later is simply part of the next
+run. A set cannot be deleted while an evaluation points at it.
+
+`SkillEvaluationModel` joins an evaluation to each `Model` to run, unique on the
+pair. Nothing reads `base_model` beyond the UI yet — it is recorded so scoring
+can use it.
+
+### `SkillEvaluationResult`
+
+One run of one skill revision, on one page, through one model.
+
+| Column              | Type         | Notes                                  |
+|---------------------|--------------|----------------------------------------|
+| `skill_evaluation_id` | FK, NOT NULL | Owning evaluation (cascades).        |
+| `source_id`         | FK, NOT NULL | The page that was sent.                |
+| `model_id`          | FK, NOT NULL | The model that answered.               |
+| `skill_revision_id` | FK, NOT NULL | The wording that produced the response.|
+| `chat_id`           | FK, nullable | The chat the run went through.         |
+| `status`            | `string`, NOT NULL, default `pending` | `pending` / `running` / `complete` / `failed`. |
+| `score`             | `decimal`, nullable | **Not computed yet** — how a response is scored is undecided, and a made-up number would be worse than none. |
+| `response`          | `text`       | What the model returned.               |
+| `error`             | `text`       | Why a failed run failed.               |
+| `started_at` / `completed_at` | `datetime` | Run timing.                |
+
+Unique on `[skill_evaluation_id, source_id, model_id, skill_revision_id]`:
+pressing Run twice must not pay twice, and editing the skill creates a revision,
+which makes every pair runnable again against the new wording.
+
+`SkillEvaluationRunner` turns the configuration into pending results plus one
+`RunSkillEvaluationJob` each; the job sends the revision as instructions and the
+page's extracted text as the message, with **no tools registered**. A failed
+pair is recorded on its own row and the rest of the run continues.
+
+---
+
+## 5. Relationship map
 
 ```
 Source ─┬─< SourceDatum
         ├─< SourceProcessingReport >─ SkillRevision >─ Skill
         ├─< Source (child_sources, via parent_source_id)
         ├─< SourceLink >─ Source   (from_source / to_source)
-        └─< LearningSetSource >─ LearningSet
+        ├─< LearningSetSource >─ LearningSet
+        └─< SkillEvaluationResult >─ SkillEvaluation
+
+SkillEvaluation ─┬─ Skill
+                 ├─ LearningSet
+                 ├─ Model (base_model)
+                 ├─< SkillEvaluationModel >─ Model
+                 └─< SkillEvaluationResult >─ SkillRevision
 ```
 
 - A `Source` has zero-or-more `SourceDatum` rows (raw payload chunks) and

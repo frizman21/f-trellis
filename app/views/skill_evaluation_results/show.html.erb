@@ -1,0 +1,70 @@
+<% content_for :title, "Result ##{@result.id}" %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Result #<%= @result.id %></h1>
+  <%= evaluation_status_badge(@result.status) %>
+</div>
+
+<p class="text-muted">
+  <%= link_to @evaluation.name, skill_evaluation_path(@evaluation) %> —
+  <%= @evaluation.skill.name %>, revision <%= @result.skill_revision.sequence %>.
+</p>
+
+<dl class="row">
+  <dt class="col-sm-3">Source</dt>
+  <dd class="col-sm-9">
+    <%= link_to "##{@result.source.id}", source_path(@result.source) %>
+    <%= external_link_to truncate(@result.source.url.to_s, length: 80), @result.source.url %>
+  </dd>
+
+  <dt class="col-sm-3">Model</dt>
+  <dd class="col-sm-9">
+    <span class="text-muted"><%= @result.model.provider %> /</span>
+    <code><%= @result.model.model_id %></code>
+    <% if @result.model_id == @evaluation.base_model_id %>
+      <span class="badge bg-light text-dark">baseline</span>
+    <% end %>
+  </dd>
+
+  <dt class="col-sm-3">Skill revision</dt>
+  <dd class="col-sm-9">
+    <%= link_to "revision #{@result.skill_revision.sequence}", skill_revision_path(@result.skill_revision) %>
+  </dd>
+
+  <dt class="col-sm-3">Score</dt>
+  <dd class="col-sm-9">
+    <%= evaluation_score_label(@result) %>
+    <span class="text-muted small">Scoring is not implemented yet.</span>
+  </dd>
+
+  <dt class="col-sm-3">Chat</dt>
+  <dd class="col-sm-9">
+    <%= @result.chat ? link_to("Chat ##{@result.chat.id}", chat_path(@result.chat)) : "—" %>
+  </dd>
+
+  <dt class="col-sm-3">Timing</dt>
+  <dd class="col-sm-9">
+    <% if @result.duration_seconds %>
+      <%= number_with_precision(@result.duration_seconds, precision: 1) %>s
+    <% else %>
+      —
+    <% end %>
+  </dd>
+</dl>
+
+<% if @result.error.present? %>
+  <div class="alert alert-danger">
+    <strong>Failed.</strong> <%= @result.error %>
+  </div>
+<% end %>
+
+<h2 class="h4">Response</h2>
+<% if @result.response.present? %>
+  <pre class="p-3 bg-light border rounded" style="white-space: pre-wrap;"><%= @result.response %></pre>
+<% else %>
+  <p class="text-muted">
+    <%= @result.status == "pending" ? "Queued — nothing returned yet." : "No response recorded." %>
+  </p>
+<% end %>
+
+<p><%= link_to "Back to evaluation", skill_evaluation_path(@evaluation) %></p>

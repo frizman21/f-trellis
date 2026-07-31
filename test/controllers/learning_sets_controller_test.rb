@@ -125,6 +125,30 @@ class LearningSetsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to learning_sets_path
   end
 
+  test "a set an evaluation points at is not deleted out from under it" do
+    skill = Skill.create!(name: "Evaluated skill")
+    model = Model.create!(provider: "openai", model_id: "gpt-eval", name: "Eval", last_seen_at: Time.current)
+    SkillEvaluation.create!(name: "Comparison", skill: skill, base_model: model, learning_set: @set)
+
+    assert_no_difference "LearningSet.count" do
+      delete learning_set_path(@set)
+    end
+
+    follow_redirect!
+    assert_match(/skill evaluations exist/i, @response.body)
+  end
+
+  test "the set page lists the evaluations using it" do
+    skill = Skill.create!(name: "Evaluated skill")
+    model = Model.create!(provider: "openai", model_id: "gpt-eval", name: "Eval", last_seen_at: Time.current)
+    evaluation = SkillEvaluation.create!(name: "Comparison", skill: skill, base_model: model,
+                                         learning_set: @set)
+
+    get learning_set_path(@set)
+
+    assert_select "a[href=?]", skill_evaluation_path(evaluation)
+  end
+
   test "the source page offers a learning set dropdown" do
     source = Source.create!(url: "https://learning.test/from-source")
 

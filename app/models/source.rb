@@ -23,6 +23,7 @@ class Source < ApplicationRecord
   has_many :source_processing_reports, dependent: :destroy
   has_many :learning_set_sources, dependent: :destroy
   has_many :learning_sets, through: :learning_set_sources
+  has_many :skill_evaluation_results, dependent: :destroy
 
   validates :url, presence: true
   validates :status, inclusion: { in: STATUSES }

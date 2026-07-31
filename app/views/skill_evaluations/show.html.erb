@@ -1,0 +1,127 @@
+<% content_for :title, @evaluation.name %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0"><%= @evaluation.name %></h1>
+  <div class="d-flex gap-2">
+    <%= link_to "Edit", edit_skill_evaluation_path(@evaluation), class: "btn btn-outline-primary" %>
+    <%= button_to "Run evaluation", run_skill_evaluation_path(@evaluation),
+                  method: :post, class: "btn btn-primary", form: { class: "m-0" } %>
+  </div>
+</div>
+
+<% if @evaluation.description.present? %>
+  <p><%= @evaluation.description %></p>
+<% end %>
+
+<dl class="row">
+  <dt class="col-sm-3">Skill</dt>
+  <dd class="col-sm-9">
+    <%= link_to @evaluation.skill.name, skill_path(@evaluation.skill) %>
+    <% if @revision %>
+      <span class="text-muted">— runs <%= link_to "revision #{@revision.sequence}", skill_revision_path(@revision) %></span>
+    <% else %>
+      <span class="text-danger">— no revisions, so there is nothing to run</span>
+    <% end %>
+  </dd>
+
+  <dt class="col-sm-3">Base model</dt>
+  <dd class="col-sm-9">
+    <span class="text-muted"><%= @evaluation.base_model.provider %> /</span>
+    <code><%= @evaluation.base_model.model_id %></code>
+    <% if @evaluation.base_model_missing_from_run? %>
+      <div class="text-warning-emphasis small">
+        The baseline is not among the models below, so this run will not produce
+        its output to compare against.
+      </div>
+    <% end %>
+  </dd>
+
+  <dt class="col-sm-3">Models</dt>
+  <dd class="col-sm-9">
+    <% if @evaluation.models.any? %>
+      <% @evaluation.models.each do |model| %>
+        <div><code><%= model.model_id %></code> <span class="text-muted small"><%= model_pricing_label(model) %></span></div>
+      <% end %>
+    <% else %>
+      <span class="text-muted">None selected.</span>
+    <% end %>
+  </dd>
+
+  <dt class="col-sm-3">Learning set</dt>
+  <dd class="col-sm-9">
+    <%= link_to @evaluation.learning_set.name, learning_set_path(@evaluation.learning_set) %>
+    <% if @evaluation.sources.any? %>
+      <% @evaluation.sources.each do |source| %>
+        <div><%= link_to "##{source.id}", source_path(source) %> <%= truncate(source.url.to_s, length: 90) %></div>
+      <% end %>
+      <div class="text-muted small">
+        Pages come from the set. Add one there and it is part of the next run.
+      </div>
+    <% else %>
+      <div class="text-muted">
+        The set has no pages yet —
+        <%= link_to "add some", learning_set_path(@evaluation.learning_set) %>.
+      </div>
+    <% end %>
+  </dd>
+
+  <dt class="col-sm-3">Pairs</dt>
+  <dd class="col-sm-9">
+    <%= pluralize(@evaluation.planned_pair_count, "run") %> per revision
+    (<%= @evaluation.sources.count %> sources × <%= @evaluation.models.size %> models).
+    Running again only queues pairs that have not been run at the current revision.
+  </dd>
+</dl>
+
+<h2 class="h4">Results</h2>
+
+<% if @results.any? %>
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Source</th>
+        <th>Model</th>
+        <th>Revision</th>
+        <th>Score</th>
+        <th>Response</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @results.each do |result| %>
+        <tr>
+          <td><%= evaluation_status_badge(result.status) %></td>
+          <td>
+            <%= link_to "##{result.source.id}", source_path(result.source) %>
+            <span class="small text-muted"><%= truncate(result.source.url.to_s, length: 40) %></span>
+          </td>
+          <td><code><%= result.model.model_id %></code></td>
+          <td><%= link_to "rev #{result.skill_revision.sequence}", skill_revision_path(result.skill_revision) %></td>
+          <td><%= evaluation_score_label(result) %></td>
+          <td class="small">
+            <% if result.status == "failed" %>
+              <span class="text-danger"><%= truncate(result.error.to_s, length: 80) %></span>
+            <% else %>
+              <%= truncate(result.response.to_s, length: 80) %>
+            <% end %>
+          </td>
+          <td>
+            <%= link_to "Open", skill_evaluation_result_path(result), class: "btn btn-sm btn-outline-primary" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <p class="text-muted small">
+    Scoring is not implemented yet, so every score reads "—". The responses are
+    the point for now.
+  </p>
+<% else %>
+  <p class="text-muted">
+    No runs yet. "Run evaluation" queues one background job per source × model pair.
+  </p>
+<% end %>
+
+<p><%= link_to "Back to evaluations", skill_evaluations_path %></p>
