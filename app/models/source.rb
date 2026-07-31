@@ -21,6 +21,8 @@ class Source < ApplicationRecord
 
   has_many :source_data, dependent: :destroy
   has_many :source_processing_reports, dependent: :destroy
+  has_many :learning_set_sources, dependent: :destroy
+  has_many :learning_sets, through: :learning_set_sources
 
   validates :url, presence: true
   validates :status, inclusion: { in: STATUSES }
@@ -28,6 +30,46 @@ class Source < ApplicationRecord
   scope :promotable_pending, -> { where(is_promotable: true, is_fixtured: false) }
 
   before_validation :assign_domain_from_url
+
+  # A page is identified by its URL. Two people pasting the same link must land
+  # on the same row — a second row would split the page's fetched content and
+  # its processing history in half. Returns nil when the text is not a usable
+  # web address.
+  def self.for_url(raw)
+    normalized = normalize_url(raw)
+    return nil if normalized.blank?
+
+    find_by(url: normalized) || create!(url: normalized)
+  end
+
+  # Tolerates what people actually paste: surrounding space, a missing scheme,
+  # a trailing #fragment that names a spot on the page rather than a page.
+  def self.normalize_url(raw)
+    candidate = raw.to_s.strip
+    return nil if candidate.blank?
+
+    candidate = "https://#{candidate}" unless candidate.match?(%r{\A[a-z][a-z0-9+.\-]*://}i)
+    uri = URI.parse(candidate)
+    return nil unless uri.is_a?(URI::HTTP) && uri.host.present?
+
+    uri.fragment = nil
+    uri.to_s
+  rescue URI::InvalidURIError
+    nil
+  end
+
+  # The most recent payload fetched for this page. A re-fetch supersedes earlier
+  # copies rather than replacing them, so "latest" is what anything reading the
+  # page should use.
+  def latest_datum
+    source_data.order(:created_at).last
+  end
+
+  # The page's extracted text. Models get this, not the markup — see
+  # ContentExtractor for why.
+  def latest_text
+    latest_datum&.text
+  end
 
   private
 

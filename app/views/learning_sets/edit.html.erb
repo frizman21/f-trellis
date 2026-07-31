@@ -1,0 +1,5 @@
+<% content_for :title, "Edit #{@learning_set.name}" %>
+
+<h1 class="mb-3">Edit <%= @learning_set.name %></h1>
+
+<%= render "form", learning_set: @learning_set, submit_label: "Save learning set" %>

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_31_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_31_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -102,6 +102,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_120000) do
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_facility_types_on_name", unique: true
+  end
+
+  create_table "learning_set_sources", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "learning_set_id", null: false
+    t.bigint "source_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["learning_set_id", "source_id"], name: "index_learning_set_sources_on_pair", unique: true
+    t.index ["learning_set_id"], name: "index_learning_set_sources_on_learning_set_id"
+    t.index ["source_id"], name: "index_learning_set_sources_on_source_id"
+  end
+
+  create_table "learning_sets", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_learning_sets_on_name", unique: true
   end
 
   create_table "messages", force: :cascade do |t|
@@ -609,6 +627,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_120000) do
   add_foreign_key "facility_detail_facility_types", "facility_types"
   add_foreign_key "facility_details", "facilities"
   add_foreign_key "facility_details", "source_processing_reports"
+  add_foreign_key "learning_set_sources", "learning_sets", on_delete: :cascade
+  add_foreign_key "learning_set_sources", "sources"
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "models"
   add_foreign_key "messages", "tool_calls"

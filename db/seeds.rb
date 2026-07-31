@@ -1047,3 +1047,17 @@ SourceLink.record(from: link_sample_source, to: apollo_source)
 # outbound edges.
 SourceLink.record(from: link_sample_children.first, to: link_sample_source)
 
+# An example learning set, so the list, the show page and the source page's
+# "add to a learning set" dropdown all have something to work with. `add_url`
+# reuses the source already seeded above rather than creating a second row for
+# the same page, which is the behaviour worth demonstrating.
+learning_set = LearningSet.find_or_create_by!(name: "Org extraction regression") do |ls|
+  ls.description = "Pages we re-run organization extraction against when a skill changes."
+end
+
+[
+  link_sample_source.url,
+  apollo_source.url,
+  "https://en.wikipedia.org/wiki/NASA"
+].each { |url| learning_set.add_url(url) }
+

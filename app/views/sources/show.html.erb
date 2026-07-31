@@ -28,6 +28,31 @@
                   class: "btn btn-sm btn-primary" %>
   </dd>
 
+  <dt>Learning sets</dt>
+  <dd>
+    <% if @source.learning_sets.any? %>
+      <% @source.learning_sets.order(:name).each do |learning_set| %>
+        <div><%= link_to learning_set.name, learning_set_path(learning_set) %></div>
+      <% end %>
+    <% else %>
+      — <span class="text-muted">(not in any set)</span>
+    <% end %>
+
+    <% if @learning_sets.any? %>
+      <%= form_with url: add_to_learning_set_source_path(@source), method: :post, local: true,
+                    class: "d-flex gap-2 mt-2", style: "max-width: 30rem;" do %>
+        <%= select_tag :learning_set_id,
+                       options_from_collection_for_select(@learning_sets, :id, :name),
+                       include_blank: "— add to a learning set —", class: "form-select form-select-sm" %>
+        <%= submit_tag "Add", class: "btn btn-sm btn-outline-primary" %>
+      <% end %>
+    <% else %>
+      <div class="form-text">
+        No learning sets yet — <%= link_to "create one", new_learning_set_path %>.
+      </div>
+    <% end %>
+  </dd>
+
   <dt>Created</dt>
   <dd><%= @source.created_at %></dd>
 

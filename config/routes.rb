@@ -37,6 +37,13 @@ Rails.application.routes.draw do
       get :links_to
       get :triage
       post :triage, action: :run_triage
+      post :add_to_learning_set
+    end
+  end
+  resources :learning_sets do
+    member do
+      post :add_source
+      delete :remove_source
     end
   end
   resources :domains, only: [:index, :edit, :update]
