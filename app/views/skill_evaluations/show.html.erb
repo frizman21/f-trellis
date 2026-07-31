@@ -28,22 +28,23 @@
   <dd class="col-sm-9">
     <span class="text-muted"><%= @evaluation.base_model.provider %> /</span>
     <code><%= @evaluation.base_model.model_id %></code>
-    <% if @evaluation.base_model_missing_from_run? %>
-      <div class="text-warning-emphasis small">
-        The baseline is not among the models below, so this run will not produce
-        its output to compare against.
-      </div>
-    <% end %>
+    <div class="text-muted small">
+      Everything below is measured against what this model proposes on the same
+      page, so it is run whether or not it is ticked.
+    </div>
   </dd>
 
   <dt class="col-sm-3">Models</dt>
   <dd class="col-sm-9">
-    <% if @evaluation.models.any? %>
-      <% @evaluation.models.each do |model| %>
+    <% if @evaluation.models_to_run.any? %>
+      <% @evaluation.models_to_run.each do |model| %>
         <div>
           <code><%= model.model_id %></code>
           <span class="text-muted small"><%= model_pricing_label(model) %></span>
           <%= model_capability_badge(model) %>
+          <% if model.id == @evaluation.base_model_id %>
+            <span class="badge bg-light text-dark border">baseline</span>
+          <% end %>
         </div>
       <% end %>
       <div class="text-muted small">
@@ -79,7 +80,7 @@
   <dt class="col-sm-3">Pairs</dt>
   <dd class="col-sm-9">
     <%= pluralize(@evaluation.planned_pair_count, "run") %> per revision
-    (<%= @evaluation.sources.count %> sources × <%= @evaluation.models.size %> models).
+    (<%= @evaluation.sources.count %> sources × <%= @evaluation.models_to_run.size %> models).
     Running again only queues pairs that have not been run at the current revision.
   </dd>
 </dl>
@@ -121,6 +122,12 @@
   </div>
 </div>
 
+<% if @comparison.any_results? %>
+  <%= render "comparison", comparison: @comparison, evaluation: @evaluation %>
+<% end %>
+
+<h2 class="h4">Runs</h2>
+
 <% if @results.any? %>
   <table class="table align-middle">
     <thead>
@@ -129,7 +136,7 @@
         <th>Source</th>
         <th>Model</th>
         <th>Revision</th>
-        <th>Score</th>
+        <th>Contribution</th>
         <th>Response</th>
         <th></th>
       </tr>
@@ -159,11 +166,6 @@
       <% end %>
     </tbody>
   </table>
-
-  <p class="text-muted small">
-    Scoring is not implemented yet, so every score reads "—". The responses are
-    the point for now.
-  </p>
 <% else %>
   <p class="text-muted">
     No runs yet. "Run evaluation" queues one background job per source × model pair.

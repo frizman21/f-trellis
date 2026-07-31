@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_31_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_31_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -530,6 +530,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_150000) do
     t.datetime "created_at", null: false
     t.text "error"
     t.bigint "model_id", null: false
+    t.string "proposal_digest"
+    t.jsonb "proposals", default: [], null: false
     t.text "response"
     t.decimal "score", precision: 6, scale: 3
     t.bigint "skill_evaluation_id", null: false
@@ -540,6 +542,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_150000) do
     t.datetime "updated_at", null: false
     t.index ["chat_id"], name: "index_skill_evaluation_results_on_chat_id"
     t.index ["model_id"], name: "index_skill_evaluation_results_on_model_id"
+    t.index ["proposal_digest"], name: "index_skill_evaluation_results_on_proposal_digest"
     t.index ["skill_evaluation_id", "source_id", "model_id", "skill_revision_id"], name: "index_skill_evaluation_results_on_run", unique: true
     t.index ["skill_evaluation_id"], name: "index_skill_evaluation_results_on_skill_evaluation_id"
     t.index ["skill_revision_id"], name: "index_skill_evaluation_results_on_skill_revision_id"

@@ -122,17 +122,26 @@ class SkillEvaluationTest < ActiveSupport::TestCase
     assert_includes result.errors.attribute_names, :status
   end
 
-  test "the baseline is flagged when it is not among the models being run" do
+  # Every number on the comparison is relative to the baseline's output on the
+  # same page, so an evaluation that skipped it would have nothing to read the
+  # other columns against.
+  test "the baseline is run whether or not it was ticked" do
     other = Model.create!(provider: "anthropic", model_id: "claude-eval", name: "Other",
                           last_seen_at: Time.current)
     e = evaluation
     e.models = [ other ]
 
-    assert e.base_model_missing_from_run?
+    assert_equal [ other, @model ], e.models_to_run
+  end
 
+  test "a ticked baseline is not run twice" do
+    other = Model.create!(provider: "anthropic", model_id: "claude-eval", name: "Other",
+                          last_seen_at: Time.current)
+    e = evaluation
     e.models = [ other, @model ]
 
-    assert_not e.reload.base_model_missing_from_run?
+    assert_equal 2, e.models_to_run.size
+    assert_equal 1, e.models_to_run.count(@model)
   end
 
   test "destroying an evaluation takes its models and results with it" do

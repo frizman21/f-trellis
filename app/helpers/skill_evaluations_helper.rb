@@ -82,11 +82,28 @@ module SkillEvaluationsHelper
     models.select { |m| m.context_window.to_i.positive? && m.context_window < estimate.largest_page_tokens }
   end
 
-  # Scoring is not implemented — a result has no number to show, and inventing
-  # one would be worse than an em dash.
+  # A run that never completed has no contribution to report, and an em dash says
+  # that better than a 0 that would read as "found nothing".
   def evaluation_score_label(result)
-    return content_tag(:span, "—", class: "text-muted", title: "Scoring not implemented yet") if result.score.nil?
+    return content_tag(:span, "—", class: "text-muted", title: "This pair has not completed") if result.score.nil?
 
     format("%g", result.score)
+  end
+
+  # One proposal as a line you can read: "organization — acme corp (ACME)".
+  def proposal_line(record)
+    record = record.stringify_keys
+    type = record["type"].to_s
+
+    subject = case type
+    when "person" then [ record["first_name"], record["last_name"] ].compact_blank.join(" ")
+    when "organization" then [ record["name"], record["acronym"].presence&.then { |a| "(#{a})" } ].compact.join(" ")
+    when "person_organization" then "#{record['person']} → #{record['organization']}"
+    when "organization_organization" then Array(record["organizations"]).join(" ↔ ")
+    else record.except("type").values.join(" ")
+    end
+
+    relationship = record["relationship_type"].presence
+    [ type.humanize, "—", subject, relationship && "[#{relationship}]" ].compact.join(" ")
   end
 end

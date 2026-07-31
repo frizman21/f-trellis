@@ -1,10 +1,12 @@
-# Runs one skill revision against one page through one model and keeps the reply.
+# Runs one skill revision against one page through one model, keeps the reply,
+# and records what the run would have contributed to the knowledge base.
 #
-# Deliberately a plain chat with NO tools. ProcessReportJob hands the model the
-# entity upsert tools because its job is to populate the knowledge graph; an
-# evaluation is a rehearsal, and a rehearsal that writes people and organizations
-# into the graph would poison the thing it is meant to measure. What is captured
-# here is the response text alone.
+# The model is handed the recording stand-ins, not the writing tools. That is the
+# whole trick: an evaluation is a rehearsal, and a rehearsal that writes people
+# and organizations into the graph would poison the thing it measures — but
+# measuring *contribution* means seeing what a model proposes, which means giving
+# it tools at all. The stand-ins present an identical contract and write nothing,
+# so the invariant holds: an evaluation still creates no entities.
 class RunSkillEvaluationJob < ApplicationJob
   queue_as :default
 
@@ -21,11 +23,14 @@ class RunSkillEvaluationJob < ApplicationJob
     source_text = result.source.latest_text
     raise NotRunnable, "source has no fetched data" if source_text.blank?
 
+    recorder = ProposalRecorder.new
     chat = Chat.create!(model: result.model)
     result.update!(chat: chat)
     chat.with_instructions(instructions)
+    chat.with_tools(*recording_tools(recorder))
     reply = chat.ask(source_text)
 
+    result.record_proposals(recorder.proposals)
     result.update!(status: "complete", response: reply&.content.to_s,
                    error: nil, completed_at: Time.current)
   rescue StandardError => e
@@ -33,5 +38,18 @@ class RunSkillEvaluationJob < ApplicationJob
     # A failed pair is recorded and left alone: the other pairs in the run are
     # independent, and a raised job would retry the same call and bill for it.
     result&.update(status: "failed", error: "#{e.class}: #{e.message}", completed_at: Time.current)
+  end
+
+  private
+
+  # One recorder behind all four, so a link tool can resolve the synthetic id an
+  # upsert tool handed the model a moment earlier.
+  def recording_tools(recorder)
+    [
+      RecordingUpsertPersonTool.new(recorder),
+      RecordingUpsertOrganizationTool.new(recorder),
+      RecordingLinkPersonOrganizationTool.new(recorder),
+      RecordingLinkOrganizationOrganizationTool.new(recorder)
+    ]
   end
 end

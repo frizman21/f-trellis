@@ -1,26 +1,5 @@
 class LinkPersonOrganizationTool < RubyLLM::Tool
-  description <<~DESC
-    Link a Person to an Organization with a named relationship type (e.g.
-    "Employment", "Affiliation"). Creates the PersonOrganization edge if one
-    doesn't already exist, then inserts a new PersonOrganizationDetail
-    attached to the active SourceProcessingReport, attaches the named
-    PersonOrganizationType, and updates the edge's current detail pointer.
-    Use after upsert_person and upsert_organization.
-  DESC
-
-  param :person_id, type: "integer", desc: "Person.id from upsert_person."
-  param :organization_id, type: "integer", desc: "Organization.id from upsert_organization."
-  param :type, type: "string",
-        desc: "Name of the PersonOrganizationType to attach (e.g. 'Employment'). Must already exist."
-  param :as_of, type: "string",
-        desc: "ISO 8601 datetime the relationship was effective. Defaults to now.",
-        required: false
-  param :confidence_tenths, type: "integer",
-        desc: "Confidence 0–1000 (1000 = 100%). Defaults to 800.",
-        required: false
-  param :additional_attributes, type: "object",
-        desc: "Flat map of string keys to scalar values (e.g. role, title, department, start_date, end_date).",
-        required: false
+  include LinkPersonOrganizationContract
 
   def initialize(report)
     super()

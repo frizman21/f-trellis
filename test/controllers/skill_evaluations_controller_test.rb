@@ -138,12 +138,13 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action=?]", run_skill_evaluation_path(evaluation)
   end
 
-  test "show warns when the baseline is not among the models being run" do
+  test "show lists the baseline among the models even when it was not ticked" do
     evaluation = evaluation_with(models: [ @slow ])
 
     get skill_evaluation_path(evaluation)
 
-    assert_match(/baseline is not among the models/, @response.body)
+    assert_match(/run whether or not it is ticked/, @response.body)
+    assert_select "dd", text: /gpt-fast/
   end
 
   test "run queues one job per source and model pair" do
@@ -291,14 +292,14 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     assert_no_match(/more likely gone than slow/, @response.body)
   end
 
-  test "a result with no score reads as an em dash rather than a number" do
+  test "a result with no contribution recorded reads as an em dash rather than a zero" do
     evaluation = evaluation_with
     SkillEvaluationResult.create!(skill_evaluation: evaluation, source: @source, model: @fast,
                                   skill_revision: @revision, status: "complete", response: "x")
 
     get skill_evaluation_path(evaluation)
 
-    assert_select "span[title=?]", "Scoring not implemented yet"
+    assert_select "span[title=?]", "This pair has not completed"
   end
 
   test "the result page shows the full response" do
@@ -419,7 +420,65 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     assert_match "Hand-picked", @response.body
   end
 
+  # --- The contribution comparison -----------------------------------------
+
+  test "the matrix ranks two models against the baseline and marks the identical cell" do
+    evaluation = evaluation_with
+    complete(evaluation, @fast, [ org("acme"), org("beta") ])
+    complete(evaluation, @slow, [ org("beta"), org("acme") ])
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_match "Contribution", @response.body
+    # Scoped to the table: the legend below it explains the badge with one too.
+    assert_select "table td span.badge", text: "=", count: 1
+  end
+
+  test "a pair that has not run leaves its cell empty" do
+    evaluation = evaluation_with
+    complete(evaluation, @fast, [ org("acme") ])
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_select "td span[title=?]", "This pair has not run"
+  end
+
+  test "the result page splits a run against the baseline" do
+    evaluation = evaluation_with
+    complete(evaluation, @fast, [ org("acme") ])
+    result = complete(evaluation, @slow, [ org("acme"), org("beta") ])
+
+    get skill_evaluation_result_path(result)
+
+    assert_response :success
+    assert_match "Shared with the baseline (1)", @response.body
+    assert_match "Added over the baseline (1)", @response.body
+    assert_match "Missed, that the baseline found (0)", @response.body
+  end
+
+  test "the result page says so when the baseline has not run on that page" do
+    evaluation = evaluation_with(models: [ @slow ])
+    result = complete(evaluation, @slow, [ org("acme") ])
+
+    get skill_evaluation_result_path(result)
+
+    assert_response :success
+    assert_match(/baseline has not run on this page/, @response.body)
+  end
+
   private
+
+  def org(name) = { "type" => "organization", "name" => name, "attributes" => {} }
+
+  def complete(evaluation, model, proposals)
+    result = SkillEvaluationResult.new(skill_evaluation: evaluation, source: @source, model: model,
+                                       skill_revision: @revision, status: "complete", response: "x")
+    result.record_proposals(proposals)
+    result.save!
+    result
+  end
 
   def priced(model, input_per_million)
     model.update!(pricing: { "text_tokens" => { "standard" => { "input_per_million" => input_per_million } } })

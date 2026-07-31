@@ -15,8 +15,7 @@ class SkillEvaluation < ApplicationRecord
 
   belongs_to :skill
   belongs_to :learning_set
-  # The model the others are compared against. Scoring is not implemented yet,
-  # so nothing reads this beyond the UI — it is recorded so scoring can.
+  # The model everything else is scored against.
   belongs_to :base_model, class_name: "Model"
 
   has_many :skill_evaluation_models, dependent: :destroy
@@ -41,16 +40,24 @@ class SkillEvaluation < ApplicationRecord
     skill.skill_revisions.max_by(&:sequence)
   end
 
-  # Pairs a run would cover — the whole point of the configuration. `size`, not
-  # `count`, for the same reason: preloaded associations must not re-query.
-  def planned_pair_count
-    sources.size * models.size
+  # The models a run actually covers: the ones ticked, plus the baseline whether
+  # it was ticked or not.
+  #
+  # Every number on the comparison — proposals not in the baseline, pages
+  # identical to it, the ranking itself — is relative to the baseline's output on
+  # the same page, so an evaluation that skipped it would produce columns and
+  # nothing to read them against. Enforced here rather than warned about on the
+  # page, because a warning is something you read after the run has already cost
+  # money.
+  def models_to_run
+    ticked = models.to_a
+    ticked.include?(base_model) ? ticked : ticked + [ base_model ].compact
   end
 
-  # True when the baseline is not among the models being run, so nothing will
-  # produce the output the others are meant to be compared against.
-  def base_model_missing_from_run?
-    models.exclude?(base_model)
+  # Pairs a run would cover — the whole point of the configuration. `size`, not
+  # `count`, so a preloaded association is used as loaded rather than re-queried.
+  def planned_pair_count
+    sources.size * models_to_run.size
   end
 
   # Results by status for one revision, e.g. {"complete" => 4, "failed" => 1}.

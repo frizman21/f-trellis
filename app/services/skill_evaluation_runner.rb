@@ -38,11 +38,12 @@ class SkillEvaluationRunner
     return blocked("#{@evaluation.skill.name} has no revisions to run.") if revision.nil?
 
     sources = @evaluation.sources.order(:id).to_a
-    models  = @evaluation.models.order(:provider, :model_id).to_a
+    # The baseline is in here whether or not it was ticked — see
+    # SkillEvaluation#models_to_run.
+    models  = @evaluation.models_to_run.sort_by { |m| [ m.provider, m.model_id ] }
     if sources.empty?
       return blocked("#{@evaluation.learning_set.name} has no sources; add a page to the set before running.")
     end
-    return blocked("Select at least one model before running.") if models.empty?
 
     queued  = []
     skipped = []
