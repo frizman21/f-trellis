@@ -153,6 +153,137 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # --- triage -------------------------------------------------------------
+
+  def triage_source
+    source = Source.create!(url: "https://triage.test/page")
+    source.update!(status: "complete")
+    bytes = Zip::OutputStream.write_buffer do |zos|
+      zos.put_next_entry("page.html")
+      zos.write("<html><body><p>Acme Corp</p></body></html>")
+    end
+    bytes.rewind
+    SourceDatum.create!(source: source, content_type: "application/zip", data: bytes.read)
+    source
+  end
+
+  def make_skill(name, applicability)
+    skill = Skill.create!(name: name, applicability: applicability, is_active: true)
+    skill.skill_revisions.create!(content: "Do #{name}.")
+    skill
+  end
+
+  def stub_triage(recommended:, skipped: [])
+    verdicts = recommended.map { |s| SkillTriage::Verdict.new(skill: s, applies: true, reason: "yes") } +
+               skipped.map { |s| SkillTriage::Verdict.new(skill: s, applies: false, reason: "no") }
+    result = SkillTriage::Result.new(verdicts: verdicts, failed: false)
+
+    original = SkillTriage.method(:call)
+    SkillTriage.define_singleton_method(:call) { |**| result }
+    yield
+  ensure
+    SkillTriage.define_singleton_method(:call, original)
+  end
+
+  test "show offers the triage button only when the source has data" do
+    empty = Source.create!(url: "https://triage.test/empty")
+
+    get source_path(empty)
+    assert_select "a[href=?]", triage_source_path(empty), count: 0
+
+    with_data = triage_source
+    get source_path(with_data)
+    assert_select "a[href=?]", triage_source_path(with_data), text: "Suggest skills"
+  end
+
+  test "triage pre-checks recommended skills and leaves the rest unchecked" do
+    source = triage_source
+    yes = make_skill("Recommended", "Directory pages.")
+    no  = make_skill("Not recommended", "Acquisition articles.")
+
+    stub_triage(recommended: [ yes ], skipped: [ no ]) { get triage_source_path(source) }
+
+    assert_response :success
+    assert_select "input[name='skill_ids[]'][value=?][checked]", yes.id.to_s
+    assert_select "input[name='skill_ids[]'][value=?]:not([checked])", no.id.to_s
+  end
+
+  test "triage creates one report and one job per selected skill" do
+    source = triage_source
+    a = make_skill("Skill A", "Directory pages.")
+    b = make_skill("Skill B", "Other pages.")
+
+    assert_difference "SourceProcessingReport.count", 2 do
+      assert_enqueued_jobs 2, only: ProcessReportJob do
+        post triage_source_path(source), params: { skill_ids: [ a.id, b.id ] }
+      end
+    end
+
+    assert_equal [ a.id, b.id ].sort,
+                 SourceProcessingReport.last(2).map { |r| r.skill_revision.skill_id }.sort
+  end
+
+  test "triage queues nothing when no skills are selected" do
+    source = triage_source
+    make_skill("Skill A", "Directory pages.")
+
+    assert_no_difference "SourceProcessingReport.count" do
+      assert_no_enqueued_jobs only: ProcessReportJob do
+        post triage_source_path(source), params: { skill_ids: [] }
+      end
+    end
+
+    assert_redirected_to source_path(source)
+    follow_redirect!
+    assert_match(/No skills selected/, response.body)
+  end
+
+  test "triage does not duplicate a report already covering this content" do
+    source = triage_source
+    skill = make_skill("Skill A", "Directory pages.")
+
+    post triage_source_path(source), params: { skill_ids: [ skill.id ] }
+
+    assert_no_difference "SourceProcessingReport.count" do
+      assert_no_enqueued_jobs only: ProcessReportJob do
+        post triage_source_path(source), params: { skill_ids: [ skill.id ] }
+      end
+    end
+
+    follow_redirect!
+    assert_match(/already covered/, response.body)
+  end
+
+  test "triage refuses skills that are not triageable" do
+    source = triage_source
+    inactive = Skill.create!(name: "Inactive", applicability: "Anywhere.", is_active: false)
+    inactive.skill_revisions.create!(content: "Do it.")
+
+    assert_no_difference "SourceProcessingReport.count" do
+      post triage_source_path(source), params: { skill_ids: [ inactive.id ] }
+    end
+  end
+
+  test "triage warns rather than dropping work when the call fails" do
+    source = triage_source
+    skill = make_skill("Skill A", "Directory pages.")
+
+    result = SkillTriage::Result.new(
+      verdicts: [ SkillTriage::Verdict.new(skill: skill, applies: true, reason: "fallback") ],
+      failed: true, error: "Triage could not decide (boom); recommending every candidate skill."
+    )
+    original = SkillTriage.method(:call)
+    SkillTriage.define_singleton_method(:call) { |**| result }
+
+    get triage_source_path(source)
+
+    assert_response :success
+    assert_match(/could not decide/, response.body)
+    assert_select "input[name='skill_ids[]'][value=?][checked]", skill.id.to_s
+  ensure
+    SkillTriage.define_singleton_method(:call, original)
+  end
+
   test "crawl enqueues a CrawlJob with parsed params" do
     source = sources(:one)
     assert_enqueued_with(job: CrawlJob) do

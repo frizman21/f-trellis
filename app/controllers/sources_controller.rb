@@ -21,6 +21,27 @@ class SourcesController < ApplicationController
     @sources = @source.linked_from.order(:id).page(params[:page]).per(50)
   end
 
+  # One cheap call decides which skills are worth running on this page.
+  def triage
+    @source = Source.find(params[:id])
+    @result = SkillTriage.call(source: @source)
+    @existing = existing_reports_for(@source, @result.verdicts.map(&:skill))
+  end
+
+  # Queue the skills the operator confirmed.
+  def run_triage
+    source = Source.find(params[:id])
+    skills = Skill.triageable.where(id: Array(params[:skill_ids]).map(&:to_i))
+
+    if skills.empty?
+      redirect_to source_path(source), alert: "No skills selected; nothing queued." and return
+    end
+
+    queued, skipped = queue_reports(source, skills)
+
+    redirect_to source_processing_reports_path, notice: queue_notice(queued, skipped)
+  end
+
   def new
     @source = Source.new
   end
@@ -70,6 +91,52 @@ class SourcesController < ApplicationController
   end
 
   private
+
+  # Reports that already cover this source's current content, keyed by skill id,
+  # so triage can show what would be a no-op before anything is queued.
+  def existing_reports_for(source, skills)
+    skills.index_with do |skill|
+      revision = skill.skill_revisions.order(:sequence).last
+      revision && SourceProcessingReport.covering(source: source, skill_revision: revision)
+    end.compact
+  end
+
+  def queue_reports(source, skills)
+    queued = []
+    skipped = []
+
+    skills.each do |skill|
+      revision = skill.skill_revisions.order(:sequence).last
+      next skipped << [ skill, "no revisions" ] if revision.nil?
+
+      if SourceProcessingReport.covering(source: source, skill_revision: revision)
+        skipped << [ skill, "already covered" ]
+        next
+      end
+
+      report = SourceProcessingReport.new(source: source, skill_revision: revision,
+                                          model: skill.preferred_model, status: "new", facts: [])
+
+      if report.save
+        ProcessReportJob.perform_later(report)
+        queued << skill
+      else
+        skipped << [ skill, report.errors.full_messages.to_sentence ]
+      end
+    end
+
+    [ queued, skipped ]
+  end
+
+  def queue_notice(queued, skipped)
+    parts = []
+    parts << "Queued #{queued.size} #{'report'.pluralize(queued.size)}: #{queued.map(&:name).to_sentence}." if queued.any?
+    if skipped.any?
+      details = skipped.map { |skill, reason| "#{skill.name} (#{reason})" }.to_sentence
+      parts << "Skipped #{skipped.size}: #{details}."
+    end
+    parts.join(" ")
+  end
 
   def source_params
     params.require(:source).permit(:url, :description)
