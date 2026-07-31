@@ -333,4 +333,96 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to new_user_session_path
   end
+
+  # --- Picking models by objective (the model_slate frame) --------------------
+
+  test "the model slate frame renders on its own" do
+    get model_slate_skill_evaluations_path
+
+    assert_response :success
+    assert_select "turbo-frame#model_slate"
+    assert_select "button.js-slate-objective", count: SkillEvaluationsHelper::OBJECTIVE_BUTTONS.size
+  end
+
+  test "an objective pre-checks its suggestions and leaves the rest listed and unchecked" do
+    priced(@fast, 0.1)
+    priced(@slow, 9.0)
+
+    get model_slate_skill_evaluations_path, params: { objective: "cheapest", count: 1 }
+
+    assert_response :success
+    assert_select "input[name=?][value=?][checked=checked]", "skill_evaluation[model_ids][]", @fast.id.to_s
+    assert_select "input[name=?][value=?]", "skill_evaluation[model_ids][]", @slow.id.to_s
+    assert_select "input[name=?][value=?][checked=checked]", "skill_evaluation[model_ids][]", @slow.id.to_s,
+                  count: 0
+    assert_match "cheapest text models", @response.body
+  end
+
+  test "a model that cannot return text is still listed, with a badge saying why" do
+    embeddings = Model.create!(provider: "openai", model_id: "text-embedding-9", name: "Embeddings",
+                               last_seen_at: @fast.last_seen_at,
+                               modalities: { "input" => [ "text" ], "output" => [ "embeddings" ] })
+
+    get model_slate_skill_evaluations_path, params: { objective: "cheapest" }
+
+    assert_response :success
+    assert_select "input[name=?][value=?]", "skill_evaluation[model_ids][]", embeddings.id.to_s
+    assert_match "returns embeddings", @response.body
+  end
+
+  test "the baseline is suggested whatever the objective picks" do
+    get model_slate_skill_evaluations_path, params: { objective: "cheapest", count: 1,
+                                                      base_model_id: @slow.id }
+
+    assert_response :success
+    assert_select "input[name=?][value=?][checked=checked]", "skill_evaluation[model_ids][]", @slow.id.to_s
+    assert_match "baseline", @response.body
+  end
+
+  test "applying an objective offers to restore what was ticked before" do
+    get model_slate_skill_evaluations_path, params: { objective: "cheapest", count: 1,
+                                                      selected: [ @slow.id ] }
+
+    assert_response :success
+    assert_select "a.js-slate-restore"
+  end
+
+  test "the frame reports the scale and cost of the run it is proposing" do
+    get model_slate_skill_evaluations_path, params: { objective: "cheapest", count: 1,
+                                                      learning_set_id: @set.id }
+
+    assert_response :success
+    assert_match(/1 model × 1 page = 1 run/, @response.body)
+  end
+
+  test "model_objective is stored and shown on the evaluation" do
+    post skill_evaluations_path, params: {
+      skill_evaluation: { name: "By objective", skill_id: @skill.id, learning_set_id: @set.id,
+                          base_model_id: @fast.id, model_objective: "cheapest",
+                          model_ids: [ @fast.id ] }
+    }
+
+    evaluation = SkillEvaluation.order(:id).last
+    assert_equal "cheapest", evaluation.model_objective
+
+    get skill_evaluation_path(evaluation)
+    assert_response :success
+    assert_match "Chosen by objective", @response.body
+  end
+
+  test "an evaluation with no objective says it was hand-picked" do
+    evaluation = evaluation_with
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_match "Hand-picked", @response.body
+  end
+
+  private
+
+  def priced(model, input_per_million)
+    model.update!(pricing: { "text_tokens" => { "standard" => { "input_per_million" => input_per_million } } })
+    model
+  end
 end

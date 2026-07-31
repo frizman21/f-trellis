@@ -73,27 +73,7 @@
     </div>
   </div>
 
-  <div class="mb-3">
-    <%= f.label :model_ids, "Models to run", class: "form-label" %>
-    <div class="border rounded p-2" style="max-height: 16rem; overflow-y: auto;">
-      <% models.group_by(&:provider).each do |provider, provider_models| %>
-        <div class="text-muted text-uppercase small mt-2"><%= provider %></div>
-        <% provider_models.each do |model| %>
-          <div class="form-check">
-            <%= check_box_tag "skill_evaluation[model_ids][]", model.id,
-                              evaluation.model_ids.include?(model.id),
-                              id: "evaluation_model_#{model.id}", class: "form-check-input" %>
-            <%= label_tag "evaluation_model_#{model.id}", model_dropdown_label(model),
-                          class: "form-check-label" %>
-          </div>
-        <% end %>
-      <% end %>
-    </div>
-    <div class="form-text">Every selected model is run against every selected source.</div>
-  </div>
-
-  <%# Nothing selected must still submit as "none", not as "unchanged". %>
-  <%= hidden_field_tag "skill_evaluation[model_ids][]", "" %>
+  <%= render "model_slate", **slate %>
 
   <%= f.submit submit_label, class: "btn btn-primary" %>
   <%= link_to "Cancel",
@@ -103,7 +83,85 @@
 
 <script>
   (function () {
+    // The model slate is a turbo frame, but the selects it depends on — skill,
+    // learning set, baseline — live outside it, and so do the objective
+    // controls' current values. Turbo has no way to know that, so the frame is
+    // navigated by hand: read the form as it stands now, build the URL, set src.
+    function slateUrl(slate, overrides) {
+      var url = new URL(slate.dataset.slateUrl, window.location.origin);
+      var params = url.searchParams;
+
+      function put(key, value) {
+        if (value !== null && value !== undefined && value !== '') params.append(key, value);
+      }
+
+      put('evaluation_id', slate.dataset.evaluationId);
+      put('learning_set_id', value('skill_evaluation_learning_set_id'));
+      put('base_model_id', value('evaluation-base-model-select'));
+      put('count', value('slate-count'));
+      put('provider', value('slate-provider'));
+      put('source_evaluation_id', value('slate-source-evaluation'));
+      put('objective', overrides.objective);
+
+      // What is ticked right now, so an objective can offer to put it back and
+      // a restore can reinstate it.
+      (overrides.selected || checkedModelIds(slate)).forEach(function (id) {
+        params.append('selected[]', id);
+      });
+
+      return url.toString();
+    }
+
+    function value(id) {
+      var el = document.getElementById(id);
+      return el ? el.value : null;
+    }
+
+    function checkedModelIds(slate) {
+      return Array.prototype.slice
+        .call(slate.querySelectorAll('.js-slate-model:checked'))
+        .map(function (box) { return box.value; });
+    }
+
+    function initializeModelSlate() {
+      var slate = document.getElementById('model-slate');
+      var frame = document.getElementById('model_slate');
+      if (!slate || !frame) return;
+      // Turbo fires DOMContentLoaded and turbo:load on the same first render,
+      // and this runs on both. The frame's contents are replaced wholesale on
+      // every navigation, so a flag on the current copy is enough to keep one
+      // set of listeners per copy.
+      if (slate.dataset.slateBound === 'true') return;
+      slate.dataset.slateBound = 'true';
+
+      slate.querySelectorAll('.js-slate-objective').forEach(function (button) {
+        button.addEventListener('click', function () {
+          frame.src = slateUrl(slate, { objective: button.dataset.objective });
+        });
+      });
+
+      var restore = slate.querySelector('.js-slate-restore');
+      if (restore) {
+        restore.addEventListener('click', function (event) {
+          event.preventDefault();
+          var previous = restore.dataset.previous ? restore.dataset.previous.split(',') : [];
+          frame.src = slateUrl(slate, { objective: null, selected: previous });
+        });
+      }
+
+      // Ticking a box by hand means the set is no longer what the objective
+      // produced, so the label stops claiming it was.
+      var objectiveField = document.getElementById('slate-objective');
+      slate.querySelectorAll('.js-slate-model').forEach(function (box) {
+        box.addEventListener('change', function () {
+          if (objectiveField) objectiveField.value = '';
+        });
+      });
+    }
+
     function initializeEvaluationForm() {
+      initializeModelSlate();
+
       var skill = document.getElementById('evaluation-skill-select');
       var baseModel = document.getElementById('evaluation-base-model-select');
       if (!skill || !baseModel) return;

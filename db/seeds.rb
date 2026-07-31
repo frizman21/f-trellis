@@ -1100,5 +1100,24 @@ if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
       completed_at: 1.minute.ago
     )
   end
+
+  # A second evaluation whose models came from an objective rather than from
+  # ticking boxes, so the "Chosen by objective" line on the show page and the
+  # pre-checked suggested set on the form both have something to render. The
+  # models are derived the same way the form derives them.
+  cheapest = ModelSlate.call(objective: "cheapest", models: Model.selectable.to_a,
+                             baseline: evaluation_models.first, count: 3)
+
+  if cheapest.any?
+    by_objective = SkillEvaluation.find_or_create_by!(name: "Org extraction — cheapest viable") do |e|
+      e.description     = "How far down the price list can this skill go before it stops finding organizations?"
+      e.skill           = evaluation_skill
+      e.learning_set    = learning_set
+      e.base_model      = evaluation_models.first
+      e.model_objective = "cheapest"
+    end
+
+    by_objective.models = cheapest.map(&:model)
+  end
 end
 

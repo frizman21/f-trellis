@@ -1,4 +1,6 @@
 require "test_helper"
+require "zip"
+require "stringio"
 
 class LearningSetTest < ActiveSupport::TestCase
   setup do
@@ -124,5 +126,61 @@ class LearningSetTest < ActiveSupport::TestCase
     assert_difference "LearningSetSource.count", -1 do
       outcome.source.destroy!
     end
+  end
+
+  test "the estimate counts the text of every fetched page" do
+    fetch(@set.add_url("https://learning.test/a").source, "a" * 400)
+    fetch(@set.add_url("https://learning.test/b").source, "b" * 800)
+
+    estimate = @set.estimated_input(cache: ActiveSupport::Cache::NullStore.new)
+
+    assert_equal 300, estimate.tokens
+    assert_equal 2, estimate.pages
+    assert_equal 200, estimate.largest_page_tokens
+    assert_equal 0, estimate.unfetched_pages
+  end
+
+  test "a page with nothing fetched is reported, not silently counted as empty" do
+    fetch(@set.add_url("https://learning.test/a").source, "a" * 400)
+    @set.add_url("https://learning.test/never-fetched")
+
+    estimate = @set.estimated_input(cache: ActiveSupport::Cache::NullStore.new)
+
+    assert_equal 1, estimate.pages
+    assert_equal 1, estimate.unfetched_pages
+  end
+
+  test "the estimate uses the newest payload, so a re-fetch supersedes the old one" do
+    source = @set.add_url("https://learning.test/a").source
+    fetch(source, "a" * 4000)
+    fetch(source, "a" * 400)
+
+    assert_equal 100, @set.estimated_input(cache: ActiveSupport::Cache::NullStore.new).tokens
+  end
+
+  # Getting the text means unzipping and stripping every page, so the answer is
+  # cached — and keyed on the content hashes, which move exactly when the text
+  # does.
+  test "the estimate is cached until a page's content changes" do
+    cache = ActiveSupport::Cache::MemoryStore.new
+    source = @set.add_url("https://learning.test/a").source
+    fetch(source, "a" * 400)
+
+    assert_equal 100, @set.estimated_input(cache: cache).tokens
+
+    fetch(source, "a" * 800)
+
+    assert_equal 200, @set.reload.estimated_input(cache: cache).tokens
+  end
+
+  private
+
+  def fetch(source, body)
+    bytes = Zip::OutputStream.write_buffer do |zos|
+      zos.put_next_entry("page.html")
+      zos.write("<html><body><p>#{body}</p></body></html>")
+    end
+    bytes.rewind
+    SourceDatum.create!(source: source, content_type: "application/zip", data: bytes.read)
   end
 end
