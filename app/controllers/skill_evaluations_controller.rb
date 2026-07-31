@@ -1,13 +1,17 @@
 class SkillEvaluationsController < ApplicationController
   def index
-    @evaluations = SkillEvaluation.includes(:skill, :base_model, :models, learning_set: :sources)
+    @evaluations = SkillEvaluation.includes(:skill, :base_model, :models,
+                                            learning_set: :sources,
+                                            skill: :skill_revisions)
                                   .order(created_at: :desc)
                                   .page(params[:page]).per(25)
+    @counts_by_evaluation = counts_for(@evaluations)
   end
 
   def show
     @evaluation = SkillEvaluation.includes(:models, learning_set: :sources).find(params[:id])
     @revision = @evaluation.current_skill_revision
+    @counts = @evaluation.result_counts(revision: @revision)
     @results = @evaluation.skill_evaluation_results
                           .includes(:source, :model, :skill_revision)
                           .order(:source_id, :model_id)
@@ -60,6 +64,25 @@ class SkillEvaluationsController < ApplicationController
   end
 
   private
+
+  # Status counts for a whole page of evaluations in one grouped query, each
+  # scoped to that evaluation's current revision. Asking the model per row would
+  # be two queries per evaluation listed.
+  def counts_for(evaluations)
+    revisions = evaluations.index_with { |e| e.current_skill_revision&.id }
+    rows = SkillEvaluationResult.where(skill_evaluation_id: evaluations.map(&:id))
+                                .group(:skill_evaluation_id, :skill_revision_id, :status)
+                                .count
+
+    evaluations.index_with do |evaluation|
+      revision_id = revisions[evaluation]
+      next {} if revision_id.nil?
+
+      rows.each_with_object({}) do |((evaluation_id, result_revision_id, status), count), memo|
+        memo[status] = count if evaluation_id == evaluation.id && result_revision_id == revision_id
+      end
+    end
+  end
 
   def load_choices
     @skills = Skill.order(:name)

@@ -153,6 +153,114 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     assert_match "Acme Corp", @response.body
   end
 
+  # --- run status ---------------------------------------------------------
+
+  test "index shows the run status and completed count" do
+    evaluation = evaluation_with(models: [ @fast ])
+    SkillEvaluationResult.create!(skill_evaluation: evaluation, source: @source, model: @fast,
+                                  skill_revision: @revision, status: "complete", response: "x")
+
+    get skill_evaluations_path
+
+    assert_response :success
+    assert_select "td", text: "Complete"
+    assert_select "td", text: /1 of 1/
+  end
+
+  test "index counts only the current revision" do
+    evaluation = evaluation_with(models: [ @fast ])
+    SkillEvaluationResult.create!(skill_evaluation: evaluation, source: @source, model: @fast,
+                                  skill_revision: @revision, status: "complete", response: "x")
+    @skill.skill_revisions.create!(content: "Reworded.")
+
+    get skill_evaluations_path
+
+    assert_select "td", text: "Not run"
+    assert_select "td", text: /0 of 1/
+  end
+
+  # Status is a per-row question, so the obvious implementation asks the database
+  # once per evaluation listed. Comparing two page sizes catches that directly:
+  # a per-row query shows up as a growing count, a bounded one does not.
+  test "listing more evaluations does not cost more queries" do
+    make_evaluations(2)
+    get skill_evaluations_path # warm up, so a one-off session load is not counted
+    with_two = count_queries { get skill_evaluations_path }
+
+    make_evaluations(3, offset: 2)
+    with_five = count_queries { get skill_evaluations_path }
+
+    assert_response :success
+    assert_equal with_two, with_five,
+      "listing 5 evaluations took #{with_five} queries against #{with_two} for 2 — status is being counted per row"
+  end
+
+  def make_evaluations(count, offset: 0)
+    count.times do |i|
+      set = LearningSet.create!(name: "Set #{offset + i}")
+      set.add_source(@source)
+      e = SkillEvaluation.create!(name: "Comparison #{offset + i}", skill: @skill,
+                                  base_model: @fast, learning_set: set)
+      e.models = [ @fast ]
+      SkillEvaluationResult.create!(skill_evaluation: e, source: @source, model: @fast,
+                                    skill_revision: @revision, status: "complete", response: "x")
+    end
+  end
+
+  def count_queries
+    queries = 0
+    counter = ->(*, payload) { queries += 1 unless payload[:name].to_s =~ /SCHEMA|TRANSACTION/ }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { yield }
+    queries
+  end
+
+  test "show summarises progress and flags failures" do
+    evaluation = evaluation_with
+    SkillEvaluationResult.create!(skill_evaluation: evaluation, source: @source, model: @fast,
+                                  skill_revision: @revision, status: "complete", response: "x")
+    SkillEvaluationResult.create!(skill_evaluation: evaluation, source: @source, model: @slow,
+                                  skill_revision: @revision, status: "failed", error: "boom")
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_match(/Complete, with failures/, @response.body)
+    assert_match(/1 complete and 1 failed of 2 pairs/, @response.body)
+    assert_select "div.progress div.progress-bar.bg-danger"
+  end
+
+  test "show says nothing has run yet when there are no results" do
+    evaluation = evaluation_with
+
+    get skill_evaluation_path(evaluation)
+
+    assert_match(/Not run/, @response.body)
+    assert_match(/No runs yet of 2 pairs/, @response.body)
+  end
+
+  test "show warns when a pair has been queued past the stale window" do
+    evaluation = evaluation_with
+    result = SkillEvaluationResult.create!(skill_evaluation: evaluation, source: @source,
+                                           model: @fast, skill_revision: @revision,
+                                           status: "pending")
+    result.update_columns(updated_at: (SkillEvaluation::STALE_AFTER + 1.minute).ago)
+
+    get skill_evaluation_path(evaluation)
+
+    assert_match(/more likely gone than slow/, @response.body)
+  end
+
+  test "show does not warn about a pair queued moments ago" do
+    evaluation = evaluation_with
+    SkillEvaluationResult.create!(skill_evaluation: evaluation, source: @source, model: @fast,
+                                  skill_revision: @revision, status: "pending")
+
+    get skill_evaluation_path(evaluation)
+
+    assert_match(/Running/, @response.body)
+    assert_no_match(/more likely gone than slow/, @response.body)
+  end
+
   test "a result with no score reads as an em dash rather than a number" do
     evaluation = evaluation_with
     SkillEvaluationResult.create!(skill_evaluation: evaluation, source: @source, model: @fast,

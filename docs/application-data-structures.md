@@ -226,6 +226,15 @@ Unique on `[skill_evaluation_id, source_id, model_id, skill_revision_id]`:
 pressing Run twice must not pay twice, and editing the skill creates a revision,
 which makes every pair runnable again against the new wording.
 
+The evaluation itself has **no** status column. Progress is derived from these
+rows — `SkillEvaluation#result_counts` and `#run_status`
+(`not_run` / `running` / `incomplete` / `failed` / `complete_with_failures` /
+`complete`) — always scoped to the current skill revision, so the number stops
+describing runs of a wording that has since been edited. A stored column would
+need every job completion to keep it in sync and would drift the moment a job was
+dropped. `#stalled?` reports pairs sitting in `pending`/`running` past
+`STALE_AFTER`, which is what a dropped job looks like; nothing re-queues them.
+
 `SkillEvaluationRunner` turns the configuration into pending results plus one
 `RunSkillEvaluationJob` each; the job sends the revision as instructions and the
 page's extracted text as the message, with **no tools registered**. A failed

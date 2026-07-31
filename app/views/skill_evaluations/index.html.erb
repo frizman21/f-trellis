@@ -23,7 +23,8 @@
         <th>Base model</th>
         <th>Sources</th>
         <th>Models</th>
-        <th>Runs</th>
+        <th>Status</th>
+        <th>Runs <span class="text-muted fw-normal small">(current revision)</span></th>
         <th>Created</th>
       </tr>
     </thead>
@@ -37,7 +38,15 @@
           <td><code><%= evaluation.base_model.model_id %></code></td>
           <td><%= evaluation.sources.size %></td>
           <td><%= evaluation.models.size %></td>
-          <td><%= evaluation.skill_evaluation_results.count %> of <%= evaluation.planned_pair_count %></td>
+          <% counts = @counts_by_evaluation[evaluation] || {} %>
+          <% planned = evaluation.planned_pair_count %>
+          <td><%= evaluation_run_badge(evaluation.run_status(counts: counts, planned: planned)) %></td>
+          <td>
+            <%= counts["complete"].to_i %> of <%= planned %>
+            <% if counts["failed"].to_i.positive? %>
+              <span class="text-danger small"><%= counts["failed"] %> failed</span>
+            <% end %>
+          </td>
           <td><%= evaluation.created_at&.to_date %></td>
         </tr>
       <% end %>

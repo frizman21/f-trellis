@@ -14,6 +14,22 @@ class SkillEvaluationTest < ActiveSupport::TestCase
                               learning_set: set }.merge(attrs))
   end
 
+  # A two-page, one-model evaluation: two pairs, so a run can be half done.
+  def two_pair_evaluation
+    set = LearningSet.create!(name: "Pages under test")
+    @page_a = set.add_url("https://eval.test/a").source
+    @page_b = set.add_url("https://eval.test/b").source
+    e = evaluation(learning_set: set)
+    e.models = [ @model ]
+    e
+  end
+
+  def result_for(evaluation, source, status, revision: @revision, **attrs)
+    SkillEvaluationResult.create!({ skill_evaluation: evaluation, source: source,
+                                    model: @model, skill_revision: revision,
+                                    status: status }.merge(attrs))
+  end
+
   test "an evaluation requires a name, a skill, a learning set and a base model" do
     blank = SkillEvaluation.new
 
@@ -129,5 +145,117 @@ class SkillEvaluationTest < ActiveSupport::TestCase
     assert_difference [ "SkillEvaluationModel.count", "SkillEvaluationResult.count" ], -1 do
       e.destroy!
     end
+  end
+
+  # --- run status ---------------------------------------------------------
+
+  test "an evaluation with no results has not been run" do
+    assert_equal :not_run, two_pair_evaluation.run_status
+  end
+
+  test "a pair still queued or in flight reads as running" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "complete")
+    result_for(e, @page_b, "pending")
+
+    assert_equal :running, e.run_status
+
+    e.skill_evaluation_results.find_by(source: @page_b).update!(status: "running")
+
+    assert_equal :running, e.run_status
+  end
+
+  test "every pair complete reads as complete" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "complete")
+    result_for(e, @page_b, "complete")
+
+    assert_equal :complete, e.run_status
+  end
+
+  test "a finished run with one failure is not reported as complete" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "complete")
+    result_for(e, @page_b, "failed")
+
+    assert_equal :complete_with_failures, e.run_status
+  end
+
+  test "every pair failing reads as failed" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "failed")
+    result_for(e, @page_b, "failed")
+
+    assert_equal :failed, e.run_status
+  end
+
+  test "fewer results than pairs, with nothing in flight, reads as incomplete" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "complete")
+
+    assert_equal :incomplete, e.run_status
+  end
+
+  test "a page added to the set moves a complete evaluation back to incomplete" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "complete")
+    result_for(e, @page_b, "complete")
+    assert_equal :complete, e.run_status
+
+    e.learning_set.add_url("https://eval.test/c")
+
+    assert_equal :incomplete, e.reload.run_status
+  end
+
+  # The number people read as progress must describe the wording being run now,
+  # or it reports "12 of 6" after a single edit.
+  test "counts ignore results from an earlier revision" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "complete")
+    result_for(e, @page_b, "complete")
+
+    @skill.skill_revisions.create!(content: "Reworded.")
+
+    assert_equal({}, e.result_counts)
+    assert_equal :not_run, e.run_status
+  end
+
+  test "result counts are keyed by status" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "complete")
+    result_for(e, @page_b, "failed")
+
+    assert_equal({ "complete" => 1, "failed" => 1 }, e.result_counts)
+  end
+
+  test "a skill with no revision has nothing to count" do
+    skill = Skill.create!(name: "Draft only")
+    e = evaluation(skill: skill)
+
+    assert_equal({}, e.result_counts)
+    assert_equal :not_run, e.run_status
+  end
+
+  test "a freshly queued pair is not stalled" do
+    e = two_pair_evaluation
+    result_for(e, @page_a, "pending")
+
+    assert_not e.stalled?
+  end
+
+  test "a pair queued longer than the stale window is stalled" do
+    e = two_pair_evaluation
+    result = result_for(e, @page_a, "pending")
+    result.update_columns(updated_at: (SkillEvaluation::STALE_AFTER + 1.minute).ago)
+
+    assert e.stalled?
+  end
+
+  test "an old finished pair is not stalled" do
+    e = two_pair_evaluation
+    result = result_for(e, @page_a, "complete")
+    result.update_columns(updated_at: 1.day.ago)
+
+    assert_not e.stalled?
   end
 end
