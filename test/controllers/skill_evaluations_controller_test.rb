@@ -55,6 +55,36 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name=?][value=?]", "skill_evaluation[model_ids][]", @fast.id.to_s
   end
 
+  # The baseline is filled in from the skill's preferred model when a skill is
+  # picked, so the form carries that pairing on each option.
+  test "the skill options carry the preferred model the baseline defaults to" do
+    @skill.update!(preferred_model: @slow)
+
+    get new_skill_evaluation_path
+
+    assert_response :success
+    assert_select "select#evaluation-skill-select option[value=?][data-preferred-model-id=?]",
+                  @skill.id.to_s, @slow.id.to_s
+    assert_select "select#evaluation-base-model-select"
+  end
+
+  test "a skill with no preferred model carries no default" do
+    @skill.update!(preferred_model: nil)
+
+    get new_skill_evaluation_path
+
+    assert_select "select#evaluation-skill-select option[value=?]", @skill.id.to_s
+    assert_select "option[value=?][data-preferred-model-id]", @skill.id.to_s, count: 0
+  end
+
+  test "the edit form keeps the skill it was saved with selected" do
+    evaluation = evaluation_with
+
+    get edit_skill_evaluation_path(evaluation)
+
+    assert_select "select#evaluation-skill-select option[value=?][selected]", @skill.id.to_s
+  end
+
   test "create persists the learning set and the selected models" do
     assert_difference "SkillEvaluation.count", 1 do
       post skill_evaluations_path, params: {

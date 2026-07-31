@@ -24,12 +24,16 @@
   <div class="mb-3">
     <%= f.label :skill_id, "Skill", class: "form-label" %>
     <%= f.select :skill_id,
-                 skills.map { |s| [ s.name, s.id ] },
+                 options_for_select(
+                   skills.map { |s| [ s.name, s.id, { "data-preferred-model-id" => s.preferred_model_id } ] },
+                   evaluation.skill_id
+                 ),
                  { prompt: "Select a skill" },
-                 { class: "form-select", required: true } %>
+                 { class: "form-select", required: true, id: "evaluation-skill-select" } %>
     <div class="form-text">
       Its most recent revision is what gets run. Editing the skill later creates a
       new revision, and every pair becomes runnable again against that wording.
+      Picking a skill fills in its preferred model as the baseline.
     </div>
   </div>
 
@@ -62,7 +66,7 @@
                    evaluation.base_model_id
                  ),
                  { prompt: "Select a baseline" },
-                 { class: "form-select", required: true } %>
+                 { class: "form-select", required: true, id: "evaluation-base-model-select" } %>
     <div class="form-text">
       The model the others are judged against. Nothing scores against it yet —
       tick it below as well if you want its responses produced.
@@ -96,3 +100,34 @@
               evaluation.persisted? ? skill_evaluation_path(evaluation) : skill_evaluations_path,
               class: "btn btn-outline-secondary" %>
 <% end %>
+
+<script>
+  (function () {
+    function initializeEvaluationForm() {
+      var skill = document.getElementById('evaluation-skill-select');
+      var baseModel = document.getElementById('evaluation-base-model-select');
+      if (!skill || !baseModel) return;
+
+      // Cloning drops listeners left by a previous Turbo visit, so picking a
+      // skill does not fire the handler several times.
+      var fresh = skill.cloneNode(true);
+      skill.parentNode.replaceChild(fresh, skill);
+
+      fresh.addEventListener('change', function () {
+        var option = fresh.options[fresh.selectedIndex];
+        var preferred = option && option.dataset ? option.dataset.preferredModelId : null;
+        if (!preferred) return;
+
+        // A skill can prefer a model the registry no longer offers; leave the
+        // baseline alone rather than silently clearing it.
+        if (!baseModel.querySelector('option[value="' + preferred + '"]')) return;
+
+        baseModel.value = preferred;
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeEvaluationForm);
+    document.addEventListener('turbo:load', initializeEvaluationForm);
+    document.addEventListener('turbo:frame-load', initializeEvaluationForm);
+  })();
+</script>
