@@ -35,6 +35,8 @@ Rails.application.routes.draw do
       post :crawl
       get :links_from
       get :links_to
+      get :triage
+      post :triage, action: :run_triage
     end
   end
   resources :domains, only: [:index, :edit, :update]

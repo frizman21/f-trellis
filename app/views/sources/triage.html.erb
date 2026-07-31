@@ -1,0 +1,72 @@
+<% content_for :title, "Suggested skills for source ##{@source.id}" %>
+<h1>Suggested skills for source #<%= @source.id %></h1>
+
+<p class="text-muted">
+  <%= external_link_to truncate(@source.url.to_s, length: 80), @source.url %>
+</p>
+
+<% if @result.failed? %>
+  <div class="alert alert-warning">
+    <%= @result.error %>
+    Everything is pre-checked rather than dropped — uncheck what you do not want.
+  </div>
+<% end %>
+
+<% if @result.verdicts.empty? %>
+  <p>
+    No skills are available to route. A skill must be active, state its
+    applicability, and have at least one revision.
+    <%= link_to "Review skills", skills_path %>.
+  </p>
+<% else %>
+  <p class="text-muted">
+    One triage call judged <%= pluralize(@result.verdicts.size, "skill") %>
+    against this page and recommended <strong><%= @result.recommended.size %></strong>.
+    Running all of them without triage would have cost
+    <%= pluralize(@result.verdicts.size, "call") %>.
+  </p>
+
+  <%= form_with url: triage_source_path(@source), method: :post, local: true do |f| %>
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th style="width: 3rem;"></th>
+          <th>Skill</th>
+          <th>Triage reason</th>
+          <th>Stated applicability</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @result.verdicts.sort_by { |v| [ v.applies ? 0 : 1, v.skill.name ] }.each do |verdict| %>
+          <% covered = @existing[verdict.skill] %>
+          <tr class="<%= "table-light text-muted" unless verdict.applies %>">
+            <td>
+              <%= check_box_tag "skill_ids[]",
+                                verdict.skill.id,
+                                verdict.applies && covered.nil?,
+                                id: "skill_#{verdict.skill.id}",
+                                class: "form-check-input" %>
+            </td>
+            <td>
+              <%= label_tag "skill_#{verdict.skill.id}", verdict.skill.name, class: "form-check-label fw-semibold" %>
+              <% if covered %>
+                <div class="small">
+                  Already covered by
+                  <%= link_to "report ##{covered.id}", source_processing_reports_path %> —
+                  queueing again would be a no-op.
+                </div>
+              <% end %>
+            </td>
+            <td><%= verdict.reason.presence || "—" %></td>
+            <td class="small"><%= truncate(verdict.skill.applicability.to_s, length: 160) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+
+    <%= f.submit "Queue selected skills", class: "btn btn-primary" %>
+    <%= link_to "Cancel", source_path(@source), class: "btn btn-outline-secondary" %>
+  <% end %>
+<% end %>
+
+<p class="mt-3"><%= link_to "Back to source", source_path(@source) %></p>

@@ -35,6 +35,22 @@
   <dd><%= @source.updated_at %></dd>
 </dl>
 
+<h2>Processing</h2>
+
+<p>
+  <% if @source.source_data.any? %>
+    <%= link_to "Suggest skills", triage_source_path(@source), class: "btn btn-primary" %>
+    <span class="form-text ms-2">
+      One cheap call reads each skill's applicability and picks the ones worth
+      running on this page.
+    </span>
+  <% else %>
+    <span class="text-muted">
+      Fetch this source's content before running skills against it.
+    </span>
+  <% end %>
+</p>
+
 <h2>Link graph</h2>
 
 <p>
