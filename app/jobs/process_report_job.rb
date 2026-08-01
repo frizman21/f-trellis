@@ -20,6 +20,7 @@ class ProcessReportJob < ApplicationJob
     chat.with_tools(
       UpsertPersonTool.new(report),
       UpsertOrganizationTool.new(report),
+      UpsertPartTool.new(report),
       LinkPersonOrganizationTool.new(report),
       LinkOrganizationOrganizationTool.new(report)
     )

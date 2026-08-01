@@ -54,6 +54,46 @@ if pull_organization_names.skill_revisions.order(:sequence).last&.content != pul
   SkillRevision.create!(skill: pull_organization_names, content: pull_organization_names_content)
 end
 
+# The skill that reads a product page and fills in the specification structure.
+# It deliberately does not list the part types or their units: the upsert_part
+# tool puts the live taxonomy in its own description, and repeating it here would
+# be a second copy to drift out of date the moment a part type gains a parameter.
+pull_part_specifications_content = <<~MARKDOWN.strip
+  This page describes one or more products, components or parts. Record each of
+  them with the upsert part tool, in a single call.
+
+  For each part:
+
+  - Use the product's own model designation as the name — "Mavic 4 Pro", not
+    "the drone". Do not merge variants of a product that have different
+    specifications; record them as separate parts.
+  - Give every part type that applies. The types decide which specifications can
+    be recorded, and most parts are a Physical Part as well as whatever else they
+    are.
+  - Read the specification table, not the marketing copy. A number in a spec
+    table is stated; a number in a headline is often rounded or conditional.
+  - Convert each value into the unit the tool declares for that parameter, and
+    put the page's own wording in `as_stated`. If the page says "624 g" and the
+    parameter is in grams, `as_stated` is still worth giving.
+  - Where a page gives a range or a qualified figure ("up to 45 mins", "34
+    mins with the standard battery"), record the number and put the
+    qualification in `as_stated`.
+  - Specifications the taxonomy does not declare go in additional_attributes, not
+    into a parameter that looks close enough.
+
+  Set confidence from where the number came: a manufacturer's own spec table is
+  near certain, a figure quoted in prose less so, and anything you inferred or
+  converted from an ambiguous unit lower still.
+MARKDOWN
+
+pull_part_specifications = Skill.find_or_create_by!(name: "Pull Part Specifications") do |s|
+  s.purpose = "Read a product page and record each part with its measured specifications."
+end
+
+if pull_part_specifications.skill_revisions.order(:sequence).last&.content != pull_part_specifications_content
+  SkillRevision.create!(skill: pull_part_specifications, content: pull_part_specifications_content)
+end
+
 # Applicability statements — what triage reads to decide which skills are worth
 # calling on a page. Backfilled here rather than in the migration because they
 # are editorial content, not schema. Only written when currently blank, so a
@@ -82,7 +122,14 @@ skill_applicability = {
     "sponsor pages, attendee lists, supplier indexes, conference programs. " \
     "Best on pages where organizations are the subject rather than mentioned " \
     "in passing. Not pages about a single company, and not prose articles, " \
-    "where a general extraction pulls mostly noise."
+    "where a general extraction pulls mostly noise.",
+  "Pull Part Specifications" =>
+    "Manufacturer product pages and spec sheets for a physical product — a " \
+    "drone, a battery, a motor, a camera payload, a component. Look for a " \
+    "specifications table: named measurements with units, such as weight, " \
+    "flight time, capacity or power. Not news about a product, not press " \
+    "releases, not store listings that give only a price, and not company or " \
+    "exhibitor pages, which name products without measuring them."
 }
 
 skill_applicability.each do |name, statement|
@@ -796,6 +843,85 @@ part_types = {
   end
 end
 
+# What each part type is measured by. `additional_attribute_keys` above stays
+# what it was — free-form labels; these are the measured ones, each with the unit
+# its values are stored in. A part carries several types, so a drone typed both
+# "Physical Part" and "Airframe" is measured by both sets, which is how "all
+# physical parts have a weight" is expressed without an inheritance hierarchy.
+part_type_parameters = {
+  "Physical Part" => {
+    description: "Anything with mass and dimensions. Nearly every part is one.",
+    parameters: [
+      { name: "weight", unit: "g", description: "Mass of the part as shipped, excluding packaging." },
+      { name: "length", unit: "mm" },
+      { name: "width", unit: "mm" },
+      { name: "height", unit: "mm" },
+      { name: "material", unit: nil, value_type: "text", description: "Primary material, e.g. carbon fibre." }
+    ]
+  },
+  "Electrical Component" => {
+    description: "A part that draws or supplies electrical power.",
+    parameters: [
+      { name: "max_power", unit: "W", description: "Peak power draw." },
+      { name: "operating_voltage", unit: "V" },
+      { name: "max_current", unit: "A" }
+    ]
+  },
+  "Battery" => {
+    description: "An energy store. Also an electrical component and a physical part.",
+    parameters: [
+      { name: "capacity", unit: "mAh" },
+      { name: "energy", unit: "Wh" },
+      { name: "cell_configuration", unit: nil, value_type: "text", description: "e.g. 4S, 6S1P." },
+      { name: "charge_time", unit: "min" }
+    ]
+  },
+  "Motor" => {
+    description: "A rotating actuator, typically a brushless DC motor on a drone.",
+    parameters: [
+      { name: "kv_rating", unit: "rpm/V" },
+      { name: "max_thrust", unit: "g" },
+      { name: "stator_diameter", unit: "mm" }
+    ]
+  },
+  "Camera Payload" => {
+    description: "An imaging sensor carried by an aircraft.",
+    parameters: [
+      { name: "sensor_resolution", unit: "MP" },
+      { name: "focal_length", unit: "mm" },
+      { name: "aperture", unit: nil, value_type: "text", description: "e.g. f/2.8." },
+      { name: "video_resolution", unit: nil, value_type: "text", description: "e.g. 4K/60fps." }
+    ]
+  },
+  "Airframe" => {
+    description: "A complete aircraft: the thing a product page is usually about.",
+    parameters: [
+      { name: "takeoff_weight", unit: "g", description: "Maximum takeoff weight, including payload." },
+      { name: "flight_time", unit: "min", description: "Manufacturer-stated maximum hover or flight time." },
+      { name: "max_speed", unit: "m/s" },
+      { name: "max_range", unit: "km", description: "Maximum transmission or operating range." },
+      { name: "wind_resistance", unit: "m/s" },
+      { name: "ingress_protection", unit: nil, value_type: "text", description: "IP rating, e.g. IP54." }
+    ]
+  }
+}
+
+part_type_parameters.each do |type_name, attrs|
+  type = PartType.find_or_create_by!(name: type_name) do |pt|
+    pt.description = attrs[:description]
+    pt.additional_attribute_keys = [ "manufacturer_part_number" ]
+  end
+  part_types[type_name] = type
+
+  attrs[:parameters].each do |parameter|
+    # Updated rather than only created, so correcting a unit here corrects it in
+    # a dev database that already ran an earlier seed.
+    row = type.part_type_parameters.find_or_initialize_by(name: parameter[:name])
+    row.update!(unit: parameter[:unit], description: parameter[:description],
+                value_type: parameter.fetch(:value_type, "number"))
+  end
+end
+
 part_organization_types = {
   "Manufacturer" => { description: "Organization manufactures the part.", keys: [ "since", "factory" ] },
   "Consumer"     => { description: "Organization uses or buys the part.", keys: [ "since" ] },
@@ -819,23 +945,40 @@ end
 # Seeded parts tied to existing Apollo / NASA story.
 parts_data = {
   "Apollo Guidance Computer" => {
-    types: [ "Assembly" ],
+    types: [ "Assembly", "Physical Part", "Electrical Component" ],
     additional_attributes: { "manufacturer_part_number" => "AGC-Block-II" },
+    specifications: [
+      { type: "Physical Part", parameter: "weight", value: 31_751, as_stated: "70 lb", confidence: 950 },
+      { type: "Physical Part", parameter: "height", value: 610, as_stated: "24 in" },
+      { type: "Physical Part", parameter: "width", value: 320, as_stated: "12.5 in" },
+      { type: "Physical Part", parameter: "material", text: "Aluminium alloy case", confidence: 700 },
+      { type: "Electrical Component", parameter: "max_power", value: 70, as_stated: "about 70 watts" },
+      { type: "Electrical Component", parameter: "operating_voltage", value: 28, as_stated: "28 V DC" }
+    ],
     source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
   },
   "AGC Memory Module" => {
-    types: [ "Component" ],
-    additional_attributes: { "material" => "Magnetic core rope memory", "manufacturer_part_number" => "AGC-MEM" },
+    types: [ "Component", "Physical Part" ],
+    additional_attributes: { "manufacturer_part_number" => "AGC-MEM" },
+    specifications: [
+      { type: "Physical Part", parameter: "material", text: "Magnetic core rope memory" }
+    ],
     source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
   },
   "AGC CPU Module" => {
-    types: [ "Component" ],
-    additional_attributes: { "material" => "RTL flat-pack ICs", "manufacturer_part_number" => "AGC-CPU" },
+    types: [ "Component", "Physical Part" ],
+    additional_attributes: { "manufacturer_part_number" => "AGC-CPU" },
+    specifications: [
+      { type: "Physical Part", parameter: "material", text: "RTL flat-pack ICs" }
+    ],
     source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
   },
   "AGC Power Supply" => {
-    types: [ "Component" ],
+    types: [ "Component", "Physical Part", "Electrical Component" ],
     additional_attributes: { "manufacturer_part_number" => "AGC-PSU" },
+    specifications: [
+      { type: "Electrical Component", parameter: "operating_voltage", value: 28, as_stated: "28 V DC" }
+    ],
     source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
   }
 }
@@ -864,6 +1007,20 @@ parts_data.each do |name, attrs|
   detail.part_types = attrs[:types].map { |t| part_types.fetch(t) }
   detail.part.update!(current_detail: detail) unless detail.part.current_detail_id == detail.id
   parts_by_name[name] = detail.part
+
+  # Measured values, so the part page renders a specification table and the
+  # `as_stated` column has something to show. The AGC's documented weight is 70
+  # lb; stored in the grams the parameter declares, with the source's own words
+  # kept beside it — which is exactly what a conversion needs to stay checkable.
+  Array(attrs[:specifications]).each do |spec|
+    parameter = PartTypeParameter.joins(:part_type)
+                                 .find_by(name: spec[:parameter], part_types: { name: spec[:type] })
+    next if parameter.nil?
+
+    row = detail.part_detail_parameters.find_or_initialize_by(part_type_parameter: parameter)
+    row.update!(value_number: spec[:value], value_text: spec[:text],
+                as_stated: spec[:as_stated], confidence_tenths: spec.fetch(:confidence, 900))
+  end
 end
 
 # NASA is the consumer of the Apollo Guidance Computer.
@@ -1060,6 +1217,28 @@ end
   apollo_source.url,
   "https://en.wikipedia.org/wiki/NASA"
 ].each { |url| learning_set.add_url(url) }
+
+# The starting learning set for "Pull Part Specifications": real manufacturer
+# spec pages, deliberately uneven. Four dense DJI tables make the easy case, a
+# non-DJI vendor makes sure the skill is not learning one page's layout, and the
+# Skydio page — which leads with marketing and buries its numbers — is the one
+# worth failing on. Pages are added, not fetched: fetch them from the source page
+# when you want to run against them.
+part_spec_learning_set = LearningSet.find_or_create_by!(name: "Product specification pages") do |ls|
+  ls.description = "Manufacturer spec pages we run part-specification extraction against. " \
+                   "Mixed on purpose: dense tables, a second vendor's format, and one page " \
+                   "that states its numbers in prose."
+end
+
+[
+  "https://www.dji.com/air-3s/specs",
+  "https://www.dji.com/mavic-3-pro/specs",
+  "https://www.dji.com/mini-4-pro/specs",
+  "https://www.dji.com/matrice-350-rtk/specs",
+  "https://www.parrot.com/en/drones/anafi-usa/technical-specifications",
+  "https://www.freeflysystems.com/astro/specs",
+  "https://skydio.com/x10"
+].each { |url| part_spec_learning_set.add_url(url) }
 
 # An example skill evaluation over that set, so the list, the configuration form
 # and the result detail page all have something to show without spending money

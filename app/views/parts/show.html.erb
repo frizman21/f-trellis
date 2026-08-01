@@ -12,6 +12,46 @@
     <% end %>
   </dl>
 
+  <% specifications = current.part_detail_parameters.includes(:part_type_parameter) %>
+  <h2>Specifications</h2>
+  <% if specifications.any? %>
+    <table class="table table-sm">
+      <thead>
+        <tr><th>Parameter</th><th>Value</th><th>As stated</th><th>Confidence</th></tr>
+      </thead>
+      <tbody>
+        <% specifications.each do |spec| %>
+          <tr>
+            <td><%= spec.name.humanize %></td>
+            <td><%= spec.to_s %></td>
+            <td class="text-muted">
+              <%# Only worth showing where it differs — repeating the value in
+                  the column beside it would be noise. %>
+              <%= spec.as_stated if spec.converted? %>
+            </td>
+            <td><%= spec.confidence_tenths ? "#{spec.confidence_tenths / 10.0}%" : "—" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <p class="text-muted small">
+      Values are stored in the unit their parameter declares, so two parts can be
+      compared. "As stated" is the page's own wording where it differed — a
+      conversion is where an extraction goes wrong quietly.
+    </p>
+  <% else %>
+    <p class="text-muted">
+      Nothing measured yet.
+      <% missing = current.available_parameters %>
+      <% if missing.any? %>
+        This part's types are measured by <%= missing.map(&:label).join(", ") %>.
+      <% else %>
+        Its types declare no parameters —
+        <%= link_to "add some", part_types_path %> to start measuring them.
+      <% end %>
+    </p>
+  <% end %>
+
   <% if current.additional_attributes.any? %>
     <h2>Attributes</h2>
     <table class="table table-sm">

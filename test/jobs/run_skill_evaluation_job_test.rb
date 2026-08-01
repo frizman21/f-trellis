@@ -104,13 +104,14 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
   # handed recording stand-ins, and an evaluation still writes nothing.
   test "registers the recording stand-ins and creates no entities" do
     assert_no_difference [ "Person.count", "Organization.count", "PersonDetail.count",
-                           "OrganizationDetail.count", "PersonOrganization.count",
+                           "OrganizationDetail.count", "Part.count", "PartDetail.count",
+                           "PartDetailParameter.count", "PersonOrganization.count",
                            "OrganizationOrganization.count", "PersonOrganizationDetail.count",
                            "OrganizationOrganizationDetail.count" ] do
       with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
     end
 
-    assert_equal [ RecordingUpsertPersonTool, RecordingUpsertOrganizationTool,
+    assert_equal [ RecordingUpsertPersonTool, RecordingUpsertOrganizationTool, RecordingUpsertPartTool,
                    RecordingLinkPersonOrganizationTool, RecordingLinkOrganizationOrganizationTool ],
                  Recorder.tools.map(&:class)
   end
@@ -120,6 +121,7 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
   test "the stand-ins present the writing tools' names, descriptions and schemas" do
     [ [ RecordingUpsertPersonTool, UpsertPersonTool ],
       [ RecordingUpsertOrganizationTool, UpsertOrganizationTool ],
+      [ RecordingUpsertPartTool, UpsertPartTool ],
       [ RecordingLinkPersonOrganizationTool, LinkPersonOrganizationTool ],
       [ RecordingLinkOrganizationOrganizationTool, LinkOrganizationOrganizationTool ] ].each do |recording, writing|
       stand_in = recording.new(ProposalRecorder.new)
