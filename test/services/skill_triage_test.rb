@@ -8,7 +8,8 @@ class SkillTriageTest < ActiveSupport::TestCase
 
   class FakeChat
     class << self
-      attr_accessor :created, :response, :raise_with, :last_prompt, :last_schema
+      attr_accessor :created, :response, :raise_with, :last_prompt, :last_schema,
+                    :last_instructions, :last_model
     end
 
     def self.reset(response: nil, raise_with: nil)
@@ -17,13 +18,17 @@ class SkillTriageTest < ActiveSupport::TestCase
       self.raise_with = raise_with
       self.last_prompt = nil
       self.last_schema = nil
+      self.last_instructions = nil
+      self.last_model = nil
     end
 
-    def initialize
+    def initialize(model: nil)
       self.class.created += 1
+      self.class.last_model = model
     end
 
-    def with_instructions(_content)
+    def with_instructions(content)
+      self.class.last_instructions = content
       self
     end
 
@@ -43,7 +48,7 @@ class SkillTriageTest < ActiveSupport::TestCase
   def with_fake_chat(response: nil, raise_with: nil)
     FakeChat.reset(response: response, raise_with: raise_with)
     original = Chat.method(:create!)
-    Chat.define_singleton_method(:create!) { |*, **| FakeChat.new }
+    Chat.define_singleton_method(:create!) { |*, **kwargs| FakeChat.new(model: kwargs[:model]) }
     yield
   ensure
     Chat.define_singleton_method(:create!, original)
@@ -281,5 +286,114 @@ class SkillTriageTest < ActiveSupport::TestCase
     end
 
     assert_not_nil FakeChat.last_schema, "expected triage to constrain the response shape"
+  end
+
+  # --- configuration ------------------------------------------------------
+
+  # One shared timestamp: Model.current keeps only the rows from the most
+  # recent refresh, so models stamped microseconds apart would leave the
+  # earlier ones out of `selectable` entirely.
+  def make_model(provider, model_id)
+    @refreshed_at ||= Time.current
+    Model.create!(provider: provider, model_id: model_id, name: model_id, last_seen_at: @refreshed_at)
+  end
+
+  test "sends the configured instructions and model" do
+    pinned = make_model("openai", "gpt-zzz")
+    make_model("anthropic", "claude-aaa")
+    TriageConfiguration.create!(instructions: "Route only parts pages.", model: pinned)
+
+    with_fake_chat(response: verdicts_json([ @orgs, true, "yes" ])) do
+      SkillTriage.call(source: @source)
+    end
+
+    assert_equal "Route only parts pages.", FakeChat.last_instructions
+    assert_equal pinned, FakeChat.last_model
+  end
+
+  test "falls back to the default instructions and the first selectable model" do
+    fallback = make_model("anthropic", "claude-aaa")
+    make_model("openai", "gpt-zzz")
+
+    with_fake_chat(response: verdicts_json([ @orgs, true, "yes" ])) do
+      SkillTriage.call(source: @source)
+    end
+
+    assert_equal TriageConfiguration::DEFAULT_INSTRUCTIONS, FakeChat.last_instructions
+    assert_equal fallback, FakeChat.last_model
+  end
+
+  test "an explicit model overrides the configured one" do
+    pinned = make_model("openai", "gpt-zzz")
+    asked_for = make_model("anthropic", "claude-aaa")
+    TriageConfiguration.create!(model: pinned)
+
+    with_fake_chat(response: verdicts_json([ @orgs, true, "yes" ])) do
+      SkillTriage.call(source: @source, model: asked_for)
+    end
+
+    assert_equal asked_for, FakeChat.last_model,
+      "an evaluation asking for a model is not asking what triage is configured to use"
+  end
+
+  # --- preview ------------------------------------------------------------
+
+  test "preview makes no call and stores nothing" do
+    make_model("anthropic", "claude-aaa")
+
+    preview = nil
+    assert_no_difference [ "Chat.count", "TriageConfiguration.count" ] do
+      with_fake_chat(response: verdicts_json) { preview = SkillTriage.preview(source: @source) }
+    end
+
+    assert_equal 0, FakeChat.created
+    assert_not_nil preview.prompt
+  end
+
+  test "preview renders the prompt a real call would send" do
+    make_model("anthropic", "claude-aaa")
+
+    preview = SkillTriage.preview(source: @source, skills: [ @orgs ])
+
+    with_fake_chat(response: verdicts_json([ @orgs, true, "yes" ])) do
+      SkillTriage.call(source: @source, skills: [ @orgs ])
+    end
+
+    assert_equal FakeChat.last_prompt, preview.prompt
+    assert_equal FakeChat.last_instructions, preview.instructions
+    assert_equal FakeChat.last_model, preview.model
+  end
+
+  test "preview stands in for the excerpt when the page has no text" do
+    empty = Source.create!(url: "https://triage.test/empty")
+
+    preview = SkillTriage.preview(source: empty)
+
+    assert_not preview.excerpt?
+    assert_includes preview.prompt, SkillTriage::PREVIEW_PLACEHOLDER_EXCERPT
+  end
+
+  test "preview names the skills that would claim the url without a call" do
+    linkedin = make_skill("LinkedIn-Person", "LinkedIn profiles.")
+    linkedin.update!(url_patterns: [ 'triage\.test' ])
+
+    preview = SkillTriage.preview(source: @source)
+
+    assert preview.routed_by_url?
+    assert_equal [ linkedin ], preview.claimants
+  end
+
+  test "preview reports no claimants for a page triage would actually ask about" do
+    preview = SkillTriage.preview(source: @source)
+
+    assert_not preview.routed_by_url?
+  end
+
+  test "preview renders without a source at all" do
+    preview = SkillTriage.preview
+
+    assert_equal 0, Chat.count
+    assert_includes preview.prompt, "id #{@orgs.id}"
+    assert_not preview.excerpt?
   end
 end

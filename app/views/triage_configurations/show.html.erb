@@ -1,0 +1,131 @@
+<% content_for :title, "Triage configuration" %>
+<h1>Triage configuration</h1>
+
+<p class="text-muted">
+  One call per page decides which skills are worth spending a call on. These are
+  its two inputs. Leave either blank to use the default — a blank field is a
+  reset, not an empty setting.
+</p>
+
+<%= form_with model: @configuration, url: triage_configuration_path, method: :patch, local: true do |f| %>
+  <% if @configuration.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% @configuration.errors.full_messages.each do |m| %>
+          <li><%= m %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :instructions, "Triage instructions", class: "form-label" %>
+    <%= f.text_area :instructions,
+                    rows: 10,
+                    class: "form-control font-monospace",
+                    placeholder: TriageConfiguration::DEFAULT_INSTRUCTIONS %>
+    <div class="form-text">
+      Sent as the system instructions on every triage call. It says how to judge
+      a skill's stated applicability against a page — it does not name skills,
+      which are listed in the prompt below and change as skills are edited.
+      <% unless @configuration.instructions_configured? %>
+        <strong>Currently unset</strong>, so the default shown greyed out above is what runs.
+      <% end %>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :model_id, "Triage model", class: "form-label" %>
+    <%= f.select :model_id,
+                 grouped_options_for_select(
+                   @models.group_by(&:provider).transform_values { |ms| ms.map { |m| [ model_dropdown_label(m), m.id ] } },
+                   @configuration.model_id
+                 ),
+                 { include_blank: "— unset: first selectable model —" },
+                 { class: "form-select" } %>
+    <div class="form-text">
+      Triage runs once per page and reads only a <%= number_with_delimiter(SkillTriage::EXCERPT_LIMIT) %>-character
+      excerpt, so it is the step where a cheap model pays off most.
+      <% if @configuration.model_configured? %>
+        Pinned to <code><%= @configuration.model.model_id %></code>.
+      <% elsif @configuration.effective_model %>
+        Unset, so it falls back to the first model in <code>(provider, model_id)</code>
+        order — today <code><%= @configuration.effective_model.model_id %></code>.
+        That is alphabetical, not cheapest, and a registry refresh can change it:
+        pin one to make the choice deliberate.
+      <% else %>
+        <strong>No models in the registry.</strong>
+        <%= link_to "Refresh the model list", models_path %> before running triage.
+      <% end %>
+    </div>
+  </div>
+
+  <%= f.submit "Save", class: "btn btn-primary" %>
+  <%= link_to "Skills", skills_path, class: "btn btn-outline-secondary" %>
+<% end %>
+
+<hr class="my-4">
+
+<h2 class="h4">Example call</h2>
+
+<p class="text-muted">
+  Read-only. This is what a triage call sends right now, rendered by the same
+  code that sends it — the settings above, the
+  <%= link_to pluralize(@skills.size, "routable skill"), skills_path %>, and a
+  real page. Nothing on this page contacts a model.
+</p>
+
+<% if @preview.skills.empty? %>
+  <div class="alert alert-warning">
+    No skills are routable, so triage has nothing to ask about and makes no call.
+    A skill must be active, state its applicability, and have at least one revision.
+    <%= link_to "Review skills", skills_path %>.
+  </div>
+<% else %>
+  <dl class="row">
+    <dt class="col-sm-3">Model</dt>
+    <dd class="col-sm-9">
+      <%= @preview.model ? content_tag(:code, @preview.model.model_id) : "— none available —" %>
+    </dd>
+
+    <dt class="col-sm-3">Example page</dt>
+    <dd class="col-sm-9">
+      <% if @preview_source %>
+        <%= link_to "Source ##{@preview_source.id}", source_path(@preview_source) %> —
+        <%= external_link_to truncate(@preview_source.url.to_s, length: 70), @preview_source.url %>
+      <% else %>
+        <span class="text-muted">No source has been fetched yet, so the excerpt below is a placeholder.</span>
+      <% end %>
+    </dd>
+
+    <dt class="col-sm-3">Response</dt>
+    <dd class="col-sm-9">
+      Constrained to one verdict per skill id —
+      <code>{ skill_id, applies, reason }</code> — so a reply that names an
+      unknown skill or skips one is discarded rather than acted on.
+    </dd>
+  </dl>
+
+  <% if @preview.routed_by_url? %>
+    <div class="alert alert-info">
+      <strong>This page would make no call at all.</strong>
+      <%= @preview.claimants.map(&:name).to_sentence %>
+      claim<%= "s" if @preview.claimants.size == 1 %> this URL by pattern, which
+      settles it without asking. The prompt below is what would be sent for a
+      page no pattern claims.
+    </div>
+  <% end %>
+
+  <h3 class="h6 text-muted text-uppercase mt-4">Instructions</h3>
+  <pre class="border rounded bg-light p-3 small"><%= @preview.instructions %></pre>
+
+  <h3 class="h6 text-muted text-uppercase mt-4">Prompt</h3>
+  <% unless @preview.excerpt? %>
+    <p class="small text-muted">
+      The excerpt is a placeholder — this page has no fetched text. A real call
+      puts the page's first
+      <%= number_with_delimiter(SkillTriage::EXCERPT_LIMIT) %> characters there.
+    </p>
+  <% end %>
+  <pre class="border rounded bg-light p-3 small"><%= @preview.prompt %></pre>
+<% end %>

@@ -10,13 +10,32 @@ require "ruby_llm/schema"
 # This reads each skill's applicability statement plus a bounded excerpt of the
 # page and returns only the skills worth calling — one call regardless of how
 # many skills exist.
+#
+# The instructions it judges against and the model it spends come from
+# TriageConfiguration, which is editable at /triage_configuration. That page
+# also renders `#preview` — the same prompt this builds, without sending it.
 class SkillTriage
   # Enough of a page to tell what kind of page it is. Triage is a routing
   # decision, not an extraction, so it does not need the whole document — and
   # sending the whole document would defeat the point.
   EXCERPT_LIMIT = 4_000
 
+  # Stands in for the page text on the configuration page when no source has
+  # been fetched yet. Never sent to a model — a preview makes no call.
+  PREVIEW_PLACEHOLDER_EXCERPT =
+    "[no fetched page text yet — a real call puts the first " \
+    "#{EXCERPT_LIMIT} characters of the page here]".freeze
+
   Verdict = Struct.new(:skill, :applies, :reason, keyword_init: true)
+
+  # Everything a real call would send, without sending it. Built from the same
+  # methods `#ask` uses, so the configuration page cannot show a prompt that
+  # differs from the one that runs.
+  Preview = Struct.new(:instructions, :prompt, :model, :source, :skills, :excerpt, :claimants,
+                       keyword_init: true) do
+    def excerpt? = excerpt.present?
+    def routed_by_url? = claimants.present?
+  end
 
   Result = Struct.new(:verdicts, :failed, :error, :routed_by_url, keyword_init: true) do
     def recommended = verdicts.select(&:applies)
@@ -28,7 +47,12 @@ class SkillTriage
     new(source: source, skills: skills, model: model).call
   end
 
-  def initialize(source:, skills: nil, model: nil)
+  # Read-only: no Chat, no provider call, nothing written.
+  def self.preview(source: nil, skills: nil, model: nil)
+    new(source: source, skills: skills, model: model).preview
+  end
+
+  def initialize(source: nil, skills: nil, model: nil)
     @source = source
     @skills = (skills || Skill.triageable).to_a
     @model  = model
@@ -49,6 +73,22 @@ class SkillTriage
     fail_open("#{e.class}: #{e.message}")
   end
 
+  # The instructions and prompt a real call would send for this source, and the
+  # model it would be sent to. Nothing is asked and nothing is stored.
+  def preview
+    excerpt = page_excerpt
+
+    Preview.new(
+      instructions: instructions,
+      prompt: prompt_for(excerpt.presence || PREVIEW_PLACEHOLDER_EXCERPT),
+      model: triage_model,
+      source: @source,
+      skills: @skills,
+      excerpt: excerpt.presence,
+      claimants: url_claimants
+    )
+  end
+
   private
 
   # A skill can claim a URL outright with a regex. A claim states a fact about
@@ -59,14 +99,10 @@ class SkillTriage
   #
   # Returns nil when nothing claims the URL, meaning "ask the model".
   def url_claim_verdicts
-    url = @source&.url.to_s
-    return nil if url.blank?
-
-    claims = @skills.each_with_object({}) do |skill, memo|
-      pattern = skill.url_pattern_matching(url)
-      memo[skill.id] = pattern if pattern
-    end
+    claims = url_claims
     return nil if claims.empty?
+
+    url = @source.url.to_s
 
     claimants = @skills.select { |s| claims.key?(s.id) }.map(&:name).to_sentence
     Rails.logger.info("SkillTriage: #{claimants} claim(s) #{url} by URL pattern; no triage call made")
@@ -83,6 +119,24 @@ class SkillTriage
     end
   end
 
+  # { skill id => matching pattern } for every skill that claims this URL.
+  def url_claims
+    url = @source&.url.to_s
+    return {} if url.blank?
+
+    @skills.each_with_object({}) do |skill, memo|
+      pattern = skill.url_pattern_matching(url)
+      memo[skill.id] = pattern if pattern
+    end
+  end
+
+  # The skills that would take this URL without a call. Empty means the model
+  # gets asked.
+  def url_claimants
+    claims = url_claims
+    @skills.select { |skill| claims.key?(skill.id) }
+  end
+
   def page_excerpt
     @source&.source_data&.order(:created_at)&.last&.text.to_s.strip.truncate(EXCERPT_LIMIT)
   end
@@ -94,27 +148,23 @@ class SkillTriage
     chat.ask(prompt_for(excerpt)).content
   end
 
+  def configuration
+    @configuration ||= TriageConfiguration.current
+  end
+
+  # An explicit `model:` still wins — an evaluation asking for a specific model
+  # is not asking what triage is configured to use.
   def triage_model
-    @model || Model.selectable.first
+    @model || configuration.effective_model
   end
 
   def instructions
-    <<~TEXT
-      You route pages to extraction skills. For each skill you are given, decide
-      whether it is worth running against the page shown.
-
-      Judge only against the skill's stated applicability. A skill that would
-      find nothing, or would find only incidental mentions, does not apply —
-      say so. Running a skill that does not apply wastes a model call, so do
-      not include a skill just because it is loosely related.
-
-      Return a verdict for every skill id you were given, and no others.
-    TEXT
+    configuration.effective_instructions
   end
 
   def prompt_for(excerpt)
     <<~TEXT
-      URL: #{@source.url}
+      URL: #{@source&.url}
 
       SKILLS
       #{skill_descriptions}
