@@ -361,7 +361,12 @@ for it, declaring the same `web` + `worker` split.
   app its own tailnet node.
 - **[`docs/dokku_devops.md`](docs/dokku_devops.md)** — day-to-day operation:
   deploying, starting and stopping, logs, console access, backups, teardown,
-  and managing the Tailscale sidecars.
+  managing the Tailscale sidecars, and what does and does not come back after a
+  reboot.
+
+Deploys are automatic: a poller ships the newest commit on `main` that CI has
+passed, so merging a PR is enough. `git push dokku main` still works for
+deploying a branch or forcing a redeploy.
 
 The app runs as its own Tailscale device, so once deployed it is served at
 `http://f-dod` from anywhere on the tailnet. On the Dokku host itself,
