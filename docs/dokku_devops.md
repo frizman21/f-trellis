@@ -199,9 +199,23 @@ dokku domains:add f-dod f-dod.localhost
 dokku domains:remove f-dod f-dod.dokku.me
 ```
 
-The app is reachable at `http://f-dod.dokku.me:8080` — `dokku.me` resolves to
-`127.0.0.1` publicly, and `:8080` is the host port the proxy is published on.
-`dokku urls` reports port 80 (the container-side port) and so omits it.
+The app is reachable at **`http://f-dod.localhost:8080`**. `:8080` is the host
+port the proxy is published on; `dokku urls` reports port 80 (the container-side
+port) and so omits it.
+
+Use the `.localhost` name, not the `f-dod.dokku.me` one Dokku assigns by
+default: on this network `dokku.me` resolves to `10.0.0.2` rather than loopback,
+so the browser times out even though the vhost is correct. See the setup guide
+for the full explanation.
+
+Testing `.localhost` from the command line needs an explicit resolve, because
+the RFC-6761 loopback rule is a browser/resolver-library behavior that
+`nslookup` and `curl` do not apply:
+
+```sh
+curl --resolve f-dod.localhost:8080:127.0.0.1 http://f-dod.localhost:8080/
+curl -H 'Host: f-dod.localhost:8080' http://localhost:8080/     # equivalent
+```
 
 If routing looks wrong after adding a domain, rebuild the proxy config:
 
@@ -256,11 +270,20 @@ Dokku: check `dokku ssh-keys:list` and that port 3022 is published
 The build runs `bin/rails assets:precompile` with a dummy secret, so a failure
 there is a real asset problem, not a missing config var.
 
-**Worker keeps restarting.** Usually the queue database does not exist yet — see
-the race described in the setup guide's caveats. Confirm with
-`dokku logs f-dod -p worker`, then either run
-`dokku run f-dod bundle exec rails db:prepare` once, or add a
-`scripts.dokku.predeploy` hook to `app.json`.
+**Push rejected with `pre-receive hook declined`.** The build succeeded but the
+`release` task exited non-zero, so Dokku aborted the deploy. The failure is in
+the push output itself, between `Start of f-dod release task` and `End of`.
+Nothing is deployed and any previously running release stays up.
+
+On a *fresh* database this is most likely the seed failure documented in the
+setup guide — `db:prepare` seeds a newly created database and
+`db/seeds.rb` aborts on an empty model registry. Pushing again skips seeding and
+succeeds.
+
+**Worker keeps restarting.** Check `dokku logs f-dod -p worker`. The queue
+database not existing is unlikely to be the cause, since the `release` task runs
+`db:prepare` to completion before any process starts — a failure there would
+have rejected the push instead.
 
 **App returns 502.** The container is not listening. `dokku ps:report f-dod`
 tells you whether it is running at all; `dokku logs f-dod -p web` tells you why

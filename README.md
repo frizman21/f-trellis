@@ -362,4 +362,4 @@ for it, declaring the same `web` + `worker` split.
   deploying, starting and stopping, logs, console access, backups, and
   teardown.
 
-Once deployed the app is served at `http://f-dod.dokku.me:8080`.
+Once deployed the app is served at `http://f-dod.localhost:8080`.

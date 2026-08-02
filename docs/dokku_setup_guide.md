@@ -202,15 +202,48 @@ git push dokku my-branch:main
 ## 8. Reach the app
 
 ```
-http://f-dod.dokku.me:8080
+http://f-dod.localhost:8080
 ```
 
-`dokku.me` is a public DNS name that resolves to `127.0.0.1`, so no hosts-file
-entry is needed. The `:8080` is required — it is the host port the Dokku proxy
-is published on.
+The `:8080` is required — it is the host port the Dokku proxy is published on.
+`dokku url f-dod` reports port 80, the *container*-side port, and so omits it.
 
-Confirm what Dokku thinks the URL is with `dokku url f-dod` (which reports port
-80, the *container*-side port, and so omits the `:8080`).
+### Why not `f-dod.dokku.me`
+
+Dokku assigns `<app>.dokku.me` by default, and upstream `dokku.me` is a public
+domain whose records point at `127.0.0.1`. **That does not hold on this
+network.** Here it resolves to something else entirely:
+
+```
+$ nslookup f-dod.dokku.me
+Name:    dokku.me
+Address: 10.0.0.2
+Aliases: f-dod.dokku.me
+```
+
+`10.0.0.2` is not this machine, so a browser hitting `f-dod.dokku.me:8080`
+times out. The vhost is configured correctly and the app is serving — the name
+just points somewhere else.
+
+The fix used here is a second vhost on the `.localhost` TLD, which browsers
+resolve to loopback themselves (RFC 6761) with no DNS server and no admin
+rights:
+
+```sh
+dokku domains:add f-dod f-dod.localhost
+```
+
+The app answers on both names; only `.localhost` is reachable from a browser
+here. Note that system resolvers do **not** honor the RFC-6761 rule — `nslookup
+f-dod.localhost` fails and `curl` needs `--resolve f-dod.localhost:8080:127.0.0.1`.
+This affects command-line testing only, not browsers.
+
+The alternative, if you prefer keeping the `dokku.me` name, is a hosts entry
+(needs administrator rights):
+
+```
+127.0.0.1 f-dod.dokku.me f-agents.dokku.me
+```
 
 The app requires sign-in and seeds no users in production. Create the first one
 through the console:
@@ -223,33 +256,77 @@ dokku run f-dod bundle exec rails console
 User.create!(email: "you@example.com", password: "set-a-good-one")
 ```
 
-## Known caveats
+## How the release task runs
 
-**The `release:` line may not run.** Heroku runs the `release` process type on
-every deploy; Dokku's documented equivalent is `app.json` →
-`scripts.dokku.predeploy`, and it is unconfirmed whether Dokku 0.38 honors a
-Procfile `release` line for a Dockerfile-built app. Migrations are covered
-anyway, because `bin/docker-entrypoint` runs `db:prepare` whenever the command
-ends in `./bin/rails server` — which the `web` line does.
+Dokku **does** honor the Procfile `release` line. Confirmed from deploy output
+on 0.38.1:
 
-The residual risk is a **race on first deploy**: the `worker` container has no
-such entrypoint branch and may boot against a queue database that `web` has not
-created yet. Dokku's restart policy is `on-failure:10`, so a slow first
-migration could exhaust the worker's restarts. If that happens, the fix is to
-make the migration an explicit pre-deploy step:
-
-```json
-{
-  "scripts": { "dokku": { "predeploy": "bundle exec rails db:prepare" } },
-  "formation": {
-    "web":    { "quantity": 1 },
-    "worker": { "quantity": 1 }
-  }
-}
+```
+-----> Checking for predeploy task
+       No predeploy task found, skipping
+-----> Checking for release task
+       Executing release task from Procfile in ephemeral container: bundle exec rails db:prepare
 ```
 
-Check with `dokku ps:report f-dod` after the first deploy; if `worker` is not
-running, `dokku logs f-dod -p worker` will show the connection error.
+It runs in an ephemeral container after the image is built and **before** any
+`web` or `worker` container starts, and a non-zero exit **rejects the push** —
+the deploy is aborted and the previously running release, if any, stays up. So
+migrations are guaranteed to complete before jobs run or traffic is served, and
+there is no race between `worker` booting and the queue database existing.
+
+`app.json`'s `scripts.dokku.predeploy` is checked first and is the place for
+anything that must run even earlier; this app does not need one.
+
+Note the release task is belt-and-braces here: `bin/docker-entrypoint` also runs
+`db:prepare` whenever the command ends in `./bin/rails server`, which the `web`
+line does. Both are idempotent.
+
+## The first deploy will fail on seeds
+
+On a **fresh** database, `db:prepare` creates the databases, loads the schema,
+and then runs `db/seeds.rb` — Rails seeds only when it had to create a database.
+Seeding aborts:
+
+```
+!     RubyLLM::ConfigurationError: Missing configuration for OpenAI: openai_api_key
+!     /rails/db/seeds.rb:945:in `<main>'
+```
+
+This is not really a missing-key problem. Nothing populates the `models` table
+on a fresh database — per the README that is a separate `ruby_llm:load_models`
+or `llm:models:refresh` step — so this seed line resolves to `nil`:
+
+```ruby
+demo_model = Model.find_by(provider: "anthropic", model_id: "claude-sonnet-4-5") ||
+             Model.find_by(model_id: "gpt-5-nano") || Model.first   # → nil
+demo_chat = Chat.create!(model: demo_model)                          # seeds.rb:945
+```
+
+`Chat.create!(model: nil)` makes RubyLLM fall back to its default model, which
+is an OpenAI one, and it validates provider configuration eagerly.
+
+The structural work all succeeds before this point — the four databases exist
+with their schemas loaded. Only seeding fails. Because every database now
+exists, **re-running the push skips seeding entirely** (`db:prepare` migrates
+instead), and the deploy goes through.
+
+That leaves a partially seeded database: whatever ran before line 945. Your
+options:
+
+- **Accept it** — push again, then populate what you need by hand:
+  ```sh
+  dokku run f-dod bundle exec rails ruby_llm:load_models   # fill the model registry, offline
+  dokku run f-dod bundle exec rails console                # create your first user
+  ```
+- **Start clean** — set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` as config vars,
+  or guard the `Chat.create!` block in `db/seeds.rb` against an empty model
+  registry, then drop and recreate the databases so seeds run from scratch.
+
+Seeding demo data into a production-environment database is arguably wrong
+regardless; `db/seeds.rb` already guards the admin user with `Rails.env.local?`,
+and the chat block could reasonably be guarded the same way.
+
+## Other notes
 
 **Assets and secrets at build time.** The `Dockerfile` precompiles assets with
 `SECRET_KEY_BASE_DUMMY=1`, so the build needs no secrets. Config vars are
