@@ -323,7 +323,14 @@ end
 
 # The Apollo source is linked to from the sample page but was seeded
 # independently, so it keeps its own (absent) parentage — the case where an
-# edge exists without the link having created the target.
+# edge exists without the link having created the target. Created here rather
+# than in db/seeds/knowledge_base.rb because a Source is not knowledge content:
+# the link graph and the learning set below reference it whether or not the
+# knowledge base is seeded. That file looks the same row up by URL.
+apollo_source = Source.find_or_create_by!(url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer") do |s|
+  s.description = "Wikipedia: Apollo Guidance Computer."
+end
+
 SourceLink.record(from: link_sample_source, to: apollo_source)
 
 # And a link back the other way, so at least one source shows both inbound and
