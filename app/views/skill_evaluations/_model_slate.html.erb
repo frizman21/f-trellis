@@ -1,0 +1,146 @@
+<%#
+  The "Models to run" section of the evaluation form.
+
+  Rendered inline by the form the first time, and by SkillEvaluationsController
+  #model_slate on its own after that — a turbo frame so applying an objective
+  re-draws this section without a round trip that would discard everything else
+  typed into the form.
+
+  Locals: models, evaluations, learning_set, objective, suggestions,
+  selected_ids, previous_ids, count, provider, source_evaluation, evaluation_id.
+%>
+<%= turbo_frame_tag "model_slate" do %>
+  <% suggested_ids = suggestions.map { |s| s.model.id } %>
+  <% selected = models.select { |m| selected_ids.include?(m.id) } %>
+
+  <div class="mb-3" id="model-slate"
+       data-slate-url="<%= model_slate_skill_evaluations_path %>"
+       data-evaluation-id="<%= evaluation_id %>">
+    <label class="form-label">Models to run</label>
+
+    <div class="border rounded p-2 mb-2 bg-body-tertiary">
+      <div class="d-flex flex-wrap align-items-end gap-2">
+        <% SkillEvaluationsHelper::OBJECTIVE_BUTTONS.each do |key, label, hint| %>
+          <button type="button"
+                  class="btn btn-sm <%= objective == key ? 'btn-primary' : 'btn-outline-primary' %> js-slate-objective"
+                  data-objective="<%= key %>" title="<%= hint %>">
+            <%= label %>
+          </button>
+        <% end %>
+
+        <div>
+          <%= label_tag :slate_count, "How many", class: "form-label small mb-0" %>
+          <%= number_field_tag :slate_count, count.presence || ModelSlate::DEFAULT_COUNT,
+                               min: 1, max: ModelSlate::MAX_COUNT, class: "form-control form-control-sm",
+                               style: "width: 6rem;", id: "slate-count" %>
+        </div>
+
+        <div>
+          <%= label_tag :slate_provider, "Provider (ladder)", class: "form-label small mb-0" %>
+          <%= select_tag :slate_provider,
+                         options_for_select(models.map(&:provider).uniq.sort, provider),
+                         class: "form-select form-select-sm", style: "width: 9rem;", id: "slate-provider" %>
+        </div>
+
+        <div>
+          <%= label_tag :slate_source_evaluation, "Copy from", class: "form-label small mb-0" %>
+          <%= select_tag :slate_source_evaluation,
+                         options_for_select(evaluations.map { |e| [ "##{e.id} #{e.name}", e.id ] },
+                                            source_evaluation&.id),
+                         include_blank: evaluations.any? ? "Select an evaluation" : "No evaluations to copy",
+                         class: "form-select form-select-sm", style: "width: 14rem;",
+                         id: "slate-source-evaluation" %>
+        </div>
+      </div>
+
+      <div class="form-text mb-0">
+        An objective replaces the ticked models. Nothing is hidden — everything
+        the registry offers is still below, and ticking anything by hand makes
+        the set your own again.
+      </div>
+    </div>
+
+    <%# Provenance: which objective produced this set, or nothing for hand-picked. %>
+    <%= hidden_field_tag "skill_evaluation[model_objective]", objective, id: "slate-objective" %>
+
+    <% if suggestions.any? %>
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <strong class="small">Suggested set — <%= objective %></strong>
+          <% if previous_ids.any? && previous_ids.sort != suggested_ids.sort %>
+            <a href="#" class="small js-slate-restore"
+               data-previous="<%= previous_ids.join(",") %>">Restore previous <%= pluralize(previous_ids.size, "model") %></a>
+          <% end %>
+        </div>
+
+        <% suggestions.each do |suggestion| %>
+          <% model = suggestion.model %>
+          <div class="form-check">
+            <%= check_box_tag "skill_evaluation[model_ids][]", model.id, true,
+                              id: "evaluation_model_#{model.id}", class: "form-check-input js-slate-model" %>
+            <label class="form-check-label" for="evaluation_model_<%= model.id %>">
+              <code><%= model.model_id %></code>
+              <span class="text-muted small">
+                <%= model.input_price_per_million ? format("$%g in per Mtok", model.input_price_per_million) : "price unknown" %>
+                <% if model.context_window.to_i.positive? %>
+                  · <%= number_with_delimiter(model.context_window) %> ctx
+                <% end %>
+              </span>
+              <span class="badge bg-light text-dark border ms-1"><%= suggestion.reason %></span>
+            </label>
+          </div>
+        <% end %>
+      </div>
+    <% elsif objective.present? %>
+      <p class="text-muted small">
+        "<%= objective %>" matched no models. Pick another objective, or tick
+        what you want below.
+      </p>
+    <% end %>
+
+    <details <%= "open" if suggestions.empty? %>>
+      <summary class="small">
+        <%= suggestions.any? ? "All other models" : "All models" %>
+        (<%= models.size - suggested_ids.size %>)
+      </summary>
+      <div class="border rounded p-2 mt-1" style="max-height: 16rem; overflow-y: auto;">
+        <% models.reject { |m| suggested_ids.include?(m.id) }.group_by(&:provider).each do |provider_name, provider_models| %>
+          <div class="text-muted text-uppercase small mt-2"><%= provider_name %></div>
+          <% provider_models.each do |model| %>
+            <div class="form-check">
+              <%= check_box_tag "skill_evaluation[model_ids][]", model.id,
+                                selected_ids.include?(model.id),
+                                id: "evaluation_model_#{model.id}", class: "form-check-input js-slate-model" %>
+              <label class="form-check-label" for="evaluation_model_<%= model.id %>">
+                <%= model_dropdown_label(model) %>
+                <%= model_capability_badge(model) %>
+              </label>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    </details>
+
+    <%# Nothing ticked must still submit as "none", not as "unchanged". %>
+    <%= hidden_field_tag "skill_evaluation[model_ids][]", "" %>
+
+    <div class="form-text">
+      <% if learning_set %>
+        <% estimate = learning_set.estimated_input %>
+        <%= evaluation_scale_summary(estimate, selected) %>
+        <% too_small = models_too_small_for(estimate, selected) %>
+        <% if too_small.any? %>
+          <div class="text-warning-emphasis">
+            <%= too_small.map(&:model_id).to_sentence %>
+            <%= too_small.one? ? "has a context window" : "have context windows" %>
+            smaller than this set's largest page
+            (<%= number_with_delimiter(estimate.largest_page_tokens) %> tokens).
+            A page is sent whole, so those runs fail on length rather than on the skill.
+          </div>
+        <% end %>
+      <% else %>
+        Pick a learning set above to see how many runs this is and what the input costs.
+      <% end %>
+    </div>
+  </div>
+<% end %>

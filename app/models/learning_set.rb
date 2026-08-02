@@ -12,6 +12,17 @@ class LearningSet < ApplicationRecord
 
   validates :name, presence: true, uniqueness: { case_sensitive: false }
 
+  # Roughly four characters to a token. Good enough to tell $0.38 from $38,
+  # which is the decision the number is there to inform; nothing bills on it.
+  CHARS_PER_TOKEN = 4
+
+  # What a run of this set would send, per model. `largest_page_tokens` is what
+  # a model's context window has to clear — evaluation sends a page whole, so a
+  # short window means that model fails for a boring reason rather than a
+  # revealing one. `unfetched_pages` are pages with no content yet: they are not
+  # part of the estimate and saying so is better than quietly undercounting.
+  Estimate = Struct.new(:tokens, :pages, :unfetched_pages, :largest_page_tokens, keyword_init: true)
+
   # What adding a URL did, so the UI can say it plainly.
   Outcome = Struct.new(:status, :source, :message, keyword_init: true) do
     def added?          = status == :added
@@ -40,5 +51,41 @@ class LearningSet < ApplicationRecord
 
     learning_set_sources.create!(source: source)
     Outcome.new(status: :added, source: source, message: "Added #{source.url} to #{name}.")
+  end
+
+  # How much input one pass over this set is, as an Estimate.
+  #
+  # Getting the text means unzipping every stored payload and stripping its
+  # markup, which is far too expensive to do while rendering a form. Cached on
+  # the set's ordered content hashes: those change exactly when a page's text
+  # changes, and adding or removing a page changes the list, so the key expires
+  # precisely when the answer would differ.
+  def estimated_input(cache: Rails.cache)
+    data = latest_data
+    cache.fetch([ "learning_set", id, "estimated_input", data.map(&:content_hash) ]) do
+      compute_estimate(data)
+    end
+  end
+
+  private
+
+  # The newest payload per page, which is what a run would send. Ordered by
+  # source so the cache key is stable across queries.
+  def latest_data
+    sources.sort_by(&:id).filter_map(&:latest_datum)
+  end
+
+  def compute_estimate(data)
+    page_tokens = data.filter_map do |datum|
+      length = datum.text.to_s.length
+      (length / CHARS_PER_TOKEN) if length.positive?
+    end
+
+    Estimate.new(
+      tokens: page_tokens.sum,
+      pages: page_tokens.size,
+      unfetched_pages: sources.size - page_tokens.size,
+      largest_page_tokens: page_tokens.max.to_i
+    )
   end
 end

@@ -40,8 +40,19 @@
   <dd class="col-sm-9">
     <% if @evaluation.models.any? %>
       <% @evaluation.models.each do |model| %>
-        <div><code><%= model.model_id %></code> <span class="text-muted small"><%= model_pricing_label(model) %></span></div>
+        <div>
+          <code><%= model.model_id %></code>
+          <span class="text-muted small"><%= model_pricing_label(model) %></span>
+          <%= model_capability_badge(model) %>
+        </div>
       <% end %>
+      <div class="text-muted small">
+        <% if @evaluation.model_objective.present? %>
+          Chosen by objective: <strong><%= @evaluation.model_objective %></strong>.
+        <% else %>
+          Hand-picked.
+        <% end %>
+      </div>
     <% else %>
       <span class="text-muted">None selected.</span>
     <% end %>

@@ -54,6 +54,11 @@ Rails.application.routes.draw do
     member do
       post :run
     end
+    collection do
+      # The models section of the form, on its own — a collection route because
+      # it serves the new form too, where there is no evaluation to hang it off.
+      get :model_slate
+    end
   end
   resources :skill_evaluation_results, only: [:show]
   resources :chats, only: [:index, :show]
