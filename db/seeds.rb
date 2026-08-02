@@ -219,29 +219,6 @@ part_part_types = {
   end
 end
 
-# ---------------------------------------------------------------------------
-# Knowledge base content — tier 1 entities (Person, Organization, Part,
-# Facility), their detail records, and the relationships between them.
-#
-# This is demo data. It is skipped outside development and test so a real
-# deployment starts with an empty knowledge base, in the same spirit as the
-# admin user at the top of this file. Skills, sources, and the type
-# taxonomies above are seeded in every environment.
-#
-# Set SEED_KNOWLEDGE_BASE=true to force it on (or =false to force it off).
-# ---------------------------------------------------------------------------
-seed_knowledge_base = ActiveModel::Type::Boolean.new.cast(
-  ENV.fetch("SEED_KNOWLEDGE_BASE", Rails.env.local?.to_s)
-)
-
-if seed_knowledge_base
-  load Rails.root.join("db/seeds/knowledge_base.rb").to_s
-else
-  puts "Skipping knowledge base seeds (SEED_KNOWLEDGE_BASE=false). " \
-       "Skills, sources, and type taxonomies were still seeded."
-end
-
-
 # Research starting points — URLs the system should poll on a schedule to
 # kick off research. Wiring is added later; for now we just seed a few.
 [
@@ -319,6 +296,12 @@ link_sample_children = [
   end
   SourceLink.record(from: link_sample_source, to: child)
   child
+end
+
+# Referenced both by the link graph below and by the knowledge base seeds, so
+# it is created here — above the guard — where every environment reaches it.
+apollo_source = Source.find_or_create_by!(url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer") do |s|
+  s.description = "Wikipedia: Apollo Guidance Computer."
 end
 
 # The Apollo source is linked to from the sample page but was seeded
@@ -416,4 +399,26 @@ if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
 
     by_objective.models = cheapest.map(&:model)
   end
+end
+
+# ---------------------------------------------------------------------------
+# Knowledge base content — tier 1 entities (Person, Organization, Part,
+# Facility), their detail records, and the relationships between them.
+#
+# This is demo data. It is skipped outside development and test so a real
+# deployment starts with an empty knowledge base, in the same spirit as the
+# admin user at the top of this file. Skills, sources, and the type
+# taxonomies above are seeded in every environment.
+#
+# Set SEED_KNOWLEDGE_BASE=true to force it on (or =false to force it off).
+# ---------------------------------------------------------------------------
+seed_knowledge_base = ActiveModel::Type::Boolean.new.cast(
+  ENV.fetch("SEED_KNOWLEDGE_BASE", Rails.env.local?.to_s)
+)
+
+if seed_knowledge_base
+  load Rails.root.join("db/seeds/knowledge_base.rb").to_s
+else
+  puts "Skipping knowledge base seeds (SEED_KNOWLEDGE_BASE=false). " \
+       "Skills, sources, and type taxonomies were still seeded."
 end

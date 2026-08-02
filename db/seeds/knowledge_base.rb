@@ -649,9 +649,10 @@ parts_data = {
   }
 }
 
-apollo_source = Source.find_or_create_by!(url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer") do |s|
-  s.description = "Wikipedia: Apollo Guidance Computer."
-end
+# Created in db/seeds.rb, above the guard, because the source link graph there
+# references it too and must work in environments that skip this file. Looked
+# up here the same way the type taxonomies are.
+apollo_source = Source.find_by!(url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer")
 apollo_report = SourceProcessingReport.find_or_create_by!(source: apollo_source, skill_revision: summarize_revision) do |r|
   r.facts = { "subject" => "Apollo Guidance Computer" }
 end
