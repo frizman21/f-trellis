@@ -19,11 +19,21 @@ process types are `web` and `worker`.
 
 ## Deploying
 
+Deploys are **automatic**: a poller watches GitHub and deploys the newest commit
+on `main` that CI has passed. See [Automatic deploys](#automatic-deploys) below.
+Everything here still works for deploying by hand — the poller will not fight
+you, because it compares against what is actually live.
+
 ```sh
 git push dokku main                 # build and deploy the current main
 git push dokku my-branch:main       # deploy a non-main branch
 git push dokku main --force         # after a rebase; Dokku takes the new tree
 ```
+
+Hand-deploying something *ahead* of `main` is fine. Hand-deploying something
+*behind* it is not: the poller will notice the live commit is behind the last
+green one and deploy forward again. Stop the poller first if you want to pin an
+older build (`docker stop f-dod-autodeploy`).
 
 Rebuild from the last-pushed source without a new commit — the way to pick up a
 changed config var that requires a fresh build:
@@ -227,6 +237,123 @@ If routing looks wrong after adding a domain, rebuild the proxy config:
 ```sh
 dokku proxy:build-config f-dod
 ```
+
+## Automatic deploys
+
+A poller container watches GitHub and deploys `f-dod` on its own. It lives with
+the other host infrastructure in `C:\Users\mikef\dokku\`, defined by
+`docker-compose.autodeploy.yml` and `autodeploy.sh`.
+
+GitHub's hosted runners cannot reach this Dokku — it listens on
+`ssh://dokku@localhost:3022` with no inbound exposure — so the trigger has to
+originate on this side. Polling also means nothing breaks while the machine is
+off; it simply catches up on the next tick.
+
+### What triggers a deploy
+
+Every 120 seconds it asks GitHub for the newest commit on `main` whose `ci.yml`
+run **succeeded**, and deploys that commit if it is genuinely ahead of what is
+live. So a deploy needs all of:
+
+- the commit is on `main`
+- its CI run finished green (`test` + `system-test`; note `quality` is
+  `pull_request`-only and does not run on pushes to `main`)
+- it is *ahead of* the currently deployed commit
+
+Three details that matter:
+
+- **What is live comes from `dokku config:get f-dod GIT_REV`**, not from a state
+  file. That is why a manual `git push dokku main` does not confuse it.
+- **It deploys the exact SHA CI validated**, not the branch tip, so a commit
+  landing mid-cycle cannot ride in untested.
+- **It refuses to move backwards.** The newest *green* commit can be older than
+  what is live — CI red on the tip, or a hand deploy that outran CI. It compares
+  via GitHub's `compare` API and acts only on `ahead`, logging and skipping on
+  `behind`, `identical`, or `diverged`.
+
+### Operating it
+
+```sh
+docker logs -f f-dod-autodeploy      # what it is doing
+docker stop f-dod-autodeploy         # pause before hand-deploying
+docker start f-dod-autodeploy        # resume
+```
+
+From `C:\Users\mikef\dokku\`:
+
+```sh
+docker compose -f docker-compose.autodeploy.yml --env-file .env.autodeploy up -d
+docker compose -f docker-compose.autodeploy.yml --env-file .env.autodeploy down
+```
+
+A normal deploy looks like:
+
+```
+[21:54:53Z] green 04032c85… is ahead of deployed e6d25e2b…; deploying
+[21:56:00Z] deployed 04032c85…
+```
+
+Idle ticks are silent — no log line means "nothing to do", not "broken".
+
+### Credentials
+
+The repo is private, so two things need the same GitHub token:
+
+- `GITHUB_TOKEN` in `.env.autodeploy` — the poller's API calls
+- Dokku's netrc, for cloning: `dokku git:auth github.com <user> <token>`
+
+A fine-grained token scoped to this repo with **Contents: read** and
+**Actions: read** is enough. Rotating means updating both places.
+
+### Troubleshooting
+
+**Nothing is deploying.** Check in this order: is CI green on `main` at all
+(`gh run list --branch main --limit 3`); does `docker logs f-dod-autodeploy`
+show a `behind`/`diverged` line; is the container even running.
+
+**"could not compare …".** Usually an expired or under-scoped token — the
+compare call needs `Contents: read`.
+
+**`git:sync` fails with an auth error.** Dokku's netrc entry is stale; re-run
+`dokku git:auth github.com <user> <token>`.
+
+**It deployed something you did not expect.** `docker logs f-dod-autodeploy`
+records every decision with both SHAs. Remember it follows the last *green*
+commit, which is not always the tip of `main`.
+
+### A note on the socket
+
+The poller mounts the Docker socket to run `docker exec dokku dokku …`, which
+is root-equivalent access to the host. That is a deliberate simplification for
+a script we control. The lower-privilege alternative is an SSH key authorised
+with `dokku ssh-keys:add`, calling the Dokku SSH interface on port 3022 instead.
+
+## Surviving a reboot
+
+**Everything comes back on its own — once you log in.** Docker Desktop starts at
+*user login*, not at boot, so an unattended reboot with nobody logging in
+brings nothing up. That is the one manual step in the chain.
+
+After login, the pieces restore in different ways, which is worth knowing when
+something is missing:
+
+| Piece | How it comes back |
+| --- | --- |
+| Docker Desktop | `AutoStart: true` in its settings — at user login |
+| `dokku` container | `restart: unless-stopped` |
+| `dokku-tailnet` attachment + `172.28.0.2` | persisted in the container config, so the sidecars' `TS_DEST_IP` stays valid |
+| Postgres/Redis services | `restart: always` |
+| **App containers** (`f-dod.web.1`, `f-dod.worker.1`) | **not** by Docker — their policy is `on-failure:10`, which only fires on a crash. Dokku restores them: the container runs a `dokku-restore` runit service that calls `dokku ps:restore` on start |
+| Tailscale sidecars | `restart: unless-stopped`; their state volumes preserve node identity, so the MagicDNS names do not change |
+| Auto-deploy poller | `restart: unless-stopped`, and it catches up on anything merged while the machine was off |
+
+If apps do not come back, `dokku ps:restore` is the manual equivalent, and
+`/var/log/services/dokku-restore` inside the container has the last run's
+output.
+
+The development containers (`f-dod-web-1`, `f-dod-postgres-1` from the repo's
+`docker-compose.yml`) have restart policy `no` and deliberately stay down —
+they are not part of the deployment.
 
 ## Tailscale sidecars
 

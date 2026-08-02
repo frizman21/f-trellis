@@ -199,6 +199,10 @@ explicitly:
 git push dokku my-branch:main
 ```
 
+Once [automatic deploys](#10-automatic-deploys) are set up you rarely need
+this — pushing to `main` on GitHub is enough — but it remains the way to deploy
+a branch, or to redeploy without waiting for a poll.
+
 ## 8. Reach the app
 
 ```
@@ -330,6 +334,33 @@ dokku run f-dod bundle exec rails console
 ```ruby
 User.create!(email: "you@example.com", password: "set-a-good-one")
 ```
+
+## 10. Automatic deploys
+
+A poller deploys the newest commit on `main` that CI has passed, so merging a
+PR is enough to ship. It is defined next to the Dokku compose file in
+`C:\Users\mikef\dokku\` — `docker-compose.autodeploy.yml` and `autodeploy.sh` —
+and documented in [`dokku_devops.md`](dokku_devops.md#automatic-deploys).
+
+The reason it polls rather than being pushed to: GitHub's hosted runners cannot
+reach this Dokku (`ssh://dokku@localhost:3022`, no inbound exposure), so the
+trigger has to start on this side. A side benefit is that it survives the
+machine being off and catches up afterwards.
+
+Two setup steps, both needing the same GitHub token — fine-grained, scoped to
+this repo, **Contents: read** and **Actions: read**:
+
+```sh
+# 1. So Dokku can clone the private repo
+dokku git:auth github.com <github-user> <token>
+
+# 2. So the poller can query the Actions API
+#    echo 'GITHUB_TOKEN=<token>' > C:\Users\mikef\dokku\.env.autodeploy
+docker compose -f docker-compose.autodeploy.yml --env-file .env.autodeploy up -d
+```
+
+Verify with `docker logs -f f-dod-autodeploy`. A deploy logs both SHAs and the
+reason; idle ticks are silent.
 
 ## How the release task runs
 
