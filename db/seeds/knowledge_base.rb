@@ -628,30 +628,48 @@ end
 # Seeded parts tied to existing Apollo / NASA story.
 parts_data = {
   "Apollo Guidance Computer" => {
-    types: [ "Assembly" ],
+    types: [ "Assembly", "Physical Part", "Electrical Component" ],
     additional_attributes: { "manufacturer_part_number" => "AGC-Block-II" },
+    specifications: [
+      { type: "Physical Part", parameter: "weight", value: 31_751, as_stated: "70 lb", confidence: 950 },
+      { type: "Physical Part", parameter: "height", value: 610, as_stated: "24 in" },
+      { type: "Physical Part", parameter: "width", value: 320, as_stated: "12.5 in" },
+      { type: "Physical Part", parameter: "material", text: "Aluminium alloy case", confidence: 700 },
+      { type: "Electrical Component", parameter: "max_power", value: 70, as_stated: "about 70 watts" },
+      { type: "Electrical Component", parameter: "operating_voltage", value: 28, as_stated: "28 V DC" }
+    ],
     source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
   },
   "AGC Memory Module" => {
-    types: [ "Component" ],
-    additional_attributes: { "material" => "Magnetic core rope memory", "manufacturer_part_number" => "AGC-MEM" },
+    types: [ "Component", "Physical Part" ],
+    additional_attributes: { "manufacturer_part_number" => "AGC-MEM" },
+    specifications: [
+      { type: "Physical Part", parameter: "material", text: "Magnetic core rope memory" }
+    ],
     source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
   },
   "AGC CPU Module" => {
-    types: [ "Component" ],
-    additional_attributes: { "material" => "RTL flat-pack ICs", "manufacturer_part_number" => "AGC-CPU" },
+    types: [ "Component", "Physical Part" ],
+    additional_attributes: { "manufacturer_part_number" => "AGC-CPU" },
+    specifications: [
+      { type: "Physical Part", parameter: "material", text: "RTL flat-pack ICs" }
+    ],
     source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
   },
   "AGC Power Supply" => {
-    types: [ "Component" ],
+    types: [ "Component", "Physical Part", "Electrical Component" ],
     additional_attributes: { "manufacturer_part_number" => "AGC-PSU" },
+    specifications: [
+      { type: "Electrical Component", parameter: "operating_voltage", value: 28, as_stated: "28 V DC" }
+    ],
     source_url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer"
   }
 }
 
-apollo_source = Source.find_or_create_by!(url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer") do |s|
-  s.description = "Wikipedia: Apollo Guidance Computer."
-end
+# Created in db/seeds.rb, above the guard, because the source link graph there
+# references it too and must work in environments that skip this file. Looked
+# up here the same way the type taxonomies are.
+apollo_source = Source.find_by!(url: "https://en.wikipedia.org/wiki/Apollo_Guidance_Computer")
 apollo_report = SourceProcessingReport.find_or_create_by!(source: apollo_source, skill_revision: summarize_revision) do |r|
   r.facts = { "subject" => "Apollo Guidance Computer" }
 end
@@ -673,6 +691,20 @@ parts_data.each do |name, attrs|
   detail.part_types = attrs[:types].map { |t| part_types.fetch(t) }
   detail.part.update!(current_detail: detail) unless detail.part.current_detail_id == detail.id
   parts_by_name[name] = detail.part
+
+  # Measured values, so the part page renders a specification table and the
+  # `as_stated` column has something to show. The AGC's documented weight is 70
+  # lb; stored in the grams the parameter declares, with the source's own words
+  # kept beside it — which is exactly what a conversion needs to stay checkable.
+  Array(attrs[:specifications]).each do |spec|
+    parameter = PartTypeParameter.joins(:part_type)
+                                 .find_by(name: spec[:parameter], part_types: { name: spec[:type] })
+    next if parameter.nil?
+
+    row = detail.part_detail_parameters.find_or_initialize_by(part_type_parameter: parameter)
+    row.update!(value_number: spec[:value], value_text: spec[:text],
+                as_stated: spec[:as_stated], confidence_tenths: spec.fetch(:confidence, 900))
+  end
 end
 
 # NASA is the consumer of the Apollo Guidance Computer.

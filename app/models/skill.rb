@@ -21,11 +21,17 @@ class Skill < ApplicationRecord
 
   # Skills triage can actually route: active, with a statement to route on, and
   # with a revision to run.
+  #
+  # Ordered by id so the result is stable. Triage does not rank — it returns
+  # every skill that applies — but the order still surfaces: it is the order of
+  # `Result#recommended`, and of the names in the "claim(s) ... by URL pattern"
+  # log line. Without this, Postgres is free to vary it between runs.
+  # Ordering by id rather than name keeps it independent of DB collation.
   scope :triageable, lambda {
     active_with_applicability = where(is_active: true)
                                  .where.not(applicability: nil)
                                  .where.not(applicability: "")
-    active_with_applicability.where(id: SkillRevision.select(:skill_id))
+    active_with_applicability.where(id: SkillRevision.select(:skill_id)).order(:id)
   }
 
   # One pattern per line, which is how the form edits them.

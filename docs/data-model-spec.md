@@ -682,3 +682,62 @@ Column abbreviations: **PO** PersonOrganization · **PP** PersonPerson · **OO**
 | Seed: at least one `<Rel>Type` attached to each detail        | ✓  | ✓  | ✓  |   ✓   |   ✓   |
 | Runtime: `current_detail_id` auto-maintained on new Detail    | ·  | ·  | ·  |   ·   |   ·   |
 | LLM `Link<Rel>Tool` (generic, type-as-param) + registered     | ✓  | ·  | ✓  |   ·   |   ·   |
+
+---
+
+## 9. Measured parameters on a type
+
+`additional_attribute_keys` (§2a) names a key and stops there. That is enough
+for a label — `manufacturer_part_number` holds whatever string the page gave —
+and not enough for a **measurement**, which is a number *and* a unit. "12 lbs"
+in the property bag cannot be sorted, cannot be compared against "5.6 kg", and
+two runs writing "12lb" and "12 lbs" record what looks like two different facts.
+§2a already anticipates this: a value needing richer structure is a signal to
+promote the key out of the bag.
+
+`PartType` is the worked example. Apply the same shape to another tier 1 type
+whose instances are measured rather than merely described.
+
+### Tables
+
+1. **`<entity>_type_parameters`** — the schema: what a type is measured by.
+   - `<entity>_type_id` (FK, NOT NULL).
+   - `name` (string, NOT NULL) — normalised to a lowercase snake_case key.
+   - `unit` (string) — the unit every value is stored in. NOT NULL in effect for
+     numeric parameters, enforced in the model rather than the database because
+     text parameters legitimately have none.
+   - `value_type` (string, NOT NULL, default `"number"`) — `number` or `text`.
+   - `description` (text).
+   - Unique composite index on `(<entity>_type_id, name)`.
+
+2. **`<entity>_detail_parameters`** — the values, one per parameter per Detail.
+   - `<entity>_detail_id` (FK, NOT NULL).
+   - `<entity>_type_parameter_id` (FK, NOT NULL).
+   - `value_number` (decimal) / `value_text` (string) — one is filled, decided by
+     the parameter's `value_type`.
+   - `as_stated` (string) — the source's own wording, before conversion.
+   - `confidence_tenths` (integer; §3 scale).
+   - Unique composite index on `(<entity>_detail_id, <entity>_type_parameter_id)`.
+
+### Rules
+
+- A parameter value is **not** a Detail. It is part of the assertion its Detail
+  makes, so it inherits that row's `as_of` and `source_processing_report_id`
+  rather than carrying its own. Re-processing a page inserts a new Detail with a
+  fresh set of values, so §2's append-only rule still holds.
+- **Values are stored in the parameter's declared unit**, converted on the way
+  in. A column of weights in mixed units compares nothing. Whoever writes the
+  value converts; `as_stated` keeps the original so a bad conversion stays
+  visible afterwards.
+- **A parameter no type declares is refused, not invented.** An undeclared fact
+  belongs in `additional_attributes`. Quietly accepting one would make the
+  taxonomy meaningless.
+- **Types compose rather than inherit.** An entity Detail carries several types
+  through the M2M join, and is measured by the union of their parameters. That is
+  how "every physical part has a weight" is expressed — a `Physical Part` type
+  declaring `weight`, attached alongside whatever else the part is. There is no
+  type hierarchy and none is needed.
+- An LLM tool that populates these must put the **live taxonomy in its own
+  description** — which types exist and what each is measured in — rather than
+  relying on a skill's prompt to repeat it. A prompt is a second copy that drifts
+  the moment a type gains a parameter. See `UpsertPartContract`.

@@ -24,6 +24,99 @@
     <div class="form-text">Comma-separated. These keys will be surfaced from each detail's <code>additional_attributes</code>.</div>
   </div>
 
+  <fieldset class="mb-3">
+    <legend class="h6">Performance parameters</legend>
+    <p class="form-text mt-0">
+      What parts of this type are <em>measured</em> by. A parameter is a number
+      and a unit, so values can be compared and sorted — unlike an attribute key
+      above, which holds whatever string the page gave. A part carrying several
+      types is measured by all of their parameters, which is how "every physical
+      part has a weight" works without a type hierarchy.
+    </p>
+
+    <div id="part-type-parameters">
+      <%= f.fields_for :part_type_parameters do |pf| %>
+        <div class="row g-2 align-items-end mb-2 part-type-parameter">
+          <div class="col-md-3">
+            <%= pf.label :name, "Name", class: "form-label small mb-0" %>
+            <%= pf.text_field :name, class: "form-control form-control-sm", placeholder: "max_power" %>
+          </div>
+          <div class="col-md-2">
+            <%= pf.label :unit, "Unit", class: "form-label small mb-0" %>
+            <%= pf.text_field :unit, class: "form-control form-control-sm", placeholder: "W" %>
+          </div>
+          <div class="col-md-2">
+            <%= pf.label :value_type, "Value", class: "form-label small mb-0" %>
+            <%= pf.select :value_type, PartTypeParameter::VALUE_TYPES,
+                          {}, class: "form-select form-select-sm" %>
+          </div>
+          <div class="col-md-4">
+            <%= pf.label :description, "Description", class: "form-label small mb-0" %>
+            <%= pf.text_field :description, class: "form-control form-control-sm" %>
+          </div>
+          <div class="col-md-1">
+            <% if pf.object.persisted? %>
+              <div class="form-check">
+                <%= pf.check_box :_destroy, class: "form-check-input" %>
+                <%= pf.label :_destroy, "Drop", class: "form-check-label small" %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="add-part-type-parameter">
+      Add parameter
+    </button>
+    <div class="form-text">
+      A row left blank is ignored. Dropping a parameter also drops the values
+      already recorded against it.
+    </div>
+  </fieldset>
+
   <%= f.submit submit_label, class: "btn btn-primary" %>
   <%= link_to "Cancel", part_types_path, class: "btn btn-outline-secondary" %>
 <% end %>
+
+<script>
+  (function () {
+    function initializePartTypeParameters() {
+      var container = document.getElementById('part-type-parameters');
+      var button = document.getElementById('add-part-type-parameter');
+      if (!container || !button) return;
+
+      // Cloning drops listeners left by a previous Turbo visit, so one click
+      // does not add several rows.
+      var fresh = button.cloneNode(true);
+      button.parentNode.replaceChild(fresh, button);
+
+      fresh.addEventListener('click', function () {
+        var rows = container.querySelectorAll('.part-type-parameter');
+        if (!rows.length) return;
+
+        var row = rows[rows.length - 1].cloneNode(true);
+        // Rails indexes nested fields by position in the name, so the copy needs
+        // an index of its own or it would overwrite the row it came from.
+        var index = Date.now();
+        row.querySelectorAll('input, select, textarea').forEach(function (field) {
+          if (field.name) field.name = field.name.replace(/\[\d+\]/, '[' + index + ']');
+          if (field.id) field.id = field.id.replace(/_\d+_/, '_' + index + '_');
+          if (field.type === 'checkbox') {
+            field.checked = false;
+          } else if (field.tagName !== 'SELECT') {
+            field.value = '';
+          }
+        });
+        row.querySelectorAll('label').forEach(function (label) {
+          if (label.htmlFor) label.htmlFor = label.htmlFor.replace(/_\d+_/, '_' + index + '_');
+        });
+        container.appendChild(row);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initializePartTypeParameters);
+    document.addEventListener('turbo:load', initializePartTypeParameters);
+    document.addEventListener('turbo:frame-load', initializePartTypeParameters);
+  })();
+</script>

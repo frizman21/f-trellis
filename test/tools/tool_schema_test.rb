@@ -7,7 +7,8 @@ require "ruby_llm/schema"
 class ToolSchemaTest < ActiveSupport::TestCase
   BATCHED_TOOLS = {
     UpsertOrganizationTool => "organizations",
-    UpsertPersonTool => "people"
+    UpsertPersonTool => "people",
+    UpsertPartTool => "parts"
   }.freeze
 
   def schema_for(klass)
@@ -52,8 +53,28 @@ class ToolSchemaTest < ActiveSupport::TestCase
     assert_includes entry[:required].map(&:to_s), "last_name"
   end
 
+  test "UpsertPartTool requires a name and at least one type per entry" do
+    entry = schema_for(UpsertPartTool).properties[:parts][:items]
+
+    assert_includes entry[:required].map(&:to_s), "name"
+    assert_includes entry[:required].map(&:to_s), "part_types"
+    assert_not_includes entry[:required].map(&:to_s), "specifications"
+  end
+
+  # A specification is three things — which parameter, what value, in what unit —
+  # and a schema that dropped any of them would leave the tool guessing.
+  test "UpsertPartTool declares specifications as parameter/value objects" do
+    specs = schema_for(UpsertPartTool).properties[:parts][:items][:properties][:specifications]
+
+    assert_equal "array", specs[:type]
+    assert_equal %i[as_stated parameter unit value],
+                 specs[:items][:properties].keys.map(&:to_sym).sort
+    assert_equal %w[parameter value], specs[:items][:required].map(&:to_s).sort
+  end
+
   test "tools expose the names the model calls" do
     assert_equal "upsert_organization", UpsertOrganizationTool.new(nil).name
     assert_equal "upsert_person", UpsertPersonTool.new(nil).name
+    assert_equal "upsert_part", UpsertPartTool.new(nil).name
   end
 end

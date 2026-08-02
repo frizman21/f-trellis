@@ -8,13 +8,23 @@
 <% if @part_types.any? %>
   <table class="table">
     <thead>
-      <tr><th>Name</th><th>Description</th><th>Additional attribute keys</th><th></th></tr>
+      <tr>
+        <th>Name</th><th>Description</th><th>Measured by</th>
+        <th>Additional attribute keys</th><th></th>
+      </tr>
     </thead>
     <tbody>
       <% @part_types.each do |pt| %>
         <tr>
           <td><%= pt.name %></td>
           <td><%= pt.description %></td>
+          <td>
+            <% if pt.part_type_parameters.any? %>
+              <%= pt.part_type_parameters.map(&:label).join(", ") %>
+            <% else %>
+              <span class="text-muted">Nothing measured</span>
+            <% end %>
+          </td>
           <td><%= pt.additional_attribute_keys.join(", ") %></td>
           <td><%= link_to "Edit", edit_part_type_path(pt), class: "btn btn-sm btn-outline-primary" %></td>
         </tr>
