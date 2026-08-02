@@ -351,6 +351,11 @@ end
 evaluation_models = Model.selectable.first(2)
 evaluation_skill  = Skill.find_by(name: "Pull Organization Names")
 
+# A proposal in the shape ProposalRecorder normalises entries into.
+def seeded_org(name, acronym = nil)
+  { "type" => "organization", "name" => name, "acronym" => acronym, "attributes" => {} }.compact
+end
+
 if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
   evaluation = SkillEvaluation.find_or_create_by!(name: "Org extraction — model comparison") do |e|
     e.description  = "Does a cheaper model pull the same organizations off a page as the baseline?"
@@ -367,21 +372,30 @@ if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
   revision = evaluation_skill.skill_revisions.order(:sequence).last
 
   evaluation_models.each_with_index do |model, index|
-    next if evaluation.skill_evaluation_results
-                      .exists?(source: link_sample_source, model: model, skill_revision: revision)
+    result = evaluation.skill_evaluation_results
+                       .find_or_initialize_by(source: link_sample_source, model: model,
+                                              skill_revision: revision)
 
-    SkillEvaluationResult.create!(
-      skill_evaluation: evaluation,
-      source: link_sample_source,
-      model: model,
-      skill_revision: revision,
-      status: index.zero? ? "complete" : "failed",
-      response: index.zero? ? "[seeded placeholder — not a real model response]\n\n" \
-                              "Organizations found on this page:\n- NASA\n- Example Corp" : nil,
-      error: index.zero? ? nil : "[seeded placeholder] RubyLLM::Error: rate limited",
+    result.assign_attributes(
+      status: "complete",
+      response: "[seeded placeholder — not a real model response]\n\n" \
+                "Organizations found on this page:\n- NASA\n- Example Corp",
       started_at: 2.minutes.ago,
       completed_at: 1.minute.ago
     )
+
+    # The baseline and the second model propose overlapping-but-different sets,
+    # so the matrix has a cell to compare, the ranking has an order and the
+    # result page has a three-way split to render. Nothing here was proposed by
+    # a model — an evaluation records these through the recording stand-ins.
+    result.record_proposals(
+      if index.zero?
+        [ seeded_org("nasa", "nasa"), seeded_org("example corp") ]
+      else
+        [ seeded_org("nasa", "nasa"), seeded_org("acme aerospace") ]
+      end
+    )
+    result.save!
   end
 
   # A second evaluation whose models came from an objective rather than from
@@ -403,4 +417,3 @@ if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
     by_objective.models = cheapest.map(&:model)
   end
 end
-

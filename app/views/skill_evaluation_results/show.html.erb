@@ -31,10 +31,15 @@
     <%= link_to "revision #{@result.skill_revision.sequence}", skill_revision_path(@result.skill_revision) %>
   </dd>
 
-  <dt class="col-sm-3">Score</dt>
+  <dt class="col-sm-3">Contribution</dt>
   <dd class="col-sm-9">
     <%= evaluation_score_label(@result) %>
-    <span class="text-muted small">Scoring is not implemented yet.</span>
+    <span class="text-muted small">
+      distinct entities and relationships this run would have added.
+    </span>
+    <% if @baseline && @baseline.id != @result.id && @result.same_proposals_as?(@baseline) %>
+      <span class="badge bg-info text-dark">identical to the baseline</span>
+    <% end %>
   </dd>
 
   <dt class="col-sm-3">Chat</dt>
@@ -56,6 +61,55 @@
   <div class="alert alert-danger">
     <strong>Failed.</strong> <%= @result.error %>
   </div>
+<% end %>
+
+<h2 class="h4">Proposals</h2>
+
+<%# The run's proposals beside the baseline's, split three ways. Nothing here
+    was written to the graph — an evaluation runs recording stand-ins for the
+    upsert tools, so this is what the run *would* have added. %>
+<% if @result.status == "complete" %>
+  <% if @baseline.nil? || @baseline.id == @result.id %>
+    <% if @result.proposal_set.empty? %>
+      <p class="text-muted">This run proposed nothing.</p>
+    <% else %>
+      <ul>
+        <% @result.proposal_set.distinct.each do |record| %>
+          <li><%= proposal_line(record) %></li>
+        <% end %>
+      </ul>
+    <% end %>
+    <% if @baseline.nil? %>
+      <p class="text-muted small">
+        The baseline has not run on this page at this revision, so there is
+        nothing to compare against yet.
+      </p>
+    <% end %>
+  <% else %>
+    <% mine = @result.proposal_set %>
+    <% base = @baseline.proposal_set %>
+    <div class="row">
+      <div class="col-md-4">
+        <h3 class="h6">Shared with the baseline (<%= mine.shared_with(base).size %>)</h3>
+        <ul class="small"><% mine.shared_with(base).each do |r| %><li><%= proposal_line(r) %></li><% end %></ul>
+      </div>
+      <div class="col-md-4">
+        <h3 class="h6">Added over the baseline (<%= mine.added_over(base).size %>)</h3>
+        <ul class="small"><% mine.added_over(base).each do |r| %><li><%= proposal_line(r) %></li><% end %></ul>
+      </div>
+      <div class="col-md-4">
+        <h3 class="h6">Missed, that the baseline found (<%= mine.missing_from(base).size %>)</h3>
+        <ul class="small"><% mine.missing_from(base).each do |r| %><li><%= proposal_line(r) %></li><% end %></ul>
+      </div>
+    </div>
+    <p class="text-muted small">
+      Compared against <%= link_to "the baseline's run on this page", skill_evaluation_result_path(@baseline) %>
+      (<code><%= @evaluation.base_model.model_id %></code>). Nothing here was written to
+      the knowledge graph — an evaluation runs recording stand-ins for the upsert tools.
+    </p>
+  <% end %>
+<% else %>
+  <p class="text-muted">Nothing proposed — this run has not completed.</p>
 <% end %>
 
 <h2 class="h4">Response</h2>

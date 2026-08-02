@@ -114,12 +114,14 @@ class SkillEvaluationRunnerTest < ActiveJob::TestCase
     end
   end
 
-  test "an evaluation with no models blocks the run" do
+  # Nothing ticked is not nothing to run: the baseline is what everything else
+  # would be compared against, so it goes in regardless.
+  test "an evaluation with nothing ticked still runs the baseline" do
     @evaluation.models = []
 
-    outcome = SkillEvaluationRunner.call(evaluation: @evaluation)
+    outcome = SkillEvaluationRunner.call(evaluation: @evaluation.reload)
 
-    assert outcome.blocked?
-    assert_match(/at least one model/, outcome.summary)
+    assert_not outcome.blocked?
+    assert_equal [ @evaluation.base_model ], outcome.queued.map(&:model).uniq
   end
 end

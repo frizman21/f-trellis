@@ -1,0 +1,102 @@
+<%#
+  What each model would contribute, and where it contributes exactly what the
+  baseline already does. Locals: comparison (an EvaluationComparison).
+%>
+<h2 class="h4">Contribution</h2>
+
+<p class="text-muted small">
+  How much each run would add to the knowledge base: the count of distinct
+  entities and relationships it proposed. Volume, not accuracy — a model that
+  invents an organization counts it. Open a cell to see what it actually said.
+</p>
+
+<h3 class="h6">Per page</h3>
+<div class="table-responsive mb-3">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th>Page</th>
+        <% comparison.models.each do |model| %>
+          <th class="text-center">
+            <code class="small"><%= model.model_id %></code>
+            <% if model.id == evaluation.base_model_id %>
+              <div><span class="badge bg-light text-dark border">baseline</span></div>
+            <% end %>
+          </th>
+        <% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% comparison.sources.each do |source| %>
+        <tr>
+          <td>
+            <%= link_to "##{source.id}", source_path(source) %>
+            <span class="small text-muted"><%= truncate(source.url.to_s, length: 40) %></span>
+          </td>
+          <% comparison.models.each do |model| %>
+            <% cell = comparison.cell(source, model) %>
+            <td class="text-center">
+              <% if cell.result.nil? %>
+                <span class="text-muted" title="This pair has not run">·</span>
+              <% elsif !cell.run? %>
+                <%= evaluation_status_badge(cell.result.status) %>
+              <% else %>
+                <%= link_to cell.count, skill_evaluation_result_path(cell.result) %>
+                <% if comparison.identical_to_base?(source, model) %>
+                  <span class="badge bg-info text-dark" title="Proposed exactly what the baseline proposed">=</span>
+                <% end %>
+              <% end %>
+            </td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<p class="text-muted small">
+  A dot is a pair that has not run — not the same as a run that proposed
+  nothing, which shows as 0. <span class="badge bg-info text-dark">=</span>
+  marks a run that proposed exactly what the baseline proposed on that page:
+  where a cheaper model is free money.
+</p>
+
+<h3 class="h6">By model</h3>
+<table class="table table-sm align-middle">
+  <thead>
+    <tr>
+      <th>Model</th>
+      <th class="text-end">Contribution</th>
+      <th class="text-end">Per page</th>
+      <th class="text-end">Not in baseline</th>
+      <th class="text-end">Pages identical to baseline</th>
+      <th class="text-end">Input $/Mtok</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% comparison.rankings.each do |ranking| %>
+      <tr>
+        <td>
+          <code><%= ranking.model.model_id %></code>
+          <% if ranking.baseline %>
+            <span class="badge bg-light text-dark border">baseline</span>
+          <% end %>
+        </td>
+        <td class="text-end"><%= ranking.total %></td>
+        <td class="text-end"><%= number_with_precision(ranking.mean_per_page, precision: 1) %></td>
+        <td class="text-end"><%= ranking.baseline ? "—" : ranking.added_over_base %></td>
+        <td class="text-end">
+          <%= ranking.baseline ? "—" : "#{ranking.pages_identical_to_base} of #{ranking.pages}" %>
+        </td>
+        <td class="text-end">
+          <%= ranking.model.input_price_per_million ? format("$%g", ranking.model.input_price_per_million) : "—" %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+
+<p class="text-muted small">
+  Ranked by total contribution, ties broken by price ascending — two models
+  contributing the same amount are not equal if one costs twenty times the other.
+</p>

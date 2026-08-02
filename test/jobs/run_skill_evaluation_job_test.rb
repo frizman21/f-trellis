@@ -9,20 +9,22 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
   # replaced.
   class Recorder
     class << self
-      attr_accessor :instructions, :asked, :tools, :reply, :raise_with
+      attr_accessor :instructions, :asked, :tools, :reply, :raise_with, :tool_calls, :tool_results
     end
 
-    def self.reset(reply: "Acme Corp, Beta Inc", raise_with: nil)
+    def self.reset(reply: "Acme Corp, Beta Inc", raise_with: nil, tool_calls: [])
       self.instructions = nil
       self.asked = nil
       self.tools = nil
       self.reply = reply
       self.raise_with = raise_with
+      self.tool_calls = tool_calls
+      self.tool_results = []
     end
   end
 
-  def with_fake_chat(reply: "Acme Corp, Beta Inc", raise_with: nil)
-    Recorder.reset(reply: reply, raise_with: raise_with)
+  def with_fake_chat(reply: "Acme Corp, Beta Inc", raise_with: nil, tool_calls: [])
+    Recorder.reset(reply: reply, raise_with: raise_with, tool_calls: tool_calls)
     original = Chat.method(:create!)
 
     Chat.define_singleton_method(:create!) do |*args, **kwargs|
@@ -32,6 +34,15 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
       chat.define_singleton_method(:ask) do |text|
         Recorder.asked = text
         raise Recorder.raise_with if Recorder.raise_with
+
+        # Stands in for a provider deciding to call tools: each entry names a
+        # registered tool and the arguments the model would have sent.
+        Array(Recorder.tool_calls).each do |tool_name, args|
+          tool = Recorder.tools.detect { |t| t.name == tool_name }
+          raise "no tool named #{tool_name} was registered" if tool.nil?
+
+          Recorder.tool_results << tool.call(args)
+        end
 
         Reply.new(Recorder.reply)
       end
@@ -89,15 +100,35 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
     assert_not_includes Recorder.asked, "<html>", "the model gets text, not markup"
   end
 
-  # An evaluation is a rehearsal. Handing it the upsert tools would let a
-  # rehearsal write into the graph it is supposed to be measuring.
-  test "registers no tools and creates no entities" do
+  # The invariant that matters, now tested *with* tools registered: the model is
+  # handed recording stand-ins, and an evaluation still writes nothing.
+  test "registers the recording stand-ins and creates no entities" do
     assert_no_difference [ "Person.count", "Organization.count", "PersonDetail.count",
-                           "OrganizationDetail.count" ] do
+                           "OrganizationDetail.count", "PersonOrganization.count",
+                           "OrganizationOrganization.count", "PersonOrganizationDetail.count",
+                           "OrganizationOrganizationDetail.count" ] do
       with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
     end
 
-    assert_nil Recorder.tools
+    assert_equal [ RecordingUpsertPersonTool, RecordingUpsertOrganizationTool,
+                   RecordingLinkPersonOrganizationTool, RecordingLinkOrganizationOrganizationTool ],
+                 Recorder.tools.map(&:class)
+  end
+
+  # The stand-ins announce themselves under the writing tools' names, so a model
+  # that has learned to call `upsert_organization` still can.
+  test "the stand-ins present the writing tools' names, descriptions and schemas" do
+    [ [ RecordingUpsertPersonTool, UpsertPersonTool ],
+      [ RecordingUpsertOrganizationTool, UpsertOrganizationTool ],
+      [ RecordingLinkPersonOrganizationTool, LinkPersonOrganizationTool ],
+      [ RecordingLinkOrganizationOrganizationTool, LinkOrganizationOrganizationTool ] ].each do |recording, writing|
+      stand_in = recording.new(ProposalRecorder.new)
+      real = writing.new(nil)
+
+      assert_equal real.name, stand_in.name
+      assert_equal real.description, stand_in.description
+      assert_equal real.params_schema, stand_in.params_schema
+    end
   end
 
   test "links the chat the run went through" do
@@ -138,5 +169,72 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
 
     assert_equal "Kept.", @result.reload.response
     assert_nil Recorder.asked
+  end
+
+  # --- What the run would contribute --------------------------------------
+
+  UPSERT_ORGS = [ "upsert_organization",
+                  { organizations: [ { name: "Acme Corp", acronym: "ACME" }, { name: "Beta Inc" } ] } ].freeze
+
+  test "a run stores what it proposed and scores it" do
+    with_fake_chat(tool_calls: [ UPSERT_ORGS ]) { RunSkillEvaluationJob.perform_now(@result) }
+
+    @result.reload
+    assert_equal "complete", @result.status
+    assert_equal 2, @result.score
+    assert_equal 2, @result.proposals.size
+    assert_includes @result.proposals.map { |p| p["name"] }, "acme corp"
+    assert @result.proposal_digest.present?
+  end
+
+  # The model gets back what the writing tool would have returned, so the ids it
+  # then passes to a link tool resolve.
+  test "the ids handed back by an upsert tool are usable by a link tool" do
+    PersonOrganizationType.find_or_create_by!(name: "Employment")
+
+    calls = [
+      [ "upsert_person", { people: [ { first_name: "Jane", last_name: "Doe" } ] } ],
+      [ "upsert_organization", { organizations: [ { name: "Acme Corp" } ] } ],
+      [ "link_person_organization", { person_id: 1, organization_id: 1, type: "Employment" } ]
+    ]
+
+    assert_no_difference [ "Person.count", "Organization.count", "PersonOrganization.count" ] do
+      with_fake_chat(tool_calls: calls) { RunSkillEvaluationJob.perform_now(@result) }
+    end
+
+    assert_nil Recorder.tool_results.last[:error]
+    link = @result.reload.proposals.detect { |p| p["type"] == "person_organization" }
+    assert_equal "jane doe", link["person"]
+    assert_equal 3, @result.score
+  end
+
+  test "the same organization proposed twice scores once" do
+    duplicate = [ "upsert_organization", { organizations: [ { name: "Acme Corp" }, { name: "acme corp" } ] } ]
+
+    with_fake_chat(tool_calls: [ duplicate ]) { RunSkillEvaluationJob.perform_now(@result) }
+
+    assert_equal 1, @result.reload.score
+  end
+
+  test "a run that proposed nothing scores zero, not nil" do
+    with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
+
+    assert_equal 0, @result.reload.score
+    assert_empty @result.proposals
+  end
+
+  test "two runs proposing the same set in a different order share a digest" do
+    other_model = Model.create!(provider: "openai", model_id: "gpt-other", name: "Other",
+                                last_seen_at: @model.last_seen_at)
+    other = SkillEvaluationResult.create!(skill_evaluation: @evaluation, source: @source,
+                                          model: other_model, skill_revision: @revision,
+                                          status: "pending")
+
+    with_fake_chat(tool_calls: [ UPSERT_ORGS ]) { RunSkillEvaluationJob.perform_now(@result) }
+    reversed = [ "upsert_organization",
+                 { organizations: [ { name: "Beta Inc" }, { name: "Acme Corp", acronym: "ACME" } ] } ]
+    with_fake_chat(tool_calls: [ reversed ]) { RunSkillEvaluationJob.perform_now(other) }
+
+    assert @result.reload.same_proposals_as?(other.reload)
   end
 end

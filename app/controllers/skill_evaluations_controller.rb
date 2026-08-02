@@ -15,6 +15,8 @@ class SkillEvaluationsController < ApplicationController
     @results = @evaluation.skill_evaluation_results
                           .includes(:source, :model, :skill_revision)
                           .order(:source_id, :model_id)
+    @comparison = EvaluationComparison.new(evaluation: @evaluation, revision: @revision,
+                                           results: @results.to_a)
   end
 
   def new
