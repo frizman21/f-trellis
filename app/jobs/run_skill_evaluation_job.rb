@@ -42,12 +42,13 @@ class RunSkillEvaluationJob < ApplicationJob
 
   private
 
-  # One recorder behind all four, so a link tool can resolve the synthetic id an
-  # upsert tool handed the model a moment earlier.
+  # One recorder behind all of them, so a link tool can resolve the synthetic id
+  # an upsert tool handed the model a moment earlier.
   def recording_tools(recorder)
     [
       RecordingUpsertPersonTool.new(recorder),
       RecordingUpsertOrganizationTool.new(recorder),
+      RecordingUpsertPartTool.new(recorder),
       RecordingLinkPersonOrganizationTool.new(recorder),
       RecordingLinkOrganizationOrganizationTool.new(recorder)
     ]

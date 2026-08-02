@@ -22,7 +22,9 @@ class ProposalRecorder
 
   def initialize
     @proposals = []
-    @labels = { person: {}, organization: {} }
+    # One id space per kind, mirroring the real tables: a Person #1 and an
+    # Organization #1 both exist, and a link tool has to resolve the right one.
+    @labels = Hash.new { |kinds, kind| kinds[kind] = {} }
     @counters = Hash.new(0)
   end
 
@@ -49,6 +51,23 @@ class ProposalRecorder
     add("organization",
         "name" => label,
         "acronym" => normalize(acronym).presence,
+        "attributes" => normalize_attributes(attributes))
+
+    [ id, created ]
+  end
+
+  # Specifications ride along inside the part's record rather than being
+  # proposals of their own: "this drone weighs 1.375 lb" is not a separate
+  # contribution from "this drone exists", and counting it as one would let a
+  # model out-rank another by listing more numbers about the same part.
+  def record_part(name:, part_types:, specifications: [], attributes: nil)
+    label = normalize(name)
+    id, created = identify(:part, label)
+
+    add("part",
+        "name" => label,
+        "part_types" => Array(part_types).map { |t| normalize(t) }.sort,
+        "specifications" => Array(specifications).map { |spec| normalize_specification(spec) }.sort_by(&:to_s),
         "attributes" => normalize_attributes(attributes))
 
     [ id, created ]
@@ -82,7 +101,7 @@ class ProposalRecorder
   # would — a stand-in that quietly accepted a made-up id would let a model get
   # away with something the real run would have rejected.
   def label_for(kind, id)
-    @labels.fetch(kind)[id.to_i]
+    @labels[kind][id.to_i]
   end
 
   # Details are inserted one per entry by the writing tools, so the stand-ins
@@ -96,7 +115,7 @@ class ProposalRecorder
   end
 
   def identify(kind, label)
-    known = @labels.fetch(kind)
+    known = @labels[kind]
     existing = known.key(label)
     return [ existing, false ] if existing
 
@@ -110,6 +129,16 @@ class ProposalRecorder
   end
 
   def normalize(value) = value.to_s.strip.downcase
+
+  # Compared on parameter, value and unit. `as_stated` is deliberately left out:
+  # two runs that both put the weight at 1.375 lb agree, whether one read "624 g"
+  # and the other "1.375 lbs".
+  def normalize_specification(spec)
+    spec = spec.stringify_keys
+    { "parameter" => normalize(spec["parameter"]),
+      "value" => normalize(spec["value"]),
+      "unit" => normalize(spec["unit"]).presence }.compact
+  end
 
   def normalize_attributes(attributes)
     sanitize_attrs(attributes).transform_values { |v| v.is_a?(String) ? normalize(v) : v }

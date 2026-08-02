@@ -7,16 +7,21 @@ require "test_helper"
 class RecordingToolsTest < ActiveSupport::TestCase
   ENTITY_TABLES = [
     "Person.count", "Organization.count", "PersonDetail.count", "OrganizationDetail.count",
+    "Part.count", "PartDetail.count", "PartDetailParameter.count",
     "PersonOrganization.count", "PersonOrganizationDetail.count",
     "OrganizationOrganization.count", "OrganizationOrganizationDetail.count"
   ].freeze
 
   setup do
+    @physical = PartType.find_or_create_by!(name: "Physical Part")
+    @physical.part_type_parameters.find_or_create_by!(name: "weight") { |p| p.unit = "g" }
+
     @recorder = ProposalRecorder.new
     @people = RecordingUpsertPersonTool.new(@recorder)
     @orgs = RecordingUpsertOrganizationTool.new(@recorder)
     @person_org = RecordingLinkPersonOrganizationTool.new(@recorder)
     @org_org = RecordingLinkOrganizationOrganizationTool.new(@recorder)
+    @parts = RecordingUpsertPartTool.new(@recorder)
     @employment = PersonOrganizationType.find_or_create_by!(name: "Employment")
     @partnership = OrganizationOrganizationType.find_or_create_by!(name: "Partnership")
   end
@@ -128,5 +133,65 @@ class RecordingToolsTest < ActiveSupport::TestCase
     link = @recorder.proposals.detect { |p| p["type"] == "person_organization" }
     assert_equal({ "sector" => "defense" }, org["attributes"])
     assert_equal({ "role" => "ceo" }, link["attributes"])
+  end
+
+  # --- Parts ----------------------------------------------------------------
+
+  test "a part is captured with its types and specifications, and nothing is written" do
+    assert_no_difference ENTITY_TABLES do
+      @parts.execute(parts: [ { name: "Drone One", part_types: [ "Physical Part" ],
+                                specifications: [ { parameter: "weight", value: "624",
+                                                    as_stated: "1.375 lb" } ] } ])
+    end
+
+    part = @recorder.proposals.detect { |p| p["type"] == "part" }
+    assert_equal "drone one", part["name"]
+    assert_equal [ "physical part" ], part["part_types"]
+    assert_equal [ { "parameter" => "weight", "value" => "624", "unit" => "g" } ], part["specifications"]
+  end
+
+  # A specification is not a contribution of its own — otherwise a model could
+  # out-rank another by listing more numbers about the same part.
+  test "specifications ride inside the part rather than counting separately" do
+    @parts.execute(parts: [ { name: "Drone One", part_types: [ "Physical Part" ],
+                              specifications: [ { parameter: "weight", value: "624" } ] } ])
+
+    assert_equal 1, @recorder.proposals.size
+  end
+
+  # `as_stated` is what the page said, not what was recorded. Two runs that both
+  # put the weight at 624 g agree, whether one read "1.375 lb" and the other "624 g".
+  test "how the page worded a value does not change the proposal" do
+    other = ProposalRecorder.new
+    RecordingUpsertPartTool.new(other).execute(
+      parts: [ { name: "Drone One", part_types: [ "Physical Part" ],
+                 specifications: [ { parameter: "weight", value: "624", as_stated: "624 g" } ] } ]
+    )
+    @parts.execute(parts: [ { name: "Drone One", part_types: [ "Physical Part" ],
+                              specifications: [ { parameter: "weight", value: "624",
+                                                  as_stated: "1.375 lb" } ] } ])
+
+    assert_equal ProposalSet.new(other.proposals).digest, ProposalSet.new(@recorder.proposals).digest
+  end
+
+  # The taxonomy is most of what upsert_part enforces. A stand-in that accepted
+  # anything would score a model for specifications the real run threw away.
+  test "the stand-in refuses the specifications the writing tool refuses" do
+    result = @parts.execute(parts: [
+      { name: "Drone One", part_types: [ "Physical Part" ],
+        specifications: [ { parameter: "weight", value: "1.375", unit: "lb" },
+                          { parameter: "capacity", value: "5000" } ] }
+    ])[:results].first
+
+    assert_equal 0, result[:specifications_recorded]
+    assert_equal 2, result[:specification_errors].size
+    assert_empty @recorder.proposals.detect { |p| p["type"] == "part" }["specifications"]
+  end
+
+  test "a part naming no configured type is refused, exactly as the writing tool refuses it" do
+    result = @parts.execute(parts: [ { name: "Drone One", part_types: [ "Spaceship" ] } ])[:results].first
+
+    assert_match(/no part type matched Spaceship/, result[:error])
+    assert_empty @recorder.proposals
   end
 end
