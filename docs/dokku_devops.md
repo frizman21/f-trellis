@@ -199,14 +199,16 @@ dokku domains:add f-dod f-dod.localhost
 dokku domains:remove f-dod f-dod.dokku.me
 ```
 
-The app is reachable at **`http://f-dod.localhost:8080`**. `:8080` is the host
-port the proxy is published on; `dokku urls` reports port 80 (the container-side
-port) and so omits it.
+The app answers on three names, in descending order of usefulness:
 
-Use the `.localhost` name, not the `f-dod.dokku.me` one Dokku assigns by
-default: on this network `dokku.me` resolves to `10.0.0.2` rather than loopback,
-so the browser times out even though the vhost is correct. See the setup guide
-for the full explanation.
+| URL | Reachable from | Notes |
+| --- | --- | --- |
+| `http://f-dod` | anywhere on the tailnet | its own Tailscale node — see below |
+| `http://f-dod.localhost:8080` | this machine only | browsers resolve `.localhost` to loopback themselves |
+| `http://f-dod.dokku.me:8080` | nowhere | `dokku.me` resolves to `10.0.0.2` on this network, not loopback |
+
+`dokku urls` reports port 80 (the container-side port) and so omits the `:8080`
+the `.localhost` name needs.
 
 Testing `.localhost` from the command line needs an explicit resolve, because
 the RFC-6761 loopback rule is a browser/resolver-library behavior that
@@ -217,10 +219,69 @@ curl --resolve f-dod.localhost:8080:127.0.0.1 http://f-dod.localhost:8080/
 curl -H 'Host: f-dod.localhost:8080' http://localhost:8080/     # equivalent
 ```
 
+The tailnet name needs no such trick — `curl http://f-dod/` just works from any
+device on the tailnet.
+
 If routing looks wrong after adding a domain, rebuild the proxy config:
 
 ```sh
 dokku proxy:build-config f-dod
+```
+
+## Tailscale sidecars
+
+Each app is its own Tailscale device, run as a sidecar container defined in
+`C:\Users\mikef\dokku\docker-compose.tailscale.yml`. These commands run from
+that directory, not the app repo:
+
+```sh
+docker compose -f docker-compose.tailscale.yml --env-file .env.tailscale up -d
+docker compose -f docker-compose.tailscale.yml --env-file .env.tailscale down
+docker compose -f docker-compose.tailscale.yml --env-file .env.tailscale restart ts-f-dod
+```
+
+Status and logs:
+
+```sh
+tailscale status                    # every node, including f-dod and f-agents
+docker logs ts-f-dod --tail 20      # "Startup complete" means it registered
+docker exec ts-f-dod tailscale ip -4
+```
+
+The sidecars are independent of the app. Restarting `ts-f-dod` does not touch
+the running app, and redeploying the app does not touch its tailnet node.
+
+### Adding a new app to the tailnet
+
+1. Copy a service block in the compose file, changing the container name,
+   `hostname`, `TS_HOSTNAME`, and state volume.
+2. Add the volume under `volumes:`.
+3. Register the names with Dokku so its vhost routing matches:
+   ```sh
+   dokku domains:add <app> <app> <app>.tail1a468b.ts.net
+   ```
+4. Bring it up with the `up -d` line above.
+
+### Troubleshooting
+
+**A tailnet name resolves but serves the wrong app.** The vhost is missing, so
+Dokku fell through to its first server block. Check `dokku domains:report <app>`
+includes the tailnet names.
+
+**`invalid configuration: TS_DEST_IP is not supported with TS_USERSPACE`.**
+The image defaults `TS_USERSPACE` to true. It must be set to `"false"`
+explicitly — removing the line is not enough.
+
+**A node reappears as `f-dod-1`.** Its state volume was deleted, so it
+registered as a new device. Remove the stale entry in the Tailscale admin
+console; the volumes are what keep identities stable.
+
+**Nothing resolves after recreating the Dokku container.** The sidecars reach
+Dokku over the `dokku-tailnet` network, attached to the running container
+rather than declared in its compose file. Re-attach it:
+
+```sh
+docker network connect --ip 172.28.0.2 dokku-tailnet dokku
 ```
 
 ## Housekeeping
@@ -259,6 +320,15 @@ dokku postgres:destroy f-dod-db
 
 Both prompt for confirmation; `-f` skips the prompt. Take an export first.
 
+Destroying the app does not remove its Tailscale node — that is a separate
+container. Remove the sidecar and its state volume, then delete the now-offline
+device in the Tailscale admin console:
+
+```sh
+docker compose -f docker-compose.tailscale.yml --env-file .env.tailscale rm -sf ts-f-dod
+docker volume rm dokku_ts-f-dod-state
+```
+
 ## Troubleshooting
 
 **Push is rejected or hangs.** Test the transport on its own with
@@ -295,7 +365,15 @@ unreachable database looks exactly like this.
 ## A note on the other apps here
 
 This Dokku instance also hosts `f-agents`, with its own `f-agents-db` and
-`f-agents-redis` services. Every command above takes an explicit app or service
-name, so nothing here is ambiguous — but `dokku ps:stop --all`,
-`dokku cleanup`, and `docker image prune -a` are instance-wide and will affect
-that app too.
+`f-agents-redis` services and its own `ts-f-agents` Tailscale sidecar. Every
+command above takes an explicit app or service name, so nothing here is
+ambiguous — but these are instance-wide and will affect that app too:
+
+- `dokku ps:stop --all`, `dokku cleanup`, `docker image prune -a`
+- `docker compose -f docker-compose.tailscale.yml … down` — stops **every**
+  sidecar, taking all apps off the tailnet. Name the service to scope it.
+
+Note `f-agents` is deployed twice on this machine: once on Dokku (reachable at
+`http://f-agents`) and once as a standalone `f-agents-production` compose stack
+published on port 3000. They are separate deployments with separate databases;
+Dokku does not manage the latter.

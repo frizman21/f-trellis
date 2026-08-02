@@ -202,11 +202,15 @@ git push dokku my-branch:main
 ## 8. Reach the app
 
 ```
-http://f-dod.localhost:8080
+http://f-dod                    from anywhere on the tailnet
+http://f-dod.localhost:8080     from this machine only
 ```
 
-The `:8080` is required — it is the host port the Dokku proxy is published on.
-`dokku url f-dod` reports port 80, the *container*-side port, and so omits it.
+The tailnet name is the primary one — see
+[Tailscale access](#9-tailscale-access) below. The `.localhost` fallback works
+only on the machine running Dokku, and the `:8080` is required there because
+that is the host port the Dokku proxy is published on. (`dokku url f-dod`
+reports port 80, the *container*-side port, and so omits it.)
 
 ### Why not `f-dod.dokku.me`
 
@@ -244,6 +248,77 @@ The alternative, if you prefer keeping the `dokku.me` name, is a hosts entry
 ```
 127.0.0.1 f-dod.dokku.me f-agents.dokku.me
 ```
+
+## 9. Tailscale access
+
+Each app on this Dokku instance is its own Tailscale device, with its own
+MagicDNS name and 100.x address:
+
+```
+$ tailscale status
+100.126.137.31  home-pc     …   # the machine itself
+100.70.98.0     f-dod       …
+100.83.249.38   f-agents    …
+```
+
+so the apps are reached as `http://f-dod` and `http://f-agents` from any device
+on the tailnet — no port numbers, no hosts-file entries, and nothing extra
+published on the host.
+
+### Why not just `home-pc:8080`
+
+Dokku separates apps by `Host` header; Tailscale gives a machine exactly one
+MagicDNS name. There is no `f-dod.home-pc` — MagicDNS has no per-machine
+subdomains, so that name fails at DNS before any connection is made.
+
+`home-pc:8080` does reach Dokku, but the `Host` matches no `server_name`, so
+nginx falls through to the first server block — whichever app sorts first,
+which is not necessarily the one you wanted. Giving each app its own tailnet
+node sidesteps the problem entirely instead of allocating a port per app.
+
+### How it is wired
+
+`C:\Users\mikef\dokku\docker-compose.tailscale.yml`, alongside the Dokku
+compose file, runs one `tailscale/tailscale` sidecar per app. Each has a
+`TS_HOSTNAME`, a named state volume holding its node identity, and a
+`TS_DEST_IP` pointing at Dokku's nginx. `TS_DEST_IP` is L3 forwarding, so the
+client's `Host` header survives the hop and Dokku's vhost routing still
+applies — which is why each app needs its tailnet names registered:
+
+```sh
+dokku domains:add f-dod f-dod f-dod.tail1a468b.ts.net
+```
+
+Adding another app is a new service block plus a matching `domains:add`.
+
+Two traps worth knowing:
+
+- **`TS_DEST_IP` is incompatible with userspace mode, and the image defaults
+  `TS_USERSPACE` to true.** Omitting it is not enough; it must be set to
+  `"false"` explicitly, and the sidecars then need `/dev/net/tun` with
+  `NET_ADMIN` and `NET_RAW`.
+- **Keep the state volumes.** They hold each node's identity. Delete one and
+  that app re-registers as a new device (`f-dod-1`, `f-dod-2`, …), leaving dead
+  entries in the admin console.
+
+The sidecars reach Dokku over a dedicated network at a fixed address, attached
+to the **running** container:
+
+```sh
+docker network create --subnet 172.28.0.0/16 dokku-tailnet
+docker network connect --ip 172.28.0.2 dokku-tailnet dokku
+```
+
+It is done this way because Dokku's compose uses `network_mode: bridge`, which
+compose cannot combine with a named network — declaring it would force a
+recreate, and that wipes the installed plugins. The cost is that the attachment
+is not captured in Dokku's compose file: **if the Dokku container is ever
+recreated, re-run both lines above** along with reinstalling the plugins.
+
+Auth keys live in `.env.tailscale` next to the compose file, never in the
+compose file itself. Use a **reusable, non-ephemeral** key — an ephemeral key
+deletes the device when the container stops. Once the nodes are registered the
+key can be revoked; they stay authenticated.
 
 The app requires sign-in and seeds no users in production. Create the first one
 through the console:
