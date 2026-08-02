@@ -1,0 +1,61 @@
+<% content_for :title, "Source Exclusions" %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Source Exclusions</h1>
+  <%= link_to "New exclusion", new_source_exclusion_path, class: "btn btn-primary" %>
+</div>
+
+<p class="text-muted">
+  URL patterns that link extraction refuses to turn into sources. A crawl that
+  finds a matching link neither creates it nor follows it. Entering a URL by
+  hand, or adding one to a learning set, is unaffected — these rules filter what
+  a page proposes, not what you ask for.
+</p>
+
+<% if @source_exclusions.any? %>
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>Pattern</th>
+        <th>Reason</th>
+        <th>Enabled</th>
+        <th class="text-end">Sources already matching</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @source_exclusions.each do |exclusion| %>
+        <tr>
+          <td><code><%= exclusion.pattern %></code></td>
+          <td><%= exclusion.description.presence || "—" %></td>
+          <td>
+            <% if exclusion.is_enabled %>
+              <span class="badge bg-success">Yes</span>
+            <% else %>
+              <span class="badge bg-secondary">No</span>
+            <% end %>
+          </td>
+          <td class="text-end"><%= number_with_delimiter(exclusion.matching_source_count) %></td>
+          <td class="text-end">
+            <%= link_to "Edit", edit_source_exclusion_path(exclusion) %>
+            <%= link_to "Delete", source_exclusion_path(exclusion),
+                        data: { turbo_method: :delete,
+                                turbo_confirm: "Delete the exclusion #{exclusion.pattern}?" },
+                        class: "ms-2 text-danger" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <div class="form-text">
+    "Sources already matching" counts sources this pattern covers that are
+    <em>already</em> in the database — an exclusion is not retroactive, so those
+    rows stay. A count of zero on a pattern you expected to bite usually means
+    the pattern is wrong rather than unused.
+  </div>
+<% else %>
+  <p>
+    No exclusions yet. Every link found on a page becomes a source.
+  </p>
+<% end %>

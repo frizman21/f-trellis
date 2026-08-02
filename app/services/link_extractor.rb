@@ -2,7 +2,15 @@ require "nokogiri"
 require "uri"
 
 class LinkExtractor
-  Result = Struct.new(:internal, :external, keyword_init: true)
+  # `excluded` is filled in downstream by SourceDatum#extract_links, which
+  # applies the SourceExclusion list. Nothing in this class touches it — the
+  # extractor stays a parser with no database of its own — so it reads as an
+  # empty list on a result that was never filtered.
+  Result = Struct.new(:internal, :external, :excluded, keyword_init: true) do
+    def excluded
+      self[:excluded] || []
+    end
+  end
 
   def self.call(html, base_url:)
     new(html, base_url).call

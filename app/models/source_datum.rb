@@ -27,14 +27,30 @@ class SourceDatum < ApplicationRecord
 
   # Unzip the stored payload and pull the links out of it. Shared by CrawlJob,
   # which uses the result to decide which pages to visit next.
+  #
+  # The SourceExclusion list is applied here rather than in either caller, so
+  # there is one place a link can be dropped and no way to reach the raw list
+  # by forgetting to filter. Excluded URLs are reported back rather than
+  # silently dropped — see the "Extract links" page.
   def extract_links
     content = html
-    return LinkExtractor::Result.new(internal: [], external: []) if content.blank?
+    return LinkExtractor::Result.new(internal: [], external: [], excluded: []) if content.blank?
 
-    LinkExtractor.call(content, base_url: source.url)
+    exclude(LinkExtractor.call(content, base_url: source.url))
   end
 
   private
+
+  def exclude(result)
+    patterns = SourceExclusion.enabled.to_a
+    return result if patterns.empty?
+
+    internal, excluded_internal = SourceExclusion.partition_urls(result.internal, patterns)
+    external, excluded_external = SourceExclusion.partition_urls(result.external, patterns)
+
+    LinkExtractor::Result.new(internal: internal, external: external,
+                              excluded: excluded_internal + excluded_external)
+  end
 
   def assign_content_hash
     return unless data_changed? || content_hash.nil?

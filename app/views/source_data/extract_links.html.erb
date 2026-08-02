@@ -14,7 +14,7 @@
 
 <% if @error.present? %>
   <div class="alert alert-danger"><%= @error %></div>
-<% elsif @links.internal.empty? && @links.external.empty? %>
+<% elsif @links.internal.empty? && @links.external.empty? && @links.excluded.empty? %>
   <p>No links found in this payload. No sources created.</p>
 <% else %>
   <p>
@@ -24,6 +24,12 @@
     skipped <strong><%= @skipped.size %></strong> already known, and recorded
     <strong><%= @new_links %></strong> new
     <%= "link".pluralize(@new_links) %> in the graph.
+    <% if @links.excluded.any? %>
+      A further <strong><%= @links.excluded.size %></strong>
+      <%= "link".pluralize(@links.excluded.size) %>
+      <%= @links.excluded.one? ? "matched an exclusion and was" : "matched an exclusion and were" %>
+      not counted above.
+    <% end %>
   </p>
 
   <h2>Sources created (<%= @created.size %>)</h2>
@@ -76,6 +82,21 @@
     </ul>
   <% else %>
     <p>None.</p>
+  <% end %>
+
+  <% if @links.excluded.any? %>
+    <h2>Excluded (<%= @links.excluded.size %>)</h2>
+    <p class="form-text">
+      These matched a pattern on the
+      <%= link_to "source exclusion list", source_exclusions_path %>. No source
+      was created and no edge was recorded — as far as the graph is concerned
+      the page does not link to them.
+    </p>
+    <ul>
+      <% @links.excluded.each do |url| %>
+        <li><%= external_link_to url, url %></li>
+      <% end %>
+    </ul>
   <% end %>
 
   <div class="form-text">

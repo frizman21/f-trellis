@@ -176,6 +176,44 @@ class CrawlJobTest < ActiveJob::TestCase
     end
   end
 
+  test "excluded links are neither created nor followed" do
+    SourceExclusion.create!(pattern: "https://excluded.test/item?id=*")
+
+    seed = make_seed(
+      "https://excluded.test/start",
+      '<a href="/item?id=1">comments</a><a href="/keep">keep</a>'
+    )
+
+    with_fake_fetcher("https://excluded.test/keep" => '<a href="/item?id=2">more comments</a>') do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 2)
+    end
+
+    assert Source.exists?(url: "https://excluded.test/keep")
+    assert_not Source.exists?(url: "https://excluded.test/item?id=1"),
+      "an excluded link must not become a source"
+    assert_not Source.exists?(url: "https://excluded.test/item?id=2"),
+      "an excluded link must not be discovered a level deeper either"
+    assert_not CrawlRecord.exists?(url: "https://excluded.test/item?id=1"),
+      "an excluded link must not be fetched"
+  end
+
+  test "no link edge is recorded to an excluded URL that is already a source" do
+    # The exclusion is added after the page already exists, which is the case
+    # where the graph could still grow an edge to something we now refuse.
+    known = Source.create!(url: "https://exclude-known.test/item?id=1")
+    SourceExclusion.create!(pattern: "https://exclude-known.test/item?id=*")
+
+    seed = make_seed("https://exclude-known.test/start", '<a href="/item?id=1">a</a>')
+
+    with_fake_fetcher do
+      assert_no_difference -> { SourceLink.count } do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+      end
+    end
+
+    assert_not_includes seed.reload.links_to, known
+  end
+
   test "raises on invalid crawl_type" do
     seed = make_seed("https://invalid.test/x", "")
     assert_raises ArgumentError do

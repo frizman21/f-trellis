@@ -269,6 +269,34 @@ end
   end
 end
 
+# Source exclusions — link patterns never worth turning into a source. The
+# Hacker News rules are the counterpart to the starting point seeded above:
+# polling the front page is the point, and the comment thread hanging off every
+# story on it is not, so without these a crawl from it spends its whole page
+# budget on discussion. The Federal Register one is seeded disabled, both as an
+# example of parking a rule rather than deleting it and so the seeded link
+# sample below still has an external link to extract.
+[
+  { pattern: "https://news.ycombinator.com/item?id=*",
+    description: "Comment threads. No organizations, parts or facilities worth extracting.",
+    is_enabled: true },
+  { pattern: "https://news.ycombinator.com/user?id=*",
+    description: "Commenter profiles — a karma score and a join date.",
+    is_enabled: true },
+  { pattern: "https://*.wikipedia.org/wiki/Special:*",
+    description: "Wikipedia's generated pages (random article, recent changes, what links here) — " \
+                 "no stable content behind them.",
+    is_enabled: true },
+  { pattern: "https://www.federalregister.gov/documents/*",
+    description: "Example of a parked rule: kept for the wording, switched off so it does not apply.",
+    is_enabled: false }
+].each do |attrs|
+  SourceExclusion.find_or_create_by!(pattern: attrs[:pattern]) do |exclusion|
+    exclusion.description = attrs[:description]
+    exclusion.is_enabled  = attrs[:is_enabled]
+  end
+end
+
 # A fetched source with a real zipped payload attached, so the Source Data
 # table on the source show page — and its "Extract links" action — can be
 # exercised in the browser without hitting the network.
@@ -281,6 +309,7 @@ link_sample_html = <<~HTML
       <a href="/about#team">Duplicate of /about once the fragment is stripped</a>
       <a href="https://en.wikipedia.org/wiki/Apollo_Guidance_Computer">Wikipedia (external)</a>
       <a href="https://www.federalregister.gov/documents/current">Federal Register (external)</a>
+      <a href="https://news.ycombinator.com/item?id=8863">Excluded by a source exclusion</a>
       <a href="#skip-me">Fragment only — skipped</a>
       <a href="mailto:someone@example.com">mailto — skipped</a>
     </body>

@@ -47,6 +47,7 @@ Rails.application.routes.draw do
     end
   end
   resources :domains, only: [:index, :edit, :update]
+  resources :source_exclusions, only: [:index, :new, :create, :edit, :update, :destroy]
   resources :research_starting_points
   resources :skills, only: [:index, :show, :new, :create, :edit, :update]
   resources :skill_revisions, only: [:show]

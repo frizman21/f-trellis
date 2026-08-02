@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_31_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_02_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -251,6 +251,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_160000) do
     t.index ["current_detail_id"], name: "index_organizations_on_current_detail_id"
   end
 
+  create_table "part_detail_parameters", force: :cascade do |t|
+    t.string "as_stated"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "part_detail_id", null: false
+    t.bigint "part_type_parameter_id", null: false
+    t.datetime "updated_at", null: false
+    t.decimal "value_number", precision: 20, scale: 6
+    t.string "value_text"
+    t.index ["part_detail_id", "part_type_parameter_id"], name: "index_part_detail_parameters_on_detail_and_parameter", unique: true
+    t.index ["part_detail_id"], name: "index_part_detail_parameters_on_part_detail_id"
+    t.index ["part_type_parameter_id"], name: "index_part_detail_parameters_on_part_type_parameter_id"
+  end
+
   create_table "part_detail_part_types", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "part_detail_id", null: false
@@ -358,6 +372,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_160000) do
     t.index ["part_a_id", "part_b_id"], name: "index_part_parts_on_part_a_id_and_part_b_id", unique: true
     t.index ["part_a_id"], name: "index_part_parts_on_part_a_id"
     t.index ["part_b_id"], name: "index_part_parts_on_part_b_id"
+  end
+
+  create_table "part_type_parameters", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.bigint "part_type_id", null: false
+    t.string "unit"
+    t.datetime "updated_at", null: false
+    t.string "value_type", default: "number", null: false
+    t.index ["part_type_id", "name"], name: "index_part_type_parameters_on_type_and_name", unique: true
+    t.index ["part_type_id"], name: "index_part_type_parameters_on_part_type_id"
   end
 
   create_table "part_types", force: :cascade do |t|
@@ -599,6 +625,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_160000) do
     t.index ["source_id"], name: "index_source_data_on_source_id"
   end
 
+  create_table "source_exclusions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.boolean "is_enabled", default: true, null: false
+    t.string "pattern", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pattern"], name: "index_source_exclusions_on_pattern", unique: true
+  end
+
   create_table "source_links", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "from_source_id", null: false
@@ -693,6 +728,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_160000) do
   add_foreign_key "organization_organizations", "organizations", column: "organization_a_id"
   add_foreign_key "organization_organizations", "organizations", column: "organization_b_id"
   add_foreign_key "organizations", "organization_details", column: "current_detail_id"
+  add_foreign_key "part_detail_parameters", "part_details"
+  add_foreign_key "part_detail_parameters", "part_type_parameters"
   add_foreign_key "part_detail_part_types", "part_details"
   add_foreign_key "part_detail_part_types", "part_types"
   add_foreign_key "part_details", "parts"
@@ -711,6 +748,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_31_160000) do
   add_foreign_key "part_parts", "part_part_details", column: "current_detail_id"
   add_foreign_key "part_parts", "parts", column: "part_a_id"
   add_foreign_key "part_parts", "parts", column: "part_b_id"
+  add_foreign_key "part_type_parameters", "part_types"
   add_foreign_key "parts", "part_details", column: "current_detail_id"
   add_foreign_key "people", "person_details", column: "current_detail_id"
   add_foreign_key "person_detail_person_types", "person_details"
