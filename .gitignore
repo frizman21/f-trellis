@@ -36,3 +36,6 @@
 /.env
 /.env.production
 /.env.*.local
+
+# Local database dumps (see docs/dokku_devops.md)
+/backups/

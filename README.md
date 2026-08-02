@@ -346,3 +346,23 @@ docker compose -f docker-compose.production.yml --env-file .env.production \
    CREATE DATABASE app_production_queue OWNER app;
    CREATE DATABASE app_production_cable OWNER app;"
 ```
+
+## Deploying to a local Dokku instance
+
+An alternative deployment target: a containerized Dokku running on the
+workstation, which builds the same `Dockerfile` but replaces the Compose file
+with a `git push`-driven workflow. The repo carries a `Procfile` and `app.json`
+for it, declaring the same `web` + `worker` split.
+
+- **[`docs/dokku_setup_guide.md`](docs/dokku_setup_guide.md)** — one-time setup:
+  installing the Postgres plugin, creating the app, adding the git remote,
+  provisioning the database, the config vars Solid Queue/Cache/Cable need
+  beyond what `postgres:link` sets, and the Tailscale sidecar that gives the
+  app its own tailnet node.
+- **[`docs/dokku_devops.md`](docs/dokku_devops.md)** — day-to-day operation:
+  deploying, starting and stopping, logs, console access, backups, teardown,
+  and managing the Tailscale sidecars.
+
+The app runs as its own Tailscale device, so once deployed it is served at
+`http://f-dod` from anywhere on the tailnet. On the Dokku host itself,
+`http://f-dod.localhost:8080` also works.
