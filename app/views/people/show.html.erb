@@ -57,62 +57,38 @@
 <% end %>
 
 <% organizations = @person.person_organizations.includes(:organization, current_detail: :person_organization_types) %>
-<% if organizations.any? %>
-  <h2>Organizations</h2>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Organization</th>
-        <th>Types</th>
-        <th>As of</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% organizations.each do |po| %>
-        <% org_detail = po.organization.current_detail %>
-        <% rel_detail = po.current_detail %>
-        <tr>
-          <td>
-            <%= link_to (org_detail ? org_detail.name : "Organization ##{po.organization_id}"), po.organization %>
-          </td>
-          <td><%= rel_detail&.person_organization_types&.map(&:name)&.join(", ") %></td>
-          <td><%= rel_detail&.as_of&.to_date %></td>
-          <td><%= link_to "Relationship", person_organization_path(po), class: "btn btn-sm btn-outline-primary" %></td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-<% end %>
+<%= render "shared/relationship_table",
+      title: "Organizations",
+      column_header: "Organization",
+      empty_message: "No organizations recorded for this person.",
+      rows: organizations.map { |po|
+        org_detail = po.organization.current_detail
+        rel_detail = po.current_detail
+        {
+          name: org_detail ? org_detail.name : "Organization ##{po.organization_id}",
+          record: po.organization,
+          types: rel_detail&.person_organization_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: person_organization_path(po)
+        }
+      } %>
 
 <% person_relationships = @person.person_people.includes(:person_a, :person_b, current_detail: :person_person_types) %>
-<% if person_relationships.any? %>
-  <h2>Related people</h2>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Person</th>
-        <th>Types</th>
-        <th>As of</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% person_relationships.each do |pp| %>
-        <% other = pp.other_person(@person) %>
-        <% other_detail = other&.current_detail %>
-        <% rel_detail = pp.current_detail %>
-        <tr>
-          <td>
-            <%= link_to (other_detail ? "#{other_detail.first_name} #{other_detail.last_name}" : "Person ##{other&.id}"), other %>
-          </td>
-          <td><%= rel_detail&.person_person_types&.map(&:name)&.join(", ") %></td>
-          <td><%= rel_detail&.as_of&.to_date %></td>
-          <td><%= link_to "Relationship", person_person_path(pp), class: "btn btn-sm btn-outline-primary" %></td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-<% end %>
+<%= render "shared/relationship_table",
+      title: "Related people",
+      column_header: "Person",
+      empty_message: "No relationships to other people recorded for this person.",
+      rows: person_relationships.map { |pp|
+        other = pp.other_person(@person)
+        other_detail = other&.current_detail
+        rel_detail = pp.current_detail
+        {
+          name: other_detail ? "#{other_detail.first_name} #{other_detail.last_name}" : "Person ##{other&.id}",
+          record: other,
+          types: rel_detail&.person_person_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: person_person_path(pp)
+        }
+      } %>
 
 <p><%= link_to "Back to people", people_path %></p>

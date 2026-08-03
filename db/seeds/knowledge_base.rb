@@ -622,6 +622,64 @@ ensure_self_relationships(
 end
 
 # ---------------------------------------------------------------------------
+# Ensure every Person belongs to at least one Organization, and every
+# Organization has at least one Person. The random loop above links whoever it
+# happens to sample, which leaves most of both tables unconnected — and an
+# entity with no link renders an empty relationship section, so the person and
+# organization pages are only reviewable if every record has one.
+# ---------------------------------------------------------------------------
+
+def link_person_to_organization(person_id:, organization_id:, report:, types:, rng:)
+  return if PersonOrganization.exists?(person_id: person_id, organization_id: organization_id)
+
+  po = PersonOrganization.create!(person_id: person_id, organization_id: organization_id)
+  detail = PersonOrganizationDetail.create!(
+    person_organization: po,
+    as_of: Faker::Date.between(from: 10.years.ago.to_date, to: Date.today),
+    confidence_tenths: 800,
+    additional_attributes: {
+      "title"      => Faker::Job.title,
+      "department" => Faker::Commerce.department(max: 1)
+    },
+    source_processing_report: report
+  )
+  detail.person_organization_types = [ types.sample(random: rng) ]
+  po.update!(current_detail: detail)
+end
+
+po_type_pool = [ employment_type, affiliation_type ]
+all_person_ids       = Person.pluck(:id)
+all_organization_ids = Organization.pluck(:id)
+
+if all_person_ids.any? && all_organization_ids.any?
+  rng = Random.new(20260424)
+
+  unlinked_person_ids = all_person_ids - PersonOrganization.distinct.pluck(:person_id)
+  unlinked_person_ids.shuffle(random: rng).each do |person_id|
+    link_person_to_organization(
+      person_id: person_id,
+      organization_id: all_organization_ids.sample(random: rng),
+      report: synthetic_report,
+      types: po_type_pool,
+      rng: rng
+    )
+  end
+
+  # Recomputed after the pass above, which may itself have covered some
+  # organizations.
+  unlinked_organization_ids = all_organization_ids - PersonOrganization.distinct.pluck(:organization_id)
+  unlinked_organization_ids.shuffle(random: rng).each do |organization_id|
+    link_person_to_organization(
+      person_id: all_person_ids.sample(random: rng),
+      organization_id: organization_id,
+      report: synthetic_report,
+      types: po_type_pool,
+      rng: rng
+    )
+  end
+end
+
+# ---------------------------------------------------------------------------
 # Parts: tier 1 + Part↔Organization + Part↔Part composition.
 # ---------------------------------------------------------------------------
 

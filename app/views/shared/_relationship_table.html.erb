@@ -1,0 +1,45 @@
+<%#
+  One relationship table. Every relationship a tier 1 entity has — to a person,
+  an organization, a part — renders the same four columns: the entity on the
+  other end, the types carried by the relationship's current detail, when that
+  detail is effective, and a link to the relationship record itself.
+
+  The heading always renders, including with no rows. A person with no recorded
+  employer and a page that does not show employers are different facts, and the
+  empty message is what tells them apart.
+
+  Locals:
+    title            heading for the section
+    column_header    label for the first column (the other entity)
+    empty_message    shown in place of the table when rows are empty
+    rows             array of hashes: :name, :record, :types, :as_of, :relationship_path
+%>
+<h2><%= title %></h2>
+
+<% if rows.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th><%= column_header %></th>
+        <th>Types</th>
+        <th>As of</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.each do |row| %>
+        <tr>
+          <td><%= link_to row[:name], row[:record] %></td>
+          <td><%= row[:types].presence || "—" %></td>
+          <td><%= row[:as_of]&.to_date %></td>
+          <td>
+            <%= link_to "Relationship", row[:relationship_path],
+                        class: "btn btn-sm btn-outline-primary" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="text-muted"><%= empty_message %></p>
+<% end %>

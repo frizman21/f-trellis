@@ -67,84 +67,55 @@
 <% end %>
 
 <% people_links = @organization.person_organizations.includes(:person, current_detail: :person_organization_types) %>
-<% if people_links.any? %>
-  <h2>People</h2>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Person</th>
-        <th>Types</th>
-        <th>As of</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% people_links.each do |po| %>
-        <% person_detail = po.person.current_detail %>
-        <% rel_detail = po.current_detail %>
-        <tr>
-          <td>
-            <%= link_to (person_detail ? "#{person_detail.first_name} #{person_detail.last_name}" : "Person ##{po.person_id}"), po.person %>
-          </td>
-          <td><%= rel_detail&.person_organization_types&.map(&:name)&.join(", ") %></td>
-          <td><%= rel_detail&.as_of&.to_date %></td>
-          <td><%= link_to "Relationship", person_organization_path(po), class: "btn btn-sm btn-outline-primary" %></td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-<% end %>
+<%= render "shared/relationship_table",
+      title: "People",
+      column_header: "Person",
+      empty_message: "No people recorded for this organization.",
+      rows: people_links.map { |po|
+        person_detail = po.person.current_detail
+        rel_detail = po.current_detail
+        {
+          name: person_detail ? "#{person_detail.first_name} #{person_detail.last_name}" : "Person ##{po.person_id}",
+          record: po.person,
+          types: rel_detail&.person_organization_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: person_organization_path(po)
+        }
+      } %>
 
 <% org_relationships = @organization.organization_organizations.includes(:organization_a, :organization_b, current_detail: :organization_organization_types) %>
-<% if org_relationships.any? %>
-  <h2>Related organizations</h2>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Organization</th>
-        <th>Types</th>
-        <th>As of</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% org_relationships.each do |oo| %>
-        <% other = oo.other_organization(@organization) %>
-        <% other_detail = other&.current_detail %>
-        <% rel_detail = oo.current_detail %>
-        <tr>
-          <td>
-            <%= link_to (other_detail ? other_detail.name : "Organization ##{other&.id}"), other %>
-          </td>
-          <td><%= rel_detail&.organization_organization_types&.map(&:name)&.join(", ") %></td>
-          <td><%= rel_detail&.as_of&.to_date %></td>
-          <td><%= link_to "Relationship", organization_organization_path(oo), class: "btn btn-sm btn-outline-primary" %></td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-<% end %>
+<%= render "shared/relationship_table",
+      title: "Related organizations",
+      column_header: "Organization",
+      empty_message: "No relationships to other organizations recorded for this organization.",
+      rows: org_relationships.map { |oo|
+        other = oo.other_organization(@organization)
+        other_detail = other&.current_detail
+        rel_detail = oo.current_detail
+        {
+          name: other_detail ? other_detail.name : "Organization ##{other&.id}",
+          record: other,
+          types: rel_detail&.organization_organization_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: organization_organization_path(oo)
+        }
+      } %>
 
 <% part_links = @organization.part_organizations.includes(:part, current_detail: :part_organization_types) %>
-<% if part_links.any? %>
-  <h2>Parts</h2>
-  <table class="table">
-    <thead>
-      <tr><th>Part</th><th>Types</th><th>As of</th><th></th></tr>
-    </thead>
-    <tbody>
-      <% part_links.each do |po| %>
-        <% part_detail = po.part.current_detail %>
-        <% rel_detail = po.current_detail %>
-        <tr>
-          <td><%= link_to (part_detail ? part_detail.name : "Part ##{po.part_id}"), po.part %></td>
-          <td><%= rel_detail&.part_organization_types&.map(&:name)&.join(", ") %></td>
-          <td><%= rel_detail&.as_of&.to_date %></td>
-          <td><%= link_to "Relationship", part_organization_path(po), class: "btn btn-sm btn-outline-primary" %></td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-<% end %>
+<%= render "shared/relationship_table",
+      title: "Parts",
+      column_header: "Part",
+      empty_message: "No parts recorded for this organization.",
+      rows: part_links.map { |po|
+        part_detail = po.part.current_detail
+        rel_detail = po.current_detail
+        {
+          name: part_detail ? part_detail.name : "Part ##{po.part_id}",
+          record: po.part,
+          types: rel_detail&.part_organization_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: part_organization_path(po)
+        }
+      } %>
 
 <p><%= link_to "Back to organizations", organizations_path %></p>
