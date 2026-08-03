@@ -36,4 +36,25 @@ class ApplicationHelperTest < ActionView::TestCase
   test "model_dropdown_label falls back to the bare model id without pricing" do
     assert_equal "gpt-test", model_dropdown_label(model(nil))
   end
+
+  test "running_version_badge links the short sha to the commit" do
+    badge = running_version_badge(short: "012345", commit_url: "https://example.com/commit/0123456789")
+
+    assert_dom_equal(
+      %(<a class="text-white-50 small font-monospace text-decoration-none me-3" ) +
+        %(title="Running commit — open on GitHub" href="https://example.com/commit/0123456789">012345</a>),
+      badge
+    )
+  end
+
+  test "running_version_badge says so when the commit is unknown" do
+    badge = running_version_badge(short: nil, commit_url: nil)
+
+    assert_includes badge, "version unknown"
+    assert_not_includes badge, "<a"
+  end
+
+  test "running_version_badge treats a blank sha as unknown" do
+    assert_includes running_version_badge(short: "", commit_url: nil), "version unknown"
+  end
 end

@@ -31,6 +31,10 @@
       <div class="container-fluid">
         <a class="navbar-brand" href="/">F-DoD</a>
         <div class="d-flex align-items-center">
+          <%# Which commit is running. Pushes to main deploy themselves, so this
+              is how you tell whether yours has landed yet. %>
+          <%= running_version_badge %>
+
           <% if user_signed_in? %>
             <span class="text-light small me-3"><%= current_user.email %></span>
             <%= button_to "Sign out", destroy_user_session_path, method: :delete, class: "btn btn-sm btn-outline-light", form: { class: "m-0" } %>
