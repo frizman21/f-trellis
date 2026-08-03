@@ -6,7 +6,7 @@ begins. A change request states what changes, why, how it will be implemented, a
 how it will be tested.
 
 Canonical rule, applies to every repo:
-https://gist.github.com/frizman21/8999e3d47a9ee9f40a0ceda4f20be8f9
+https://gist.githubusercontent.com/frizman21/8999e3d47a9ee9f40a0ceda4f20be8f9/raw/19600ec1b432ae86a5c85c3899831557a5b7e90e/gistfile1.txt
 
 Read it before starting work on an issue and before opening a PR.
 
