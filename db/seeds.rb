@@ -4,6 +4,13 @@ if Rails.env.local?
   User.find_or_create_by!(email: "admin@example.com") do |user|
     user.password = "Password1"
   end
+
+  # A read-only counterpart, so the restriction can be exercised by signing in
+  # as it rather than only in the test suite. Reads everything, writes nothing.
+  User.find_or_create_by!(email: "readonly@example.com") do |user|
+    user.password = "Password1"
+    user.read_only = true
+  end
 end
 
 skills = [

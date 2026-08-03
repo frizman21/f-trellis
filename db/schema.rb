@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_02_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_03_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -592,9 +592,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_02_130000) do
   create_table "skill_revisions", force: :cascade do |t|
     t.string "content"
     t.datetime "created_at", null: false
+    t.bigint "model_id"
     t.integer "sequence", default: 0, null: false
     t.bigint "skill_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["model_id"], name: "index_skill_revisions_on_model_id"
     t.index ["skill_id", "sequence"], name: "index_skill_revisions_on_skill_id_and_sequence", unique: true
     t.index ["skill_id"], name: "index_skill_revisions_on_skill_id"
   end
@@ -703,6 +705,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_02_130000) do
     t.datetime "created_at", null: false
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
+    t.boolean "read_only", default: false, null: false
     t.datetime "remember_created_at"
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"
@@ -787,6 +790,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_02_130000) do
   add_foreign_key "skill_evaluations", "learning_sets"
   add_foreign_key "skill_evaluations", "models", column: "base_model_id"
   add_foreign_key "skill_evaluations", "skills"
+  add_foreign_key "skill_revisions", "models"
   add_foreign_key "skill_revisions", "skills"
   add_foreign_key "skills", "models", column: "preferred_model_id"
   add_foreign_key "source_data", "sources"
