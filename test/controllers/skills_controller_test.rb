@@ -190,6 +190,117 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_select "td code", text: 'linkedin\.com/in/'
   end
 
+  # --- revisions record the model, and are minted only on a change ---------
+
+  def a_model(model_id)
+    Model.create!(provider: "openai", model_id: model_id, name: model_id, last_seen_at: Time.current)
+  end
+
+  # Puts the skill in the shape the edit form submits from: one revision whose
+  # content and model match what is currently on the skill.
+  def settle(skill, content: "Do it.", model: nil)
+    skill.update!(preferred_model: model)
+    skill.skill_revisions.destroy_all
+    skill.skill_revisions.create!(content: content, model: model)
+    skill
+  end
+
+  test "changing only the preferred model adds a revision recording it" do
+    old_model = a_model("gpt-old")
+    new_model = a_model("gpt-new")
+    settle(@skill, model: old_model)
+
+    assert_difference "@skill.skill_revisions.count", 1 do
+      patch skill_path(@skill), params: {
+        skill: { name: @skill.name, preferred_model_id: new_model.id, revision_content: "Do it." }
+      }
+    end
+
+    revision = @skill.reload.current_revision
+    assert_equal new_model, revision.model
+    assert_equal "Do it.", revision.content
+  end
+
+  test "changing only the content adds a revision carrying the current model" do
+    model = a_model("gpt-steady")
+    settle(@skill, model: model)
+
+    assert_difference "@skill.skill_revisions.count", 1 do
+      patch skill_path(@skill), params: {
+        skill: { name: @skill.name, preferred_model_id: model.id, revision_content: "Do it differently." }
+      }
+    end
+
+    revision = @skill.reload.current_revision
+    assert_equal model, revision.model
+    assert_equal "Do it differently.", revision.content
+  end
+
+  test "saving with neither the wording nor the model changed adds no revision" do
+    model = a_model("gpt-unchanged")
+    settle(@skill, model: model)
+
+    assert_no_difference "@skill.skill_revisions.count" do
+      patch skill_path(@skill), params: {
+        skill: { name: @skill.name, preferred_model_id: model.id, revision_content: "Do it." }
+      }
+    end
+
+    assert_match "no revision added", flash[:notice]
+  end
+
+  test "a save that adds no revision still persists the skill's own attributes" do
+    model = a_model("gpt-attrs")
+    settle(@skill, model: model)
+
+    assert_no_difference "@skill.skill_revisions.count" do
+      patch skill_path(@skill), params: {
+        skill: {
+          name: @skill.name,
+          applicability: "Only widget pages.",
+          url_patterns_text: 'widgets\.example\.com',
+          preferred_model_id: model.id,
+          revision_content: "Do it."
+        }
+      }
+    end
+
+    @skill.reload
+    assert_equal "Only widget pages.", @skill.applicability
+    assert_equal [ 'widgets\.example\.com' ], @skill.url_patterns
+  end
+
+  test "creating a skill records the model on its first revision" do
+    model = a_model("gpt-first")
+
+    post skills_path, params: {
+      skill: { name: "Brand New", applicability: "Pages.", preferred_model_id: model.id,
+               revision_content: "Do it." }
+    }
+
+    revision = Skill.find_by(name: "Brand New").current_revision
+    assert_equal model, revision.model
+    assert_equal "Do it.", revision.content
+  end
+
+  test "show renders the model of each revision" do
+    settle(@skill, model: a_model("gpt-shown"))
+
+    get skill_path(@skill)
+
+    assert_response :success
+    assert_match "gpt-shown", @response.body
+  end
+
+  test "show says so for a revision with no model recorded" do
+    settle(@skill, model: nil)
+
+    get skill_path(@skill)
+
+    assert_response :success
+    assert_match "not recorded", @response.body
+  end
+
   test "show requires authentication" do
     sign_out users(:admin)
 

@@ -8,7 +8,9 @@ class SkillsController < ApplicationController
 
   def show
     @skill = Skill.find(params[:id])
-    @revisions = @skill.skill_revisions.order(created_at: :desc)
+    # Ordered by sequence, matching Skill#current_revision — created_at can
+    # disagree, and sequence is what the unique index and the pointer use.
+    @revisions = @skill.skill_revisions.includes(:model).order(sequence: :desc)
     @current_revision = @revisions.first
   end
 
@@ -24,7 +26,7 @@ class SkillsController < ApplicationController
 
     Skill.transaction do
       @skill.save!
-      @skill.skill_revisions.create!(content: @revision_content)
+      @skill.skill_revisions.create!(content: @revision_content, model: @skill.preferred_model)
     end
 
     redirect_to skill_path(@skill), notice: "Skill ##{@skill.id} created with initial revision."
@@ -43,12 +45,28 @@ class SkillsController < ApplicationController
     @skill = Skill.find(params[:id])
     @revision_content = revision_content_param
 
+    minted = false
+
     Skill.transaction do
       @skill.update!(skill_params)
-      @skill.skill_revisions.create!(content: @revision_content)
+
+      # A revision records a change to what runs — the wording or the model.
+      # Saving the form without touching either edits the skill's own
+      # attributes and mints nothing, so the revision list stays a history of
+      # changes rather than a log of visits to this page.
+      if @skill.revision_changed?(content: @revision_content, model: @skill.preferred_model)
+        @skill.skill_revisions.create!(content: @revision_content, model: @skill.preferred_model)
+        minted = true
+      end
     end
 
-    redirect_to skill_path(@skill), notice: "Skill ##{@skill.id} updated; new revision added."
+    notice = if minted
+      "Skill ##{@skill.id} updated; new revision added."
+    else
+      "Skill ##{@skill.id} updated; no revision added (wording and model unchanged)."
+    end
+
+    redirect_to skill_path(@skill), notice: notice
   rescue ActiveRecord::RecordInvalid
     load_models
     render :edit, status: :unprocessable_entity
