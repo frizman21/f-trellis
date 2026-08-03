@@ -511,6 +511,13 @@ end
   "https://skydio.com/x10"
 ].each { |url| part_spec_learning_set.add_url(url) }
 
+# The triage configuration page reads a singleton row, created on first read.
+# Seeding it means the page renders a saved record rather than creating one on
+# the first visit. Left with both fields blank on purpose: a seeded prompt or a
+# seeded model would look like a decision someone made, and the page's whole
+# point is showing which of the two are still defaults.
+TriageConfiguration.current.save!
+
 # An example skill evaluation over that set, so the list, the configuration form
 # and the result detail page all have something to show without spending money
 # on a real run. Skipped entirely when no models have been refreshed yet — the

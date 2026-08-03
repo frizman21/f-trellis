@@ -32,6 +32,7 @@
       against this page and recommended <strong><%= @result.recommended.size %></strong>.
       Running all of them without triage would have cost
       <%= pluralize(@result.verdicts.size, "call") %>.
+      <%= link_to "What was sent", triage_configuration_path %>.
     </p>
   <% end %>
 

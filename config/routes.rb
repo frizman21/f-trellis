@@ -50,6 +50,8 @@ Rails.application.routes.draw do
   resources :source_exclusions, only: [:index, :new, :create, :edit, :update, :destroy]
   resources :research_starting_points
   resources :skills, only: [:index, :show, :new, :create, :edit, :update]
+  # Singular: one triage step, one configuration.
+  resource :triage_configuration, only: [:show, :update]
   resources :skill_revisions, only: [:show]
   resources :skill_evaluations, only: [:index, :show, :new, :create, :edit, :update] do
     member do

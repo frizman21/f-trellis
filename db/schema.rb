@@ -691,6 +691,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_02_120000) do
     t.index ["tool_call_id"], name: "index_tool_calls_on_tool_call_id", unique: true
   end
 
+  create_table "triage_configurations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "instructions"
+    t.bigint "model_id"
+    t.datetime "updated_at", null: false
+    t.index ["model_id"], name: "index_triage_configurations_on_model_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", default: "", null: false
@@ -791,4 +799,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_02_120000) do
   add_foreign_key "sources", "domains"
   add_foreign_key "sources", "sources", column: "parent_source_id", on_delete: :nullify
   add_foreign_key "tool_calls", "messages"
+  add_foreign_key "triage_configurations", "models"
 end
