@@ -1,5 +1,15 @@
 # Claude Configuration
 
+## Change Requests
+All work must be defined in a change request (a GitHub Issue) before implementation
+begins. A change request states what changes, why, how it will be implemented, and
+how it will be tested.
+
+Canonical rule, applies to every repo:
+https://gist.github.com/frizman21/8999e3d47a9ee9f40a0ceda4f20be8f9
+
+Read it before starting work on an issue and before opening a PR.
+
 ## Data Model
 See `docs/data-model-spec.md` for the repeating shape used by tier 1 entities
 and their relationships (entity + versioned, confidence-scored detail record).
