@@ -155,6 +155,42 @@ class SourceDataControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Could not unzip/, response.body)
   end
 
+  test "extract_links creates nothing for an excluded link and reports it" do
+    SourceExclusion.create!(pattern: "https://elsewhere.example.org/item?id=*")
+
+    datum = zipped_datum(<<~HTML)
+      <html><body>
+        <a href="/about">kept</a>
+        <a href="https://elsewhere.example.org/item?id=7">excluded</a>
+      </body></html>
+    HTML
+
+    assert_difference "Source.count", 1 do
+      post extract_links_source_datum_path(datum)
+    end
+
+    assert_response :success
+    assert_not Source.exists?(url: "https://elsewhere.example.org/item?id=7")
+    assert_match(/Excluded \(1\)/, response.body)
+  end
+
+  test "extract_links records no edge to an excluded link that is already a source" do
+    Source.create!(url: "https://elsewhere.example.org/item?id=7")
+    SourceExclusion.create!(pattern: "https://elsewhere.example.org/item?id=*")
+
+    datum = zipped_datum(<<~HTML)
+      <html><body>
+        <a href="https://elsewhere.example.org/item?id=7">excluded</a>
+      </body></html>
+    HTML
+
+    assert_no_difference "SourceLink.count" do
+      post extract_links_source_datum_path(datum)
+    end
+
+    assert_response :success
+  end
+
   test "source show page offers an Extract links button for each datum" do
     datum = zipped_datum("<html><body></body></html>")
 

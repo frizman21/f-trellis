@@ -105,6 +105,46 @@ page's identity in this app is its URL; a second row for the same page would
 split its fetched content and its processing history in two. Adding a page the
 set already has is a reported no-op, not an error.
 
+### `SourceExclusion` (table: `source_exclusions`)
+
+A URL pattern that link extraction refuses to turn into a `Source`. Standalone
+reference data — it has no association with `Source` at all, because a rule
+about pages the system should *not* hold cannot be stored on the rows it
+prevents from existing.
+
+| Column        | Type     | Notes                                          |
+|---------------|----------|------------------------------------------------|
+| `pattern`     | `string`, NOT NULL, unique | Absolute URL, `*` for any run of characters. |
+| `description` | `text`   | Why these pages are not worth holding.         |
+| `is_enabled`  | `boolean`, NOT NULL, default `true` | A disabled rule is kept but not applied. |
+| `created_at` / `updated_at` | `datetime` | Standard timestamps.       |
+
+`pattern` is normalized on save by `Source.normalize_url` — the same treatment
+a source's URL gets, filling in a missing scheme and dropping a `#fragment`.
+This is not cosmetic: links are matched in normalized form, so a pattern that
+kept its fragment would match nothing. A pattern that does not resolve to a URL
+is rejected.
+
+Matching is a full-string glob, anchored at both ends and case-insensitive:
+`*` stands for any run of characters and everything else is literal. So
+`https://news.ycombinator.com/item?id=*` excludes every comment page and leaves
+the front page alone. A pattern is written as an absolute URL and still catches
+the relative hrefs on that host, because `LinkExtractor` resolves every href
+against the page it was found on **before** exclusions are applied.
+
+Enforcement is at one point: `SourceDatum#extract_links`. Both callers —
+`CrawlJob` and the "Extract links" action — go through it, so there is no path
+to the unfiltered list, and an excluded URL is neither created as a source nor
+recorded as a `SourceLink` edge. The filtered result carries the rejected URLs
+in `LinkExtractor::Result#excluded` rather than dropping them silently, which is
+what the "Extract links" page reports.
+
+Deliberately **not** applied to `Source.for_url`, so entering a URL by hand or
+adding one to a learning set still works. Exclusions filter what a page
+proposes, not what a person asks for. They are also not retroactive: sources
+that already exist stay, which is why the index shows how many of them each
+pattern covers.
+
 ---
 
 ## 2. Skill family
@@ -251,6 +291,8 @@ Source ─┬─< SourceDatum
         ├─< SourceLink >─ Source   (from_source / to_source)
         ├─< LearningSetSource >─ LearningSet
         └─< SkillEvaluationResult >─ SkillEvaluation
+
+SourceExclusion              (standalone — consulted when links become Sources)
 
 SkillEvaluation ─┬─ Skill
                  ├─ LearningSet

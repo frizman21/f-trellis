@@ -1,0 +1,48 @@
+<%= form_with model: @source_exclusion, local: true do |f| %>
+  <% if @source_exclusion.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% @source_exclusion.errors.full_messages.each do |m| %>
+          <li><%= m %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :pattern, class: "form-label" %>
+    <%= f.text_field :pattern,
+                     class: "form-control font-monospace",
+                     required: true,
+                     placeholder: "https://news.ycombinator.com/item?id=*" %>
+    <div class="form-text">
+      An absolute URL. <code>*</code> stands for any run of characters, and the
+      rest is matched literally, end to end — so
+      <code>https://news.ycombinator.com/item?id=*</code> excludes every comment
+      page while leaving the front page alone. Matching ignores case.
+      <br>
+      Write the pattern with its host even though the links on a page usually
+      omit theirs: an <code>href="/item?id=1"</code> is resolved against the page
+      it was found on before it is matched.
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :description, "Reason", class: "form-label" %>
+    <%= f.text_area :description, class: "form-control", rows: 3,
+                    placeholder: "Comment threads — no organizations or parts worth extracting." %>
+    <div class="form-text">
+      Why these pages are not worth holding. The next person to look at the list
+      cannot recover this from the pattern.
+    </div>
+  </div>
+
+  <div class="mb-3 form-check">
+    <%= f.check_box :is_enabled, class: "form-check-input" %>
+    <%= f.label :is_enabled, "Enabled", class: "form-check-label" %>
+    <div class="form-text">A disabled pattern is kept but not applied.</div>
+  </div>
+
+  <%= f.submit class: "btn btn-primary" %>
+  <%= link_to "Cancel", source_exclusions_path, class: "btn btn-outline-secondary" %>
+<% end %>
