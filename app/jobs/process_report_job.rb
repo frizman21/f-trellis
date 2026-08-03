@@ -22,7 +22,10 @@ class ProcessReportJob < ApplicationJob
       UpsertOrganizationTool.new(report),
       UpsertPartTool.new(report),
       LinkPersonOrganizationTool.new(report),
-      LinkOrganizationOrganizationTool.new(report)
+      LinkPersonPersonTool.new(report),
+      LinkOrganizationOrganizationTool.new(report),
+      CreatePersonOrganizationTypeTool.new(report),
+      CreatePersonPersonTypeTool.new(report)
     )
     chat.ask(source_text)
 

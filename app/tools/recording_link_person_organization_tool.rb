@@ -22,12 +22,17 @@ class RecordingLinkPersonOrganizationTool < RubyLLM::Tool
     type_name = type.to_s.strip
     return { error: "type is required" } if type_name.empty?
 
+    # Configured already, or minted by `create_person_organization_type` earlier
+    # in this run — the writing run would have created that type for real, so
+    # refusing the link here would fail a model for a sequence that works.
     relationship_type = PersonOrganizationType.find_by(name: type_name)
-    return { error: "PersonOrganizationType '#{type_name}' is not configured" } unless relationship_type
+    unless relationship_type || @recorder.minted_relationship_type?(:person_organization, type_name)
+      return { error: "PersonOrganizationType '#{type_name}' is not configured" }
+    end
 
     edge_id = @recorder.record_person_organization(
       person_id: person_id, organization_id: organization_id,
-      relationship_type: relationship_type.name, attributes: additional_attributes
+      relationship_type: relationship_type&.name || type_name, attributes: additional_attributes
     )
 
     {
@@ -35,7 +40,7 @@ class RecordingLinkPersonOrganizationTool < RubyLLM::Tool
       detail_id: @recorder.next_detail_id,
       person_id: person_id,
       organization_id: organization_id,
-      type: relationship_type.name
+      type: relationship_type&.name || type_name
     }
   end
 end

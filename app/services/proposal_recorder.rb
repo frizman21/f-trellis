@@ -83,6 +83,19 @@ class ProposalRecorder
     next_id(:person_organization)
   end
 
+  def record_person_person(person_a_id:, person_b_id:, relationship_type:, attributes: nil)
+    # Keyed on the unordered pair, exactly as the writing tool keys the edge:
+    # proposing A–B and proposing B–A is the same contribution.
+    pair = [ label_for(:person, person_a_id), label_for(:person, person_b_id) ].sort
+
+    add("person_person",
+        "people" => pair,
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:person_person)
+  end
+
   def record_organization_organization(organization_a_id:, organization_b_id:, relationship_type:, attributes: nil)
     # The writing tool keys the edge on the unordered pair, so the record does
     # too: proposing A–B and proposing B–A are the same contribution.
@@ -94,6 +107,24 @@ class ProposalRecorder
         "attributes" => normalize_attributes(attributes))
 
     next_id(:organization_organization)
+  end
+
+  # Vocabulary a run proposed, via the recording stand-ins for the type-creating
+  # tools. Deliberately *not* a proposal: naming "Mentorship" is not a
+  # contribution to the knowledge base, and counting it as one would let a model
+  # out-rank another by inventing names rather than by reading the page. What a
+  # new type is worth shows up in whether the run then used it — and the link
+  # proposal records that, against the name.
+  def record_relationship_type(kind, name:)
+    identify(:"#{kind}_type", normalize(name))
+  end
+
+  # True for a type name this run minted. The recording link tools accept those
+  # alongside the configured ones: in a real run the type would have been created
+  # for real a moment earlier, so refusing the link here would fail a model for
+  # something the writing run allows.
+  def minted_relationship_type?(kind, name)
+    @labels[:"#{kind}_type"].value?(normalize(name))
   end
 
   # The name behind a synthetic id, or nil for one this run never issued. The

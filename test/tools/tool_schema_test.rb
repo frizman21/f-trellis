@@ -72,9 +72,30 @@ class ToolSchemaTest < ActiveSupport::TestCase
     assert_equal %w[parameter value], specs[:items][:required].map(&:to_s).sort
   end
 
+  TYPE_TOOLS = {
+    CreatePersonOrganizationTypeTool => "person_organization_type_id",
+    CreatePersonPersonTypeTool => "person_person_type_id"
+  }.freeze
+
+  TYPE_TOOLS.each_key do |klass|
+    test "#{klass} compiles to a valid schema" do
+      assert_nothing_raised { schema_for(klass) }
+    end
+
+    test "#{klass} requires a name and a description, and takes plain string attribute keys" do
+      schema = schema_for(klass)
+
+      assert_equal %w[description name], schema.required_properties.map(&:to_s).sort
+      assert_equal "array", schema.properties[:additional_attribute_keys][:type]
+      assert_equal "string", schema.properties[:additional_attribute_keys][:items][:type]
+    end
+  end
+
   test "tools expose the names the model calls" do
     assert_equal "upsert_organization", UpsertOrganizationTool.new(nil).name
     assert_equal "upsert_person", UpsertPersonTool.new(nil).name
     assert_equal "upsert_part", UpsertPartTool.new(nil).name
+    assert_equal "create_person_organization_type", CreatePersonOrganizationTypeTool.new(nil).name
+    assert_equal "create_person_person_type", CreatePersonPersonTypeTool.new(nil).name
   end
 end

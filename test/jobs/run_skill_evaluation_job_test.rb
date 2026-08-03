@@ -107,12 +107,16 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
                            "OrganizationDetail.count", "Part.count", "PartDetail.count",
                            "PartDetailParameter.count", "PersonOrganization.count",
                            "OrganizationOrganization.count", "PersonOrganizationDetail.count",
-                           "OrganizationOrganizationDetail.count" ] do
+                           "OrganizationOrganizationDetail.count",
+                           "PersonPerson.count", "PersonPersonDetail.count",
+                           "PersonOrganizationType.count", "PersonPersonType.count" ] do
       with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
     end
 
     assert_equal [ RecordingUpsertPersonTool, RecordingUpsertOrganizationTool, RecordingUpsertPartTool,
-                   RecordingLinkPersonOrganizationTool, RecordingLinkOrganizationOrganizationTool ],
+                   RecordingLinkPersonOrganizationTool, RecordingLinkPersonPersonTool,
+                   RecordingLinkOrganizationOrganizationTool,
+                   RecordingCreatePersonOrganizationTypeTool, RecordingCreatePersonPersonTypeTool ],
                  Recorder.tools.map(&:class)
   end
 
@@ -123,7 +127,10 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
       [ RecordingUpsertOrganizationTool, UpsertOrganizationTool ],
       [ RecordingUpsertPartTool, UpsertPartTool ],
       [ RecordingLinkPersonOrganizationTool, LinkPersonOrganizationTool ],
-      [ RecordingLinkOrganizationOrganizationTool, LinkOrganizationOrganizationTool ] ].each do |recording, writing|
+      [ RecordingLinkPersonPersonTool, LinkPersonPersonTool ],
+      [ RecordingLinkOrganizationOrganizationTool, LinkOrganizationOrganizationTool ],
+      [ RecordingCreatePersonOrganizationTypeTool, CreatePersonOrganizationTypeTool ],
+      [ RecordingCreatePersonPersonTypeTool, CreatePersonPersonTypeTool ] ].each do |recording, writing|
       stand_in = recording.new(ProposalRecorder.new)
       real = writing.new(nil)
 

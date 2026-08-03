@@ -99,6 +99,7 @@ module SkillEvaluationsHelper
     when "person" then [ record["first_name"], record["last_name"] ].compact_blank.join(" ")
     when "organization" then [ record["name"], record["acronym"].presence&.then { |a| "(#{a})" } ].compact.join(" ")
     when "person_organization" then "#{record['person']} → #{record['organization']}"
+    when "person_person" then Array(record["people"]).join(" ↔ ")
     when "organization_organization" then Array(record["organizations"]).join(" ↔ ")
     else record.except("type").values.join(" ")
     end
