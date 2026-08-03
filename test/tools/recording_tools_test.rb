@@ -9,6 +9,7 @@ class RecordingToolsTest < ActiveSupport::TestCase
     "Person.count", "Organization.count", "PersonDetail.count", "OrganizationDetail.count",
     "Part.count", "PartDetail.count", "PartDetailParameter.count",
     "PersonOrganization.count", "PersonOrganizationDetail.count",
+    "PersonPerson.count", "PersonPersonDetail.count",
     "OrganizationOrganization.count", "OrganizationOrganizationDetail.count"
   ].freeze
 
@@ -22,8 +23,16 @@ class RecordingToolsTest < ActiveSupport::TestCase
     @person_org = RecordingLinkPersonOrganizationTool.new(@recorder)
     @org_org = RecordingLinkOrganizationOrganizationTool.new(@recorder)
     @parts = RecordingUpsertPartTool.new(@recorder)
+    @person_person = RecordingLinkPersonPersonTool.new(@recorder)
     @employment = PersonOrganizationType.find_or_create_by!(name: "Employment")
     @partnership = OrganizationOrganizationType.find_or_create_by!(name: "Partnership")
+    @founder = PersonPersonType.find_or_create_by!(name: "Co-Founder")
+  end
+
+  def two_people
+    @people.execute(people: [ { first_name: "Ada", last_name: "Lovelace" },
+                              { first_name: "Alan", last_name: "Turing" } ])[:results]
+           .map { |r| r[:person_id] }
   end
 
   test "a whole batch is captured and nothing is written" do
@@ -61,6 +70,59 @@ class RecordingToolsTest < ActiveSupport::TestCase
 
     link = @recorder.proposals.detect { |p| p["type"] == "organization_organization" }
     assert_equal [ "alpha", "zeta" ], link["organizations"]
+  end
+
+  # A person-to-person edge is keyed on the unordered pair too, so proposing
+  # A–B and proposing B–A is the same contribution.
+  test "a person link records the pair in a stable order and writes nothing" do
+    ada, alan = two_people
+
+    assert_no_difference ENTITY_TABLES do
+      @person_person.execute(person_a_id: alan, person_b_id: ada, type: "Co-Founder")
+    end
+
+    link = @recorder.proposals.detect { |p| p["type"] == "person_person" }
+    assert_equal [ "ada lovelace", "alan turing" ], link["people"]
+    assert_equal "co-founder", link["relationship_type"]
+  end
+
+  test "a person cannot be linked to themselves, exactly as the writing tool refuses it" do
+    ada, = two_people
+
+    result = @person_person.execute(person_a_id: ada, person_b_id: ada, type: "Co-Founder")
+
+    assert_match(/must be different/, result[:error])
+  end
+
+  test "a person link to an id this run never issued is refused" do
+    ada, = two_people
+
+    result = @person_person.execute(person_a_id: ada, person_b_id: 99, type: "Co-Founder")
+
+    assert_equal "no person #99", result[:error]
+  end
+
+  test "a person link can use a type minted earlier in the same run" do
+    RecordingCreatePersonPersonTypeTool.new(@recorder)
+      .execute(name: "Mentorship", description: "One person mentors another.")
+    ada, alan = two_people
+
+    assert_no_difference ENTITY_TABLES do
+      result = @person_person.execute(person_a_id: ada, person_b_id: alan, type: "Mentorship")
+
+      assert_nil result[:error]
+    end
+
+    link = @recorder.proposals.detect { |p| p["type"] == "person_person" }
+    assert_equal "mentorship", link["relationship_type"]
+  end
+
+  test "a person link to a type no one minted or configured is refused" do
+    ada, alan = two_people
+
+    result = @person_person.execute(person_a_id: ada, person_b_id: alan, type: "Nonsense")
+
+    assert_match(/PersonPersonType 'Nonsense' is not configured/, result[:error])
   end
 
   # A model reading the response decides what to do next from it, so an error
