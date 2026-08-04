@@ -1,13 +1,20 @@
 <%#
-  What each model would contribute, and where it contributes exactly what the
-  baseline already does. Locals: comparison (an EvaluationComparison).
+  How far each model agrees with the baseline, and how much it would contribute.
+  Locals: comparison (an EvaluationComparison).
 %>
-<h2 class="h4">Contribution</h2>
+<h2 class="h4">Agreement with the baseline</h2>
 
 <p class="text-muted small">
-  How much each run would add to the knowledge base: the count of distinct
-  entities and relationships it proposed. Volume, not accuracy — a model that
-  invents an organization counts it. Open a cell to see what it actually said.
+  The baseline defines correctness: every other model is scored by how far its
+  proposals line up with the baseline's on the <em>same page</em>. The count is
+  the contribution — distinct entities and relationships proposed — and the
+  fraction beneath it is how many of the baseline's the run also found.
+</p>
+
+<p class="text-muted small">
+  The baseline is a stand-in for truth, not truth. Where it missed something, a
+  model that found it is scored as having invented it — which is why this says
+  agreement rather than accuracy. Open a cell to see what the run actually said.
 </p>
 
 <h3 class="h6">Per page</h3>
@@ -45,6 +52,12 @@
                 <% if comparison.identical_to_base?(source, model) %>
                   <span class="badge bg-info text-dark" title="Proposed exactly what the baseline proposed">=</span>
                 <% end %>
+                <% if cell.agreement %>
+                  <div class="small text-muted"
+                       title="Agreed with <%= cell.agreement.agreed %> of the baseline's <%= cell.agreement.agreed + cell.agreement.missed %>, and proposed <%= cell.agreement.invented %> the baseline did not">
+                    <%= agreement_fraction(cell.agreement) %>
+                  </div>
+                <% end %>
               <% end %>
             </td>
           <% end %>
@@ -66,9 +79,13 @@
   <thead>
     <tr>
       <th>Model</th>
+      <th class="text-end">Agreement</th>
+      <th class="text-end">Recall</th>
+      <th class="text-end">Precision</th>
+      <th class="text-end">Agreed</th>
+      <th class="text-end">Missed</th>
+      <th class="text-end">Invented</th>
       <th class="text-end">Contribution</th>
-      <th class="text-end">Per page</th>
-      <th class="text-end">Not in baseline</th>
       <th class="text-end">Pages identical to baseline</th>
       <th class="text-end">Input $/Mtok</th>
     </tr>
@@ -82,9 +99,19 @@
             <span class="badge bg-light text-dark border">baseline</span>
           <% end %>
         </td>
-        <td class="text-end"><%= ranking.total %></td>
-        <td class="text-end"><%= number_with_precision(ranking.mean_per_page, precision: 1) %></td>
-        <td class="text-end"><%= ranking.baseline ? "—" : ranking.added_over_base %></td>
+        <% agreement = ranking.agreement %>
+        <td class="text-end fw-semibold">
+          <%= ranking.baseline ? content_tag(:span, "yardstick", class: "text-muted small") : agreement_percentage(agreement.f1) %>
+        </td>
+        <td class="text-end"><%= ranking.baseline ? "—" : agreement_percentage(agreement.recall) %></td>
+        <td class="text-end"><%= ranking.baseline ? "—" : agreement_percentage(agreement.precision) %></td>
+        <td class="text-end"><%= ranking.baseline ? "—" : agreement.agreed %></td>
+        <td class="text-end"><%= ranking.baseline ? "—" : agreement.missed %></td>
+        <td class="text-end"><%= ranking.baseline ? "—" : agreement.invented %></td>
+        <td class="text-end">
+          <%= ranking.total %>
+          <span class="text-muted small">(<%= number_with_precision(ranking.mean_per_page, precision: 1) %>/pg)</span>
+        </td>
         <td class="text-end">
           <%= ranking.baseline ? "—" : "#{ranking.pages_identical_to_base} of #{ranking.pages}" %>
         </td>
@@ -97,6 +124,17 @@
 </table>
 
 <p class="text-muted small">
-  Ranked by total contribution, ties broken by price ascending — two models
-  contributing the same amount are not equal if one costs twenty times the other.
+  Ranked by agreement, ties broken by price ascending — two models agreeing to
+  the same degree are not equal if one costs twenty times the other. Agreement is
+  the harmonic mean of recall and precision, so a run cannot score well by being
+  either indiscriminate or timid: <strong>recall</strong> is how much of what the
+  baseline found this run also found, <strong>precision</strong> is how much of
+  what it proposed the baseline backed up.
+</p>
+
+<p class="text-muted small">
+  Counts are summed across pages before the ratios are taken, so a sparse page
+  where the baseline found two things does not weigh as heavily as a dense one
+  where it found ninety. Pages the baseline did not complete are left out
+  entirely — there is no truth to score against there.
 </p>

@@ -545,7 +545,10 @@ TriageConfiguration.current.save!
 # and the result detail page all have something to show without spending money
 # on a real run. Skipped entirely when no models have been refreshed yet — the
 # registry is populated from the providers, not from seeds.
-evaluation_models = Model.selectable.first(2)
+# Four, so the seeded comparison can show a baseline plus the three ways a model
+# goes wrong against it: faithful, timid, and inventive. With fewer, the
+# agreement columns render one row and demonstrate nothing.
+evaluation_models = Model.selectable.first(4)
 evaluation_skill  = Skill.find_by(name: "Pull Organization Names")
 
 # A proposal in the shape ProposalRecorder normalises entries into.
@@ -581,15 +584,20 @@ if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
       completed_at: 1.minute.ago
     )
 
-    # The baseline and the second model propose overlapping-but-different sets,
-    # so the matrix has a cell to compare, the ranking has an order and the
-    # result page has a three-way split to render. Nothing here was proposed by
-    # a model — an evaluation records these through the recording stand-ins.
+    # Each model fails differently, so the agreement columns have all three
+    # shapes to render and the ranking has a reason to disagree with the
+    # contribution column. Nothing here was proposed by a model — an evaluation
+    # records these through the recording stand-ins.
+    baseline_proposals = [ seeded_org("nasa", "nasa"), seeded_org("example corp") ]
+
     result.record_proposals(
-      if index.zero?
-        [ seeded_org("nasa", "nasa"), seeded_org("example corp") ]
-      else
-        [ seeded_org("nasa", "nasa"), seeded_org("acme aerospace") ]
+      case index
+      when 0 then baseline_proposals                      # the baseline itself
+      when 1 then baseline_proposals                      # faithful: agrees completely
+      when 2 then [ seeded_org("nasa", "nasa") ]          # timid: precise, but stopped early
+      else                                                # inventive: finds everything, plus
+        baseline_proposals + [ seeded_org("acme aerospace"), seeded_org("globex"),
+                               seeded_org("initech") ]
       end
     )
     result.save!

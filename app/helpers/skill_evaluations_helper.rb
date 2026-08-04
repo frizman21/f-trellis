@@ -90,6 +90,22 @@ module SkillEvaluationsHelper
     format("%g", result.score)
   end
 
+  # A ratio as a percentage, or an em dash where it is undefined — a run with
+  # nothing to compare against must not read as 0%, which is a real and much
+  # worse result.
+  def agreement_percentage(ratio)
+    return content_tag(:span, "—", class: "text-muted", title: "Nothing to compare against") if ratio.nil?
+
+    "#{number_with_precision(ratio * 100, precision: 0)}%"
+  end
+
+  # "8/10" — what a run agreed on, out of what the baseline found on that page.
+  def agreement_fraction(agreement)
+    return nil if agreement.nil?
+
+    "#{agreement.agreed}/#{agreement.agreed + agreement.missed}"
+  end
+
   # One proposal as a line you can read: "organization — acme corp (ACME)".
   def proposal_line(record)
     record = record.stringify_keys

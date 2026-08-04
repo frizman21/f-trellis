@@ -184,6 +184,45 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     assert_match "Acme Corp", @response.body
   end
 
+  # --- agreement ----------------------------------------------------------
+
+  def org(name) = { "type" => "organization", "name" => name, "attributes" => {} }
+
+  def completed_run(evaluation, model, proposals)
+    result = SkillEvaluationResult.new(skill_evaluation: evaluation, source: @source, model: model,
+                                       skill_revision: @revision, status: "complete", response: "x")
+    result.record_proposals(proposals)
+    result.save!
+    result
+  end
+
+  test "show reports each model's agreement with the baseline" do
+    evaluation = evaluation_with
+    completed_run(evaluation, @fast, [ org("acme"), org("beta") ])
+    completed_run(evaluation, @slow, [ org("acme"), org("zeta") ])
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_select "th", text: "Agreement"
+    assert_select "th", text: "Recall"
+    assert_select "th", text: "Invented"
+    # Agreed on one of the baseline's two, and proposed one it did not.
+    assert_match "50%", @response.body
+  end
+
+  # The baseline is the only thing the numbers mean anything against, so the
+  # page has to hold up before it has run.
+  test "show renders when the baseline has not run on a page" do
+    evaluation = evaluation_with
+    completed_run(evaluation, @slow, [ org("acme") ])
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_select "th", text: "Agreement"
+  end
+
   # --- run status ---------------------------------------------------------
 
   test "index shows the run status and completed count" do
@@ -453,9 +492,12 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     get skill_evaluation_result_path(result)
 
     assert_response :success
-    assert_match "Shared with the baseline (1)", @response.body
-    assert_match "Added over the baseline (1)", @response.body
+    assert_match "Agreed with the baseline (1)", @response.body
+    assert_match "Invented — not in the baseline (1)", @response.body
     assert_match "Missed, that the baseline found (0)", @response.body
+    # Found everything the baseline did, and one thing it did not.
+    assert_match "recall 100%", @response.body
+    assert_match "precision 50%", @response.body
   end
 
   test "the result page says so when the baseline has not run on that page" do
