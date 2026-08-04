@@ -40,7 +40,25 @@ class Source < ApplicationRecord
     normalized = normalize_url(raw)
     return nil if normalized.blank?
 
-    find_by(url: normalized) || create!(url: normalized)
+    existing = find_by(url: normalized)
+    return existing if existing
+
+    create!(url: normalized).tap(&:queue_initial_fetch)
+  end
+
+  # Start the download for a page somebody deliberately asked for.
+  #
+  # Unforced on purpose: FetchSourceJob returns unless the status is still
+  # `new`, so a queued fetch can never clobber content a crawl or a manual
+  # re-fetch produced in the meantime.
+  #
+  # Called explicitly rather than from an `after_create` callback. A callback
+  # would fire on all four creation paths and two of them are wrong: CrawlJob
+  # fetches the children it creates with `perform_now`, so a callback would race
+  # its own crawl, and link extraction can create hundreds of rows from one
+  # click and would turn that click into hundreds of outbound requests.
+  def queue_initial_fetch
+    FetchSourceJob.perform_later(self)
   end
 
   # Tolerates what people actually paste: surrounding space, a missing scheme,

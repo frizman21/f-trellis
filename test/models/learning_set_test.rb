@@ -3,6 +3,8 @@ require "zip"
 require "stringio"
 
 class LearningSetTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
     @set = LearningSet.create!(name: "Exhibitor lists")
   end
@@ -33,12 +35,20 @@ class LearningSetTest < ActiveSupport::TestCase
     assert_match(/Added/, outcome.message)
   end
 
+  test "adding a new url queues its download" do
+    assert_enqueued_jobs 1, only: FetchSourceJob do
+      @set.add_url("https://learning.test/exhibitors")
+    end
+  end
+
   test "a url the app already knows is linked, not duplicated" do
     existing = Source.create!(url: "https://learning.test/exhibitors")
 
     outcome = nil
     assert_no_difference "Source.count" do
-      outcome = @set.add_url("https://learning.test/exhibitors")
+      assert_no_enqueued_jobs only: FetchSourceJob do
+        outcome = @set.add_url("https://learning.test/exhibitors")
+      end
     end
 
     assert outcome.added?

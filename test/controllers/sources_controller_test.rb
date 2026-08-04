@@ -153,6 +153,31 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # --- create -------------------------------------------------------------
+
+  # Unforced, unlike the manual button above: the job returns unless the status
+  # is still `new`, which is what keeps this from clobbering a crawl's content.
+  test "create enqueues an unforced fetch for the new source" do
+    assert_enqueued_jobs 1, only: FetchSourceJob do
+      post sources_path, params: { source: { url: "https://example.com/fresh" } }
+    end
+
+    source = Source.find_by(url: "https://example.com/fresh")
+    assert_not_nil source
+    assert_enqueued_with(job: FetchSourceJob, args: [ source ])
+    assert_redirected_to source_path(source)
+    follow_redirect!
+    assert_match(/fetch queued/i, response.body)
+  end
+
+  test "create with an unusable url re-renders and enqueues nothing" do
+    assert_no_enqueued_jobs only: FetchSourceJob do
+      post sources_path, params: { source: { url: "" } }
+    end
+
+    assert_response :unprocessable_entity
+  end
+
   # --- triage -------------------------------------------------------------
 
   def triage_source

@@ -58,6 +58,24 @@ class CrawlJobTest < ActiveJob::TestCase
     assert_not Source.exists?(url: "https://other.test/elsewhere")
   end
 
+  # A crawl fetches the children it creates itself, with perform_now. If the
+  # initial fetch ever moves to an after_create callback, every crawled page
+  # gets a second, racing download and this catches it.
+  test "a crawl queues no fetch for the sources it creates" do
+    seed = make_seed(
+      "https://stay.test/start",
+      '<a href="/internal">in</a>'
+    )
+
+    assert_no_enqueued_jobs only: FetchSourceJob do
+      with_fake_fetcher("https://stay.test/internal" => "<p>leaf</p>") do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+      end
+    end
+
+    assert Source.exists?(url: "https://stay.test/internal")
+  end
+
   test "follow-external-links includes external urls" do
     seed = make_seed(
       "https://follow.test/start",
