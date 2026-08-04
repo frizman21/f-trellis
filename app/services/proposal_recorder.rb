@@ -83,6 +83,16 @@ class ProposalRecorder
     next_id(:person_organization)
   end
 
+  def record_part_organization(part_id:, organization_id:, relationship_type:, attributes: nil)
+    add("part_organization",
+        "part" => label_for(:part, part_id),
+        "organization" => label_for(:organization, organization_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:part_organization)
+  end
+
   def record_person_person(person_a_id:, person_b_id:, relationship_type:, attributes: nil)
     # Keyed on the unordered pair, exactly as the writing tool keys the edge:
     # proposing A–B and proposing B–A is the same contribution.

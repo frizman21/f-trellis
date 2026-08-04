@@ -91,10 +91,52 @@ class ToolSchemaTest < ActiveSupport::TestCase
     end
   end
 
+  # The link tools declare parameters one at a time rather than through a schema
+  # block, so there is no block to compile — the equivalent check is that the
+  # declared parameters are the ones the tool reads, with the right types and
+  # the right ones optional.
+  LINK_PARAMS = %i[as_of additional_attributes confidence_tenths].freeze
+
+  [ LinkPartOrganizationTool, RecordingLinkPartOrganizationTool ].each do |klass|
+    test "#{klass} declares the part-to-organization parameters" do
+      params = klass.parameters
+
+      assert_equal %i[additional_attributes as_of confidence_tenths organization_id part_id type].sort,
+                   params.keys.sort
+      assert_equal "integer", params[:part_id].type.to_s
+      assert_equal "integer", params[:organization_id].type.to_s
+      assert_equal "string", params[:type].type.to_s
+    end
+
+    test "#{klass} requires the pair and the type, and nothing else" do
+      params = klass.parameters
+
+      assert_equal %i[organization_id part_id type], params.select { |_, p| p.required }.keys.sort
+      LINK_PARAMS.each { |name| assert_not params[name].required, "#{name} should be optional" }
+    end
+  end
+
+  # The stand-in an evaluation runs has to be indistinguishable from the writing
+  # tool, or the evaluation stops measuring what it claims to.
+  test "the recording part link presents the same contract as the writing one" do
+    written = LinkPartOrganizationTool.parameters
+    recorded = RecordingLinkPartOrganizationTool.parameters
+
+    assert_equal written.keys.sort, recorded.keys.sort
+    written.each do |name, param|
+      assert_equal param.type, recorded[name].type, "#{name} type differs"
+      assert_equal param.required, recorded[name].required, "#{name} requiredness differs"
+      assert_equal param.description, recorded[name].description, "#{name} description differs"
+    end
+    assert_equal LinkPartOrganizationTool.description, RecordingLinkPartOrganizationTool.description
+  end
+
   test "tools expose the names the model calls" do
     assert_equal "upsert_organization", UpsertOrganizationTool.new(nil).name
     assert_equal "upsert_person", UpsertPersonTool.new(nil).name
     assert_equal "upsert_part", UpsertPartTool.new(nil).name
+    assert_equal "link_part_organization", LinkPartOrganizationTool.new(nil).name
+    assert_equal "link_part_organization", RecordingLinkPartOrganizationTool.new(nil).name
     assert_equal "create_person_organization_type", CreatePersonOrganizationTypeTool.new(nil).name
     assert_equal "create_person_person_type", CreatePersonPersonTypeTool.new(nil).name
   end
