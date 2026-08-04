@@ -129,8 +129,12 @@ class SourcesController < ApplicationController
         next
       end
 
+      # The revision's model, not the skill's: a report runs a specific revision,
+      # so it should run the model that revision pins. Revisions written before
+      # the column carry none, and fall back to the skill.
       report = SourceProcessingReport.new(source: source, skill_revision: revision,
-                                          model: skill.preferred_model, status: "new", facts: [])
+                                          model: revision.model || skill.preferred_model,
+                                          status: "new", facts: [])
 
       if report.save
         ProcessReportJob.perform_later(report)

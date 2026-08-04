@@ -33,9 +33,13 @@ class SourceProcessingReportsController < ApplicationController
       return
     end
 
+    # An explicit pick on the form wins; otherwise the revision's own model, and
+    # the skill's only for revisions written before the column existed.
+    chosen_model_id = params.dig(:source_processing_report, :model_id).presence
+
     @report = SourceProcessingReport.new(
       source: source,
-      model_id: params.dig(:source_processing_report, :model_id),
+      model_id: chosen_model_id || revision.model_id || skill.preferred_model_id,
       skill_revision: revision,
       status: "new",
       facts: []

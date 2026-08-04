@@ -108,4 +108,63 @@ class SkillTest < ActiveSupport::TestCase
 
     assert_equal 'linkedin\.com/in/', skill.reload.url_pattern_matching("https://linkedin.com/in/jane")
   end
+
+  # --- revisions ----------------------------------------------------------
+
+  def a_model(model_id = "gpt-test")
+    Model.create!(provider: "openai", model_id: model_id, name: model_id, last_seen_at: Time.current)
+  end
+
+  test "current_revision is the highest sequence, not the newest created_at" do
+    skill = Skill.create!(name: "Versioned")
+    first  = skill.skill_revisions.create!(content: "one")
+    second = skill.skill_revisions.create!(content: "two")
+    # An older row can carry the higher sequence; the unique index is on
+    # sequence, so that is what "current" has to follow.
+    first.update_columns(created_at: 1.day.from_now)
+
+    assert_equal 1, second.sequence
+    assert_equal second, skill.reload.current_revision
+  end
+
+  test "revision_changed? is true for a skill with no revisions" do
+    skill = Skill.create!(name: "Fresh")
+
+    assert skill.revision_changed?(content: "", model: nil)
+  end
+
+  test "revision_changed? is false when wording and model both match" do
+    model = a_model
+    skill = Skill.create!(name: "Steady", preferred_model: model)
+    skill.skill_revisions.create!(content: "Do it.", model: model)
+
+    assert_not skill.revision_changed?(content: "Do it.", model: model)
+  end
+
+  test "revision_changed? is true when the wording differs" do
+    model = a_model
+    skill = Skill.create!(name: "Reworded", preferred_model: model)
+    skill.skill_revisions.create!(content: "Do it.", model: model)
+
+    assert skill.revision_changed?(content: "Do it differently.", model: model)
+  end
+
+  test "revision_changed? is true when only the model differs" do
+    skill = Skill.create!(name: "Remodelled")
+    skill.skill_revisions.create!(content: "Do it.", model: a_model("gpt-old"))
+
+    assert skill.revision_changed?(content: "Do it.", model: a_model("gpt-new"))
+  end
+
+  test "revision_changed? is true when the model is set or cleared" do
+    model = a_model
+    skill = Skill.create!(name: "Toggled")
+    skill.skill_revisions.create!(content: "Do it.", model: nil)
+
+    assert skill.revision_changed?(content: "Do it.", model: model), "nil to set is a change"
+
+    skill.skill_revisions.create!(content: "Do it.", model: model)
+
+    assert skill.revision_changed?(content: "Do it.", model: nil), "set to nil is a change"
+  end
 end
