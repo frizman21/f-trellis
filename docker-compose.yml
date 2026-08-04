@@ -17,7 +17,16 @@ services:
     working_dir: /app
     tty: true
     stdin_open: true
-    command: bash -c "bundle install && bin/rails db:prepare && bundle exec rerun --pattern '{Gemfile.lock,db/schema.rb}' --signal SIGTERM -- bin/rails server -b 0.0.0.0 -p 3000"
+    # libvips is the shared library ruby-vips links against, and the stock
+    # ruby:3.3 image does not ship it. Rails loads ruby-vips during boot, so
+    # without this the dev container dies before serving anything. The
+    # production Dockerfile and CI install it their own way; this is the dev
+    # equivalent, kept inline rather than as a build so the service stays on
+    # the stock image.
+    # Probe the shared library rather than a package name: Debian renamed it
+    # libvips42 -> libvips42t64 in the time64 transition, so a dpkg -s check
+    # would silently re-apt on every start.
+    command: bash -c "(ldconfig -p | grep -q libvips || (apt-get update -qq && apt-get install --no-install-recommends -y libvips)) && bundle install && bin/rails db:prepare && bundle exec rerun --pattern '{Gemfile.lock,db/schema.rb}' --signal SIGTERM -- bin/rails server -b 0.0.0.0 -p 3000"
     env_file:
       - .env
     environment:
