@@ -88,24 +88,37 @@
   <% else %>
     <% mine = @result.proposal_set %>
     <% base = @baseline.proposal_set %>
+    <% agreement = EvaluationComparison::Agreement.new(
+         agreed: mine.shared_with(base).size,
+         missed: mine.missing_from(base).size,
+         invented: mine.added_over(base).size,
+         pages: 1) %>
+    <p>
+      Agreement <strong><%= agreement_percentage(agreement.f1) %></strong> —
+      recall <%= agreement_percentage(agreement.recall) %>,
+      precision <%= agreement_percentage(agreement.precision) %>
+      <span class="text-muted small">on this page.</span>
+    </p>
     <div class="row">
       <div class="col-md-4">
-        <h3 class="h6">Shared with the baseline (<%= mine.shared_with(base).size %>)</h3>
+        <h3 class="h6">Agreed with the baseline (<%= agreement.agreed %>)</h3>
         <ul class="small"><% mine.shared_with(base).each do |r| %><li><%= proposal_line(r) %></li><% end %></ul>
       </div>
       <div class="col-md-4">
-        <h3 class="h6">Added over the baseline (<%= mine.added_over(base).size %>)</h3>
+        <h3 class="h6">Invented — not in the baseline (<%= agreement.invented %>)</h3>
         <ul class="small"><% mine.added_over(base).each do |r| %><li><%= proposal_line(r) %></li><% end %></ul>
       </div>
       <div class="col-md-4">
-        <h3 class="h6">Missed, that the baseline found (<%= mine.missing_from(base).size %>)</h3>
+        <h3 class="h6">Missed, that the baseline found (<%= agreement.missed %>)</h3>
         <ul class="small"><% mine.missing_from(base).each do |r| %><li><%= proposal_line(r) %></li><% end %></ul>
       </div>
     </div>
     <p class="text-muted small">
       Compared against <%= link_to "the baseline's run on this page", skill_evaluation_result_path(@baseline) %>
-      (<code><%= @evaluation.base_model.model_id %></code>). Nothing here was written to
-      the knowledge graph — an evaluation runs recording stand-ins for the upsert tools.
+      (<code><%= @evaluation.base_model.model_id %></code>), which defines correctness
+      here. "Invented" means the baseline did not back it up — on a page the baseline
+      read incompletely, some of it may be right. Nothing here was written to the
+      knowledge graph — an evaluation runs recording stand-ins for the upsert tools.
     </p>
   <% end %>
 <% else %>

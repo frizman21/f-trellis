@@ -80,12 +80,26 @@ class EvaluationComparisonTest < ActiveSupport::TestCase
     assert_equal 0, ranking.pages
   end
 
-  test "rankings order by total contribution, most first" do
+  # The reason this change exists. Under volume scoring @dear won this ordering
+  # by proposing two things the page does not support; under agreement it loses
+  # to the model that proposed exactly what the baseline did.
+  test "rankings order by agreement, not by contribution" do
     record_run(@page_a, @base,  [ org("acme") ])
     record_run(@page_a, @cheap, [ org("acme") ])
     record_run(@page_a, @dear,  [ org("acme"), org("beta"), org("gamma") ])
 
-    assert_equal [ @dear, @cheap, @base ], comparison.rankings.map(&:model)
+    assert_equal [ @base, @cheap, @dear ], comparison.rankings.map(&:model)
+  end
+
+  test "the baseline is pinned first and scores no agreement against itself" do
+    record_run(@page_a, @base,  [ org("acme") ])
+    record_run(@page_a, @cheap, [ org("acme") ])
+
+    ranking = comparison.rankings.first
+    assert_equal @base, ranking.model
+    assert ranking.baseline
+    assert_nil ranking.agreement.f1
+    assert_not ranking.agreement.comparable?
   end
 
   # Two models contributing the same amount are not equal if one costs thirty
@@ -110,6 +124,130 @@ class EvaluationComparisonTest < ActiveSupport::TestCase
     assert_in_delta 1.5, ranking.mean_per_page
     assert_equal 1, ranking.added_over_base, "only delta is new"
     assert_equal 1, ranking.pages_identical_to_base, "page a matched, page b did not"
+  end
+
+  def agreement_for(model) = comparison.rankings.detect { |r| r.model == model }.agreement
+
+  test "a run proposing exactly the baseline's records agrees completely" do
+    record_run(@page_a, @base,  [ org("acme"), org("beta") ])
+    record_run(@page_a, @cheap, [ org("beta"), org("acme") ])
+
+    agreement = agreement_for(@cheap)
+    assert_equal 2, agreement.agreed
+    assert_equal 0, agreement.missed
+    assert_equal 0, agreement.invented
+    assert_in_delta 1.0, agreement.recall
+    assert_in_delta 1.0, agreement.precision
+    assert_in_delta 1.0, agreement.f1
+  end
+
+  # Timid, not wrong: everything it said was right, it just stopped early.
+  # Volume scoring cannot tell this apart from the case below.
+  test "a run finding half the baseline's records keeps full precision" do
+    record_run(@page_a, @base,  [ org("acme"), org("beta") ])
+    record_run(@page_a, @cheap, [ org("acme") ])
+
+    agreement = agreement_for(@cheap)
+    assert_equal 1, agreement.agreed
+    assert_equal 1, agreement.missed
+    assert_equal 0, agreement.invented
+    assert_in_delta 0.5, agreement.recall
+    assert_in_delta 1.0, agreement.precision
+  end
+
+  # The Bio Reader failure: everything the baseline found, plus a pile the page
+  # does not support. Full recall, poor precision — and under the old ranking
+  # this was the top-scoring run.
+  test "a run inventing records keeps full recall but loses precision" do
+    record_run(@page_a, @base,  [ org("acme") ])
+    record_run(@page_a, @cheap, [ org("acme"), org("b"), org("c"), org("d"), org("e") ])
+
+    agreement = agreement_for(@cheap)
+    assert_equal 1, agreement.agreed
+    assert_equal 0, agreement.missed
+    assert_equal 4, agreement.invented
+    assert_in_delta 1.0, agreement.recall
+    assert_in_delta 0.2, agreement.precision
+  end
+
+  # Zero and "nothing to compare" are the same shape in a column of numbers and
+  # mean opposite things, so they must not both render as 0%.
+  test "a run proposing nothing scores zero agreement, not an undefined one" do
+    record_run(@page_a, @base,  [ org("acme"), org("beta") ])
+    record_run(@page_a, @cheap, [])
+
+    agreement = agreement_for(@cheap)
+    assert_equal 0, agreement.agreed
+    assert_equal 2, agreement.missed
+    assert_in_delta 0.0, agreement.recall
+    assert_in_delta 0.0, agreement.f1, 0.001, "no overlap is zero agreement"
+    assert agreement.comparable?
+  end
+
+  test "a model with no baseline to compare against has an undefined agreement" do
+    record_run(@page_a, @cheap, [ org("acme") ])
+
+    agreement = agreement_for(@cheap)
+    assert_not agreement.comparable?
+    assert_nil agreement.f1
+    assert_nil agreement.recall
+  end
+
+  # A page the baseline never ran has no truth on it. Scoring the model's
+  # proposals there as invented would punish it for the baseline's gap.
+  test "a page the baseline did not run is left out of the agreement entirely" do
+    record_run(@page_a, @base,  [ org("acme") ])
+    record_run(@page_a, @cheap, [ org("acme") ])
+    record_run(@page_b, @cheap, [ org("gamma"), org("delta") ])
+
+    agreement = agreement_for(@cheap)
+    assert_equal 1, agreement.pages, "only page a is comparable"
+    assert_equal 0, agreement.invented, "page b's proposals are not held against it"
+    assert_in_delta 1.0, agreement.f1
+  end
+
+  # Micro-averaged: summed then divided, so the dense page carries its weight.
+  # Per-page averaging would score this 0.75 instead.
+  test "agreement sums counts across pages before taking the ratio" do
+    record_run(@page_a, @base,  [ org("a1") ])
+    record_run(@page_a, @cheap, [ org("a1") ])
+    record_run(@page_b, @base,  [ org("b1"), org("b2"), org("b3"), org("b4") ])
+    record_run(@page_b, @cheap, [ org("b1"), org("b2") ])
+
+    agreement = agreement_for(@cheap)
+    assert_equal 3, agreement.agreed
+    assert_equal 2, agreement.missed
+    assert_in_delta 0.6, agreement.recall, 0.001, "3 of 5 overall, not the mean of 1.0 and 0.5"
+  end
+
+  test "a tie on agreement is broken by price ascending" do
+    record_run(@page_a, @base,  [ org("acme") ])
+    record_run(@page_a, @cheap, [ org("acme") ])
+    record_run(@page_a, @dear,  [ org("acme") ])
+
+    ordered = comparison.rankings.map(&:model)
+    assert_operator ordered.index(@cheap), :<, ordered.index(@dear)
+  end
+
+  test "a model with nothing comparable ranks below one that agreed" do
+    record_run(@page_a, @base,  [ org("acme") ])
+    record_run(@page_a, @dear,  [ org("acme") ])
+    record_run(@page_b, @cheap, [ org("gamma") ])
+
+    ordered = comparison.rankings.map(&:model)
+    assert_operator ordered.index(@dear), :<, ordered.index(@cheap),
+                    "no agreement is not high agreement, even at a lower price"
+  end
+
+  test "a cell carries the agreement for its page" do
+    record_run(@page_a, @base,  [ org("acme"), org("beta") ])
+    record_run(@page_a, @cheap, [ org("acme"), org("zeta") ])
+
+    agreement = comparison.cell(@page_a, @cheap).agreement
+    assert_equal 1, agreement.agreed
+    assert_equal 1, agreement.missed
+    assert_equal 1, agreement.invented
+    assert_nil comparison.cell(@page_a, @base).agreement, "the baseline has none of its own"
   end
 
   # Results from an earlier wording are not part of this run's comparison.
