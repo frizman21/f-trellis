@@ -51,6 +51,24 @@ class SourceDataControllerTest < ActionDispatch::IntegrationTest
     assert_equal @source, external.parent_source
   end
 
+  # One click here can create hundreds of rows. None of them is a page somebody
+  # asked for, so none of them downloads — the guard against this moving to an
+  # after_create callback.
+  test "extract_links queues no fetch for the sources it creates" do
+    datum = zipped_datum(<<~HTML)
+      <html><body>
+        <a href="/about">internal</a>
+        <a href="https://elsewhere.example.org/page">external</a>
+      </body></html>
+    HTML
+
+    assert_no_enqueued_jobs only: FetchSourceJob do
+      post extract_links_source_datum_path(datum)
+    end
+
+    assert_response :success
+  end
+
   test "extract_links records a link edge for every link it resolves" do
     datum = zipped_datum(<<~HTML)
       <html><body>

@@ -65,7 +65,8 @@ class SourcesController < ApplicationController
     @source = Source.new(source_params)
 
     if @source.save
-      redirect_to source_path(@source), notice: "Source ##{@source.id} created."
+      @source.queue_initial_fetch
+      redirect_to source_path(@source), notice: "Source ##{@source.id} created; fetch queued."
     else
       render :new, status: :unprocessable_entity
     end
