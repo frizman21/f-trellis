@@ -109,12 +109,14 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
                            "OrganizationOrganization.count", "PersonOrganizationDetail.count",
                            "OrganizationOrganizationDetail.count",
                            "PersonPerson.count", "PersonPersonDetail.count",
-                           "PersonOrganizationType.count", "PersonPersonType.count" ] do
+                           "PersonOrganizationType.count", "PersonPersonType.count",
+                           "PartOrganization.count", "PartOrganizationDetail.count" ] do
       with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
     end
 
     assert_equal [ RecordingUpsertPersonTool, RecordingUpsertOrganizationTool, RecordingUpsertPartTool,
-                   RecordingLinkPersonOrganizationTool, RecordingLinkPersonPersonTool,
+                   RecordingLinkPersonOrganizationTool, RecordingLinkPartOrganizationTool,
+                   RecordingLinkPersonPersonTool,
                    RecordingLinkOrganizationOrganizationTool,
                    RecordingCreatePersonOrganizationTypeTool, RecordingCreatePersonPersonTypeTool ],
                  Recorder.tools.map(&:class)

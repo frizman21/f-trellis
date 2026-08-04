@@ -9,6 +9,7 @@ class RecordingToolsTest < ActiveSupport::TestCase
     "Person.count", "Organization.count", "PersonDetail.count", "OrganizationDetail.count",
     "Part.count", "PartDetail.count", "PartDetailParameter.count",
     "PersonOrganization.count", "PersonOrganizationDetail.count",
+    "PartOrganization.count", "PartOrganizationDetail.count",
     "PersonPerson.count", "PersonPersonDetail.count",
     "OrganizationOrganization.count", "OrganizationOrganizationDetail.count"
   ].freeze
@@ -23,8 +24,10 @@ class RecordingToolsTest < ActiveSupport::TestCase
     @person_org = RecordingLinkPersonOrganizationTool.new(@recorder)
     @org_org = RecordingLinkOrganizationOrganizationTool.new(@recorder)
     @parts = RecordingUpsertPartTool.new(@recorder)
+    @part_org = RecordingLinkPartOrganizationTool.new(@recorder)
     @person_person = RecordingLinkPersonPersonTool.new(@recorder)
     @employment = PersonOrganizationType.find_or_create_by!(name: "Employment")
+    @manufacturer = PartOrganizationType.find_or_create_by!(name: "Manufacturer")
     @partnership = OrganizationOrganizationType.find_or_create_by!(name: "Partnership")
     @founder = PersonPersonType.find_or_create_by!(name: "Co-Founder")
   end
@@ -255,5 +258,48 @@ class RecordingToolsTest < ActiveSupport::TestCase
 
     assert_match(/no part type matched Spaceship/, result[:error])
     assert_empty @recorder.proposals
+  end
+
+  def one_part
+    @parts.execute(parts: [ { name: "Drone One", part_types: [ "Physical Part" ] } ])[:results]
+          .first[:part_id]
+  end
+
+  test "a part-to-organization link is captured against the names and writes nothing" do
+    part_id = one_part
+    org_id = @orgs.execute(organizations: [ { name: "Acme Corp" } ])[:results].first[:organization_id]
+
+    assert_no_difference ENTITY_TABLES do
+      @part_org.execute(part_id: part_id, organization_id: org_id, type: "Manufacturer",
+                        additional_attributes: { "program" => "X-3" })
+    end
+
+    link = @recorder.proposals.detect { |p| p["type"] == "part_organization" }
+    assert_equal "drone one", link["part"]
+    assert_equal "acme corp", link["organization"]
+    assert_equal "manufacturer", link["relationship_type"]
+    assert_equal({ "program" => "x-3" }, link["attributes"])
+  end
+
+  test "a part link to an id this run never issued is refused" do
+    org_id = @orgs.execute(organizations: [ { name: "Acme Corp" } ])[:results].first[:organization_id]
+
+    assert_equal "no part #99", @part_org.execute(part_id: 99, organization_id: org_id,
+                                                  type: "Manufacturer")[:error]
+    assert_equal "no organization #99", @part_org.execute(part_id: one_part, organization_id: 99,
+                                                          type: "Manufacturer")[:error]
+    assert_nil @recorder.proposals.detect { |p| p["type"] == "part_organization" }
+  end
+
+  # No tool mints part-organization types, so an unconfigured name is a mistake
+  # the writing run would refuse — there is no minted case to allow here.
+  test "a part link to a type no one configured is refused" do
+    part_id = one_part
+    org_id = @orgs.execute(organizations: [ { name: "Acme Corp" } ])[:results].first[:organization_id]
+
+    result = @part_org.execute(part_id: part_id, organization_id: org_id, type: "Nonsense")
+
+    assert_match(/PartOrganizationType 'Nonsense' is not configured/, result[:error])
+    assert_nil @recorder.proposals.detect { |p| p["type"] == "part_organization" }
   end
 end

@@ -106,6 +106,22 @@ class ProcessReportJobTest < ActiveJob::TestCase
     assert_equal "complete", report.reload.status
   end
 
+  # A tool the run does not register is a tool the skill cannot use, however
+  # well the skill is written.
+  test "registers the writing tools, including the part-to-organization link" do
+    report = report_for("<html><body><p>content</p></body></html>")
+
+    with_fake_chat { ProcessReportJob.perform_now(report) }
+
+    names = ProcessReportJobTest::FakeChat.last.tools.map(&:name)
+
+    assert_includes names, "link_part_organization"
+    assert_equal %w[create_person_organization_type create_person_person_type
+                    link_organization_organization link_part_organization
+                    link_person_organization link_person_person
+                    upsert_organization upsert_part upsert_person], names.sort
+  end
+
   test "fails the report when the page has no extractable text" do
     report = report_for("<html><head><title>t</title></head></html>")
 
