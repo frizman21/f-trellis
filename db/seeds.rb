@@ -43,6 +43,22 @@ if pull_organization_names.skill_revisions.order(:sequence).last&.content != pul
   SkillRevision.create!(skill: pull_organization_names, content: pull_organization_names_content)
 end
 
+# A revision records the model it runs on, so the skill page has a model to show
+# per revision. Seeded only when the registry has been refreshed — it is
+# populated from the providers, not from here — and only onto the newest
+# revision, so the older ones keep reading "not recorded" and both states are
+# visible on one page.
+#
+# Also gives the skill the matching preferred_model, since the two are meant to
+# agree: the pointer is what the edit form writes, the revision is the history.
+seed_skill_model = Model.selectable.first
+
+if seed_skill_model
+  pull_organization_names.update!(preferred_model: seed_skill_model)
+  current = pull_organization_names.skill_revisions.order(:sequence).last
+  current.update!(model: seed_skill_model) if current && current.model_id.nil?
+end
+
 # The skill that reads a product page and fills in the specification structure.
 # It deliberately does not list the part types or their units: the upsert_part
 # tool puts the live taxonomy in its own description, and repeating it here would

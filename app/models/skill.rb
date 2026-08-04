@@ -34,6 +34,26 @@ class Skill < ApplicationRecord
     active_with_applicability.where(id: SkillRevision.select(:skill_id)).order(:id)
   }
 
+  # The revision a run would use. Ordered by `sequence`, not `created_at`: the
+  # unique index is on (skill_id, sequence), and the two can disagree.
+  def current_revision
+    skill_revisions.order(:sequence).last
+  end
+
+  # Whether the proposed wording and model differ from what the current revision
+  # already pins. A skill with no revisions reports true, so the first one is
+  # always minted.
+  #
+  # This is what makes a revision mean something: without it every save minted
+  # one, so the revision list recorded visits to the edit form rather than
+  # changes to the skill.
+  def revision_changed?(content:, model:)
+    revision = current_revision
+    return true if revision.nil?
+
+    revision.content.to_s != content.to_s || revision.model_id != model&.id
+  end
+
   # One pattern per line, which is how the form edits them.
   def url_patterns_text
     Array(url_patterns).join("\n")

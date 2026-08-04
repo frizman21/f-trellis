@@ -269,6 +269,34 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     assert_match(/already covered/, response.body)
   end
 
+  test "a queued report runs the model its revision pins" do
+    source = triage_source
+    skill = make_skill("Skill A", "Directory pages.")
+    revision_model = Model.create!(provider: "openai", model_id: "gpt-revision",
+                                   name: "gpt-revision", last_seen_at: Time.current)
+    skill_model = Model.create!(provider: "openai", model_id: "gpt-skill",
+                                name: "gpt-skill", last_seen_at: Time.current)
+    skill.update!(preferred_model: skill_model)
+    skill.current_revision.update!(model: revision_model)
+
+    post triage_source_path(source), params: { skill_ids: [ skill.id ] }
+
+    assert_equal revision_model, SourceProcessingReport.order(:id).last.model
+  end
+
+  test "a revision with no model recorded falls back to the skill's preferred model" do
+    source = triage_source
+    skill = make_skill("Skill B", "Directory pages.")
+    skill_model = Model.create!(provider: "openai", model_id: "gpt-fallback",
+                                name: "gpt-fallback", last_seen_at: Time.current)
+    skill.update!(preferred_model: skill_model)
+    assert_nil skill.current_revision.model
+
+    post triage_source_path(source), params: { skill_ids: [ skill.id ] }
+
+    assert_equal skill_model, SourceProcessingReport.order(:id).last.model
+  end
+
   test "triage refuses skills that are not triageable" do
     source = triage_source
     inactive = Skill.create!(name: "Inactive", applicability: "Anywhere.", is_active: false)
