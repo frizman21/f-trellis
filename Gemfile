@@ -40,6 +40,14 @@ gem "thruster", require: false
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 gem "image_processing", "~> 2.0"
 
+# image_processing 2.0 dropped ruby-vips from its runtime dependencies, so the
+# application has to declare the backend for the :vips processor Active Storage
+# defaults to. Not optional in practice: Rails 8.1.3.1 calls
+# Vips.block_untrusted(true) during boot (CVE-2026-66066), which loads this gem
+# before any variant is ever requested — without it, `rails` aborts at boot.
+# The 2.2.1 floor is that release's stated new minimum.
+gem "ruby-vips", "~> 2.2", ">= 2.2.1"
+
 # Zip archive creation for storing fetched source content as SourceDatum payloads.
 gem "rubyzip", "~> 3.3"
 
