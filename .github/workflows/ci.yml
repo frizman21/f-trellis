@@ -139,7 +139,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Pinning happens HERE, not in the marketplace string. There is no ref
       # syntax for `claude plugin marketplace add`, and the action validates
@@ -148,7 +148,7 @@ jobs:
       # out at the pinned ref and hand the action the resulting local path
       # instead; local paths skip URL validation and go straight to the CLI.
       - name: Check out the sw-factory marketplace at the pinned ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: frizman21/software-factory-plugin
           # The pin: bump deliberately, never float. A commit rather than a tag
