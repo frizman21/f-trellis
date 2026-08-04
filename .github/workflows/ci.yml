@@ -107,9 +107,26 @@ jobs:
   # Sourced from https://github.com/frizman21/software-factory-plugin
   # (examples/agent-review.yml). Lives in this workflow rather than its own file
   # because Actions has no cross-workflow `needs:`.
+  #
+  # Dependabot is excluded, and not as a convenience. The gate cannot run there
+  # for two mechanical reasons — claude-code-action refuses non-human actors
+  # ("Workflow initiated by non-human actor: dependabot"), and Dependabot-
+  # triggered runs receive no repository secrets, so ANTHROPIC_API_KEY resolves
+  # to empty. Neither is worth working around, because of the deciding reason:
+  # this gate judges traceability to a change request, and a version bump has
+  # none and never will. Reviewing one is a category error, not missing config.
+  # Left in place, it painted every Dependabot PR with a red X that reads as
+  # "reviewed and rejected" when the truth was "nobody looked, and nobody can" —
+  # the exact confusion the failure-report step below exists to prevent.
+  #
+  # Test the PR's author, not `github.actor`: the two diverge when a human
+  # re-runs a failed Dependabot job, and it is authorship that decides both
+  # secret availability and whether a change request could exist.
   quality:
     needs: [ test, system-test ]
-    if: github.event_name == 'pull_request'
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
 
     permissions:
