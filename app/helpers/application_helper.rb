@@ -19,6 +19,26 @@ module ApplicationHelper
     link_to(url, **options) { safe_join([ text.to_s, EXTERNAL_LINK_ICON ]) }
   end
 
+  # The commit the running process was built from, for the navbar.
+  #
+  # Takes what it renders as arguments so both branches are reachable without
+  # stubbing AppVersion — the working tree always has a .git in development and
+  # test, so the unresolvable case cannot be reached through the environment.
+  def running_version_badge(short: AppVersion.short, commit_url: AppVersion.commit_url)
+    # text-white-50 rather than a *-emphasis utility: those resolve to dark text
+    # for light backgrounds unless data-bs-theme="dark" is set, which it is not
+    # here, and this sits on the dark navbar.
+    if short.blank?
+      return tag.span("version unknown",
+                      class: "text-white-50 small me-3",
+                      title: "Could not determine the running commit")
+    end
+
+    link_to short, commit_url,
+            class: "text-white-50 small font-monospace text-decoration-none me-3",
+            title: "Running commit — open on GitHub"
+  end
+
   # Standard text-token pricing as "$<in> in / $<out> out per Mtok",
   # or nil when the model carries no pricing at all.
   def model_pricing_label(model)
