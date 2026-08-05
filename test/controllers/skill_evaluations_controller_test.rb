@@ -138,6 +138,22 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action=?]", run_skill_evaluation_path(evaluation)
   end
 
+  # The baseline is run on every page like any other model, so leaving its price
+  # off the one line that names it is the one place the page hides what it costs.
+  test "show carries the base model's price where it names the base model" do
+    @fast.update!(pricing: { "text_tokens" => { "standard" => {
+      "input_per_million" => 0.25, "output_per_million" => 2.0
+    } } })
+    evaluation = evaluation_with(models: [ @slow ])
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_select "dd", text: /run whether or not it is ticked/ do |base_model_cell|
+      assert_match(/\$0\.25 in \/ \$2 out per Mtok/, base_model_cell.first.text)
+    end
+  end
+
   test "show lists the baseline among the models even when it was not ticked" do
     evaluation = evaluation_with(models: [ @slow ])
 
