@@ -34,7 +34,14 @@
       <% @reports.each do |report| %>
         <tr>
           <td><%= report.id %></td>
-          <td><%= status_badge.call(report.status) %></td>
+          <td>
+            <%= status_badge.call(report.status) %>
+            <% if report.error.present? %>
+              <div class="small text-danger" title="<%= report.error %>">
+                <%= truncate(report.error, length: 120) %>
+              </div>
+            <% end %>
+          </td>
           <td>
             <% if report.source %>
               <%= link_to "Source ##{report.source.id}", source_path(report.source) %>
