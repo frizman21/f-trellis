@@ -8,6 +8,16 @@ class SourcesController < ApplicationController
     @links_from_count = @source.links_to.count
     @links_to_count   = @source.linked_from.count
     @learning_sets = LearningSet.order(:name)
+
+    # What has already been run against this page. Not paginated: reports are
+    # bounded by skills × revisions × re-fetches, and a page-two link would hide
+    # the history the section exists to show.
+    @reports = @source.source_processing_reports
+                      .includes(:model, :chat, skill_revision: :skill)
+                      .order(created_at: :desc)
+    # Read once here rather than per row: it is what decides whether each report
+    # still covers the page, and it is the same answer for all of them.
+    @current_content_hash = @source.latest_datum&.content_hash
   end
 
   # File a page into a learning set from the page itself, so a source found

@@ -1,6 +1,30 @@
 require "test_helper"
+require "zip"
 
 class SourcesControllerTest < ActionDispatch::IntegrationTest
+  # A page with content attached, so its reports have a content hash to agree or
+  # disagree with.
+  def source_with_content(url, html)
+    source = Source.create!(url: url)
+    source.update!(status: "complete")
+
+    bytes = Zip::OutputStream.write_buffer do |zos|
+      zos.put_next_entry("page.html")
+      zos.write(html)
+    end
+    bytes.rewind
+    SourceDatum.create!(source: source, content_type: "application/zip", data: bytes.read)
+
+    source
+  end
+
+  def report_on(source, skill_name:, **attrs)
+    skill = Skill.create!(name: skill_name)
+    revision = skill.skill_revisions.create!(content: "Do the thing.")
+
+    SourceProcessingReport.create!({ source: source, skill_revision: revision,
+                                     status: "complete", facts: [] }.merge(attrs))
+  end
   test "index renders and paginates without raising NoMethodError" do
     get sources_path
     assert_response :success
@@ -359,6 +383,65 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
            params: { crawl_type: "stay_in_domain", max_depth: "2", max_pages: "100" }
     end
     assert_redirected_to source_path(source)
+  end
+
+  test "show page lists the processing already done on this page" do
+    source = source_with_content("https://history.test/page", "<html><body><p>Acme Corp</p></body></html>")
+    model = Model.create!(provider: "anthropic", model_id: "claude-test", name: "Claude test")
+    report = report_on(source, skill_name: "Pull orgs", model: model)
+
+    get source_path(source)
+
+    assert_response :success
+    assert_match(/##{report.id}/, response.body)
+    assert_match(/Pull orgs/, response.body)
+    assert_match(/claude-test/, response.body)
+  end
+
+  test "show page lists only this source's reports" do
+    source = source_with_content("https://history.test/mine", "<html><body><p>Mine</p></body></html>")
+    other  = source_with_content("https://history.test/theirs", "<html><body><p>Theirs</p></body></html>")
+    report_on(other, skill_name: "Someone else's skill")
+
+    get source_path(source)
+
+    assert_response :success
+    assert_no_match(/Someone else's skill/, response.body)
+    assert_match(/No skills have been run against this page yet/, response.body)
+  end
+
+  # The dedup rule refuses a re-run while a report still covers the current
+  # content, so which of the two a row is decides whether it can be run again.
+  test "show page marks a report against the current content as current" do
+    source = source_with_content("https://history.test/current", "<html><body><p>Acme Corp</p></body></html>")
+    report_on(source, skill_name: "Pull orgs")
+
+    get source_path(source)
+
+    assert_response :success
+    assert_select "td span.text-success", text: /Current/
+    assert_no_match(/Superseded/, response.body)
+  end
+
+  test "show page marks a report against older content as superseded" do
+    source = source_with_content("https://history.test/stale", "<html><body><p>Acme Corp</p></body></html>")
+    report_on(source, skill_name: "Pull orgs", content_hash: "a-hash-from-an-earlier-fetch")
+
+    get source_path(source)
+
+    assert_response :success
+    assert_select "td span.text-muted", text: /Superseded/
+  end
+
+  test "show page shows why a report failed" do
+    source = source_with_content("https://history.test/failed", "<html><body><p>Acme Corp</p></body></html>")
+    report_on(source, skill_name: "Pull orgs", status: "failed",
+                      error: "RubyLLM::Error: model: claude-3-5-haiku-20241022")
+
+    get source_path(source)
+
+    assert_response :success
+    assert_match(/RubyLLM::Error: model: claude-3-5-haiku-20241022/, response.body)
   end
 
   test "crawl rejects unknown crawl_type without enqueueing" do

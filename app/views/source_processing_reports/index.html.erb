@@ -5,16 +5,6 @@
   <%= link_to "New report", new_source_processing_report_path, class: "btn btn-primary" %>
 </div>
 
-<% status_badge = ->(s) {
-  cls = case s
-        when "complete"   then "bg-success"
-        when "processing" then "bg-info text-dark"
-        when "failed"     then "bg-danger"
-        else "bg-secondary"
-        end
-  content_tag(:span, s.capitalize, class: "badge #{cls}")
-} %>
-
 <% if @reports.any? %>
   <table class="table">
     <thead>
@@ -34,14 +24,7 @@
       <% @reports.each do |report| %>
         <tr>
           <td><%= report.id %></td>
-          <td>
-            <%= status_badge.call(report.status) %>
-            <% if report.error.present? %>
-              <div class="small text-danger" title="<%= report.error %>">
-                <%= truncate(report.error, length: 120) %>
-              </div>
-            <% end %>
-          </td>
+          <td><%= report_status_cell(report) %></td>
           <td>
             <% if report.source %>
               <%= link_to "Source ##{report.source.id}", source_path(report.source) %>

@@ -631,23 +631,35 @@ if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
   end
 end
 
-# Two failed reports, so the reports index has both shapes of failure to render:
-# one that recorded why it failed, and one that did not. The second is what every
-# report that failed before `error` existed looks like — their messages went to
-# the log only — and the index has to stay readable for them.
+# Processing history for one page, so the reports index and the Processing
+# section of the source page both have every shape they render:
 #
-# Seeded failed rather than complete on purpose: a seeded "complete" report would
+#   - a failure that recorded why, and one that did not. The second is what every
+#     report that failed before `error` existed looks like — their messages went
+#     to the log only — and both pages have to stay readable for them.
+#   - a report against the page's current content, and one against content the
+#     page no longer has. That pair is the Content column: only the superseded
+#     one could be run again.
+#
+# All three are seeded `failed` on purpose. A seeded "complete" report would
 # claim a run happened and entities were written, and nothing here wrote any.
+current_hash = link_sample_source.latest_datum&.content_hash
+
 [
-  { skill: pull_organization_names,
+  { skill: pull_organization_names, hash: current_hash,
     error: "ProcessReportJob::ReportNotProcessable: source has no fetched data" },
-  { skill: pull_part_specifications, error: nil }
+  { skill: pull_part_specifications, hash: current_hash, error: nil },
+  { skill: pull_organization_names, hash: "seeded-hash-of-an-earlier-fetch",
+    error: "RubyLLM::Error: model: claude-3-5-haiku-20241022" }
 ].each do |attrs|
   revision = attrs[:skill].skill_revisions.order(:sequence).last
   next if revision.nil?
 
+  # Keyed on the content hash too, because that is what makes the third row a
+  # separate report rather than a duplicate of the first.
   report = SourceProcessingReport.find_or_initialize_by(source: link_sample_source,
-                                                        skill_revision: revision)
+                                                        skill_revision: revision,
+                                                        content_hash: attrs[:hash])
   report.assign_attributes(status: "failed", facts: [], error: attrs[:error])
   report.save!
 end
