@@ -76,6 +76,66 @@
   <% end %>
 </p>
 
+<% if @reports.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Report</th>
+        <th>Status</th>
+        <th>Skill</th>
+        <th>Revision</th>
+        <th>Model</th>
+        <th>Content</th>
+        <th>Chat</th>
+        <th>Facts</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @reports.each do |report| %>
+        <tr>
+          <td>#<%= report.id %></td>
+          <td><%= report_status_cell(report) %></td>
+          <td><%= report.skill_revision&.skill&.name || "—" %></td>
+          <td>
+            <% if report.skill_revision %>
+              <%= link_to "rev #{report.skill_revision.sequence}", skill_revision_path(report.skill_revision) %>
+            <% else %>
+              —
+            <% end %>
+          </td>
+          <td><%= report.model&.model_id || "—" %></td>
+          <td>
+            <%# Whether this run still covers the page. A report is refused when
+                one already covers (source, skill revision, content), so a
+                superseded row is the one that can be run again. %>
+            <% if report.content_hash.blank? %>
+              —
+            <% elsif report.content_hash == @current_content_hash %>
+              <span class="text-success">Current</span>
+            <% else %>
+              <span class="text-muted" title="The page has been re-fetched with different content since this ran.">
+                Superseded
+              </span>
+            <% end %>
+          </td>
+          <td>
+            <% if report.chat %>
+              <%= link_to "Chat ##{report.chat.id}", chat_path(report.chat) %>
+            <% else %>
+              —
+            <% end %>
+          </td>
+          <td><%= report.facts.is_a?(Array) ? report.facts.size : (report.facts.is_a?(Hash) ? report.facts.keys.size : 0) %></td>
+          <td><%= report.created_at&.to_date %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="text-muted">No skills have been run against this page yet.</p>
+<% end %>
+
 <h2>Link graph</h2>
 
 <p>
