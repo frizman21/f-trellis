@@ -28,6 +28,7 @@
   <dd class="col-sm-9">
     <span class="text-muted"><%= @evaluation.base_model.provider %> /</span>
     <code><%= @evaluation.base_model.model_id %></code>
+    <span class="text-muted small"><%= model_pricing_label(@evaluation.base_model) %></span>
     <div class="text-muted small">
       Everything below is measured against what this model proposes on the same
       page, so it is run whether or not it is ticked.
