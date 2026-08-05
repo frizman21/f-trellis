@@ -30,9 +30,11 @@ class ProcessReportJob < ApplicationJob
     )
     chat.ask(source_text)
 
-    report.update!(status: "complete")
+    report.update!(status: "complete", error: nil)
   rescue StandardError => e
-    report.update!(status: "failed") if report.persisted?
+    # The message goes on the record, not only into the log: reports have no show
+    # page, so the index is the only place anyone can ask why a run failed.
+    report.update!(status: "failed", error: "#{e.class}: #{e.message}") if report.persisted?
     Rails.logger.error("ProcessReportJob failed for report ##{report.id}: #{e.class}: #{e.message}")
     raise
   end

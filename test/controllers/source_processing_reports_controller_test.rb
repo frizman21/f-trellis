@@ -31,6 +31,29 @@ class SourceProcessingReportsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "the index shows why a failed report failed" do
+    SourceProcessingReport.create!(source: @source, skill_revision: @revision,
+                                   status: "failed", facts: [],
+                                   error: "IOError: provider hung up")
+
+    get source_processing_reports_path
+
+    assert_response :success
+    assert_match(/IOError: provider hung up/, response.body)
+  end
+
+  # Every report that failed before the column existed has a null error, and the
+  # index is the one page that lists them.
+  test "the index renders a failed report that recorded no error" do
+    SourceProcessingReport.create!(source: @source, skill_revision: @revision,
+                                   status: "failed", facts: [], error: nil)
+
+    get source_processing_reports_path
+
+    assert_response :success
+    assert_match(/Failed/, response.body)
+  end
+
   test "new renders" do
     get new_source_processing_report_path
     assert_response :success

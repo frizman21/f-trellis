@@ -31,9 +31,9 @@ class ProcessReportJobTest < ActiveJob::TestCase
     end
   end
 
-  def with_fake_chat
+  def with_fake_chat(chat_class = FakeChat)
     original = Chat.method(:create!)
-    Chat.define_singleton_method(:create!) { |*, **| FakeChat.new }
+    Chat.define_singleton_method(:create!) { |*, **| chat_class.new }
     # The job assigns the chat to the report; skip that write for the fake.
     SourceProcessingReport.class_eval do
       alias_method :update_without_chat_stub!, :update!
@@ -129,6 +129,38 @@ class ProcessReportJobTest < ActiveJob::TestCase
       with_fake_chat { ProcessReportJob.perform_now(report) }
     end
 
-    assert_equal "failed", report.reload.status
+    report.reload
+
+    assert_equal "failed", report.status
+    # The reason has to survive the job: reports have no show page, so a message
+    # that lives only in the log cannot be read from the application at all.
+    assert_equal "ProcessReportJob::ReportNotProcessable: source has no fetched data",
+                 report.error
+  end
+
+  test "records the class and message of an error raised mid-run" do
+    report = report_for("<html><body><p>content</p></body></html>")
+
+    raising = Class.new(FakeChat) do
+      def ask(_text) = raise IOError, "provider hung up"
+    end
+
+    assert_raises IOError do
+      with_fake_chat(raising) { ProcessReportJob.perform_now(report) }
+    end
+
+    report.reload
+
+    assert_equal "failed", report.status
+    assert_equal "IOError: provider hung up", report.error
+  end
+
+  test "a completed run records no error" do
+    report = report_for("<html><body><p>content</p></body></html>")
+
+    with_fake_chat { ProcessReportJob.perform_now(report) }
+
+    assert_equal "complete", report.reload.status
+    assert_nil report.error
   end
 end

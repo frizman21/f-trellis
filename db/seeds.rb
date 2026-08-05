@@ -631,6 +631,27 @@ if evaluation_models.any? && evaluation_skill&.skill_revisions&.any?
   end
 end
 
+# Two failed reports, so the reports index has both shapes of failure to render:
+# one that recorded why it failed, and one that did not. The second is what every
+# report that failed before `error` existed looks like — their messages went to
+# the log only — and the index has to stay readable for them.
+#
+# Seeded failed rather than complete on purpose: a seeded "complete" report would
+# claim a run happened and entities were written, and nothing here wrote any.
+[
+  { skill: pull_organization_names,
+    error: "ProcessReportJob::ReportNotProcessable: source has no fetched data" },
+  { skill: pull_part_specifications, error: nil }
+].each do |attrs|
+  revision = attrs[:skill].skill_revisions.order(:sequence).last
+  next if revision.nil?
+
+  report = SourceProcessingReport.find_or_initialize_by(source: link_sample_source,
+                                                        skill_revision: revision)
+  report.assign_attributes(status: "failed", facts: [], error: attrs[:error])
+  report.save!
+end
+
 # ---------------------------------------------------------------------------
 # Knowledge base content — tier 1 entities (Person, Organization, Part,
 # Facility), their detail records, and the relationships between them.
