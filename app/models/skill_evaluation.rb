@@ -49,9 +49,16 @@ class SkillEvaluation < ApplicationRecord
   # nothing to read them against. Enforced here rather than warned about on the
   # page, because a warning is something you read after the run has already cost
   # money.
+  #
+  # Models since deprecated or disabled drop out. An evaluation is configured
+  # once and run repeatedly, so the set it holds can name a model that has gone
+  # bad since — and a deprecated baseline leaves nothing to compare against,
+  # which is no run at all rather than a run without a column.
   def models_to_run
-    ticked = models.to_a
-    ticked.include?(base_model) ? ticked : ticked + [ base_model ].compact
+    return [] if base_model.nil? || base_model.unusable?
+
+    ticked = models.reject(&:unusable?)
+    ticked.include?(base_model) ? ticked : ticked + [ base_model ]
   end
 
   # Pairs a run would cover — the whole point of the configuration. `size`, not

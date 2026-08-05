@@ -4,6 +4,10 @@
   <h1 class="mb-0">Models</h1>
   <div class="d-flex align-items-center gap-3">
     <form method="get" action="<%= models_path %>" class="d-flex align-items-center gap-2">
+      <label for="q" class="form-label mb-0 small text-muted">Search</label>
+      <input type="search" name="q" id="q" value="<%= @query %>"
+             class="form-control form-control-sm" style="width: 14rem"
+             placeholder="id, name, family, provider">
       <label for="provider" class="form-label mb-0 small text-muted">Provider</label>
       <select name="provider" id="provider" class="form-select form-select-sm" onchange="this.form.submit()">
         <option value="">All</option>
@@ -12,6 +16,11 @@
         <% end %>
       </select>
       <% if @show_stale %><input type="hidden" name="show_stale" value="1"><% end %>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
+      <% if @query %>
+        <%= link_to "Clear", models_path(provider: @provider, show_stale: @show_stale ? 1 : nil),
+                    class: "btn btn-sm btn-link" %>
+      <% end %>
     </form>
     <%= button_to "Refresh from providers",
                   refresh_models_path(provider: @provider),
@@ -26,6 +35,9 @@
     (<%= @last_refreshed_at.strftime("%Y-%m-%d %H:%M UTC") %>).
   <% else %>
     Never refreshed from providers.
+  <% end %>
+  <% if @unusable_count.positive? %>
+    <%= @unusable_count %> deprecated or disabled, and offered nowhere.
   <% end %>
   <% if @stale_count.positive? %>
     <%= @stale_count %> model<%= "s" unless @stale_count == 1 %> no longer returned by their provider
@@ -51,6 +63,8 @@
         <th class="text-end">Output $/M</th>
         <th class="text-end">Cached input $/M</th>
         <th>Capabilities</th>
+        <th>Status</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -78,6 +92,20 @@
           <td class="small text-muted">
             <%= Array(m.capabilities).join(", ").presence || "—" %>
           </td>
+          <td class="small">
+            <% if m.is_deprecated? %>
+              <span class="badge text-bg-danger">deprecated</span>
+            <% end %>
+            <% if m.is_disabled? %>
+              <span class="badge text-bg-secondary">disabled</span>
+            <% end %>
+            <% unless m.unusable? %>—<% end %>
+          </td>
+          <td class="text-end">
+            <%= link_to "Edit", edit_model_path(m, provider: @provider, q: @query,
+                                                show_stale: @show_stale ? 1 : nil, page: params[:page]),
+                        class: "btn btn-sm btn-outline-secondary" %>
+          </td>
         </tr>
       <% end %>
     </tbody>
@@ -86,6 +114,11 @@
   <%= paginate @models %>
   <p class="text-muted small">
     Showing <%= @models.size %> of <%= @models.total_count %>.
+  </p>
+<% elsif @query %>
+  <p>
+    Nothing matches <strong><%= @query %></strong><%= " in #{@provider}" if @provider %>.
+    <%= link_to "Clear the search", models_path(show_stale: @show_stale ? 1 : nil) %>.
   </p>
 <% else %>
   <p>

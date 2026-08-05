@@ -70,6 +70,10 @@ class SkillTriage
     parse(ask(excerpt))
   rescue StandardError => e
     Rails.logger.error("SkillTriage failed for source ##{@source&.id}: #{e.class}: #{e.message}")
+    # A model the provider has retired would fail every source from here on, and
+    # triage runs unattended. Retiring it here is what makes the fallback in
+    # TriageConfiguration#model pick a working one on the next source.
+    triage_model&.deprecate_for!(e)
     fail_open("#{e.class}: #{e.message}")
   end
 

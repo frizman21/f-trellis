@@ -54,6 +54,19 @@
           Hand-picked.
         <% end %>
       </div>
+      <% dropped = @evaluation.models.select(&:unusable?) %>
+      <% if dropped.any? %>
+        <div class="text-warning small">
+          Not run: <%= dropped.map(&:model_id).to_sentence %> —
+          <%= dropped.size == 1 ? "deprecated or disabled" : "all deprecated or disabled" %>.
+        </div>
+      <% end %>
+    <% elsif @evaluation.base_model&.unusable? %>
+      <span class="text-danger">
+        The baseline <code><%= @evaluation.base_model.model_id %></code> is
+        <%= @evaluation.base_model.capability_flag %>, so there is nothing to measure against.
+        Pick a different baseline before running.
+      </span>
     <% else %>
       <span class="text-muted">None selected.</span>
     <% end %>

@@ -104,6 +104,66 @@ class ModelTest < ActiveSupport::TestCase
     assert_not build_model(provider: "openai", model_id: "gpt-5-nano", last_seen_at: nil).dated_snapshot?
   end
 
+  test "deprecated and disabled models are out of circulation" do
+    now = Time.current
+    fine       = build_model(provider: "openai", model_id: "circ-fine", last_seen_at: now)
+    deprecated = build_model(provider: "openai", model_id: "circ-deprecated", last_seen_at: now)
+    disabled   = build_model(provider: "openai", model_id: "circ-disabled", last_seen_at: now)
+    deprecated.update!(is_deprecated: true)
+    disabled.update!(is_disabled: true)
+
+    assert_includes Model.selectable, fine
+    assert_not_includes Model.selectable, deprecated
+    assert_not_includes Model.selectable, disabled
+
+    assert_not deprecated.chat_capable?
+    assert_not disabled.chat_capable?
+    assert fine.chat_capable?
+
+    assert_equal [ deprecated, disabled ].sort_by(&:id),
+                 Model.current.out_of_circulation.sort_by(&:id)
+  end
+
+  # The flags are evidence from a real call; the modality metadata is the
+  # provider's description of itself. When they disagree the call wins.
+  test "the flags outrank a declared text modality" do
+    model = with_modalities("gpt-flagged", [ "text" ])
+    assert_nil model.capability_flag
+
+    model.update!(is_deprecated: true)
+    assert_equal "deprecated", model.capability_flag
+
+    model.update!(is_deprecated: false, is_disabled: true)
+    assert_equal "disabled", model.capability_flag
+  end
+
+  test "deprecation_reason_for recognises the errors that mean the model is finished" do
+    assert_equal "deprecated by the provider",
+                 Model.deprecation_reason_for("The model `gpt-5.1-codex` has been deprecated, learn more here...")
+    assert_equal "not served by the chat completions endpoint",
+                 Model.deprecation_reason_for("This is not a chat model and thus not supported in the v1/chat/completions endpoint.")
+    assert_equal "unknown to this account",
+                 Model.deprecation_reason_for("The model `gpt-5.3-codex-spark` does not exist or you do not have access to it.")
+    assert_equal "unknown to this account", Model.deprecation_reason_for("model_not_found")
+  end
+
+  test "deprecation_reason_for leaves failures a retry could survive alone" do
+    assert_nil Model.deprecation_reason_for("Rate limit reached for model `gpt-5-nano`")
+    assert_nil Model.deprecation_reason_for("The server had an error while processing your request")
+    assert_nil Model.deprecation_reason_for(Timeout::Error.new("execution expired"))
+  end
+
+  test "deprecate_for! sets the flag only on a permanent failure" do
+    model = build_model(provider: "openai", model_id: "dep-target", last_seen_at: Time.current)
+
+    assert_nil model.deprecate_for!(StandardError.new("Rate limit reached"))
+    assert_not model.reload.is_deprecated?
+
+    reason = model.deprecate_for!(StandardError.new("The model `dep-target` has been deprecated"))
+    assert_equal "deprecated by the provider", reason
+    assert model.reload.is_deprecated?
+  end
+
   test "selectable is ordered by provider then model_id" do
     now = Time.current
     build_model(provider: "openai",    model_id: "b-model", last_seen_at: now)

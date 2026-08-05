@@ -34,6 +34,80 @@ class ModelsControllerTest < ActionDispatch::IntegrationTest
     assert_no_match(/openai-model/, @response.body)
   end
 
+  test "index searches id, name, family and provider" do
+    Model.create!(provider: "openai", model_id: "gpt-5-nano", name: "GPT-5 Nano",
+                  family: "gpt-5", last_seen_at: @now)
+
+    get models_path(q: "nano")
+    assert_response :success
+    assert_match "gpt-5-nano", @response.body
+    assert_no_match(/fresh-model/, @response.body)
+
+    get models_path(q: "gpt-5")
+    assert_match "gpt-5-nano", @response.body
+
+    get models_path(q: "openai")
+    assert_match "gpt-5-nano", @response.body
+    assert_no_match(/fresh-model/, @response.body)
+  end
+
+  test "index search combines with the provider filter" do
+    Model.create!(provider: "openai", model_id: "openai-fresh-model", name: "OpenAI", last_seen_at: @now)
+
+    get models_path(q: "fresh", provider: "anthropic")
+
+    assert_response :success
+    assert_match "fresh-model", @response.body
+    assert_no_match(/openai-fresh-model/, @response.body)
+  end
+
+  test "index says so when a search matches nothing" do
+    get models_path(q: "no-such-model")
+
+    assert_response :success
+    assert_match(/Nothing matches/, @response.body)
+  end
+
+  test "update sets and clears both flags" do
+    patch model_path(@fresh), params: { model: { is_deprecated: "1", is_disabled: "1" } }
+
+    assert_redirected_to models_path
+    @fresh.reload
+    assert @fresh.is_deprecated?
+    assert @fresh.is_disabled?
+
+    patch model_path(@fresh), params: { model: { is_deprecated: "0", is_disabled: "0" } }
+
+    @fresh.reload
+    assert_not @fresh.is_deprecated?
+    assert_not @fresh.is_disabled?
+  end
+
+  # Everything else on the row is the provider's to say, and the next refresh
+  # would overwrite a hand edit anyway.
+  test "update writes nothing but the two flags" do
+    patch model_path(@fresh), params: { model: { model_id: "renamed", name: "Renamed", is_disabled: "1" } }
+
+    @fresh.reload
+    assert_equal "fresh-model", @fresh.model_id
+    assert_equal "Fresh", @fresh.name
+    assert @fresh.is_disabled?, "the permitted flag still went through"
+  end
+
+  test "update returns to the list it was called from" do
+    patch model_path(@fresh, provider: "anthropic", q: "fresh"),
+          params: { model: { is_disabled: "1" } }
+
+    assert_redirected_to models_path(provider: "anthropic", q: "fresh")
+  end
+
+  test "edit renders the flags for one model" do
+    get edit_model_path(@fresh)
+
+    assert_response :success
+    assert_match "fresh-model", @response.body
+  end
+
   test "refresh enqueues RefreshModelsJob and redirects" do
     assert_enqueued_with(job: RefreshModelsJob) do
       post refresh_models_path

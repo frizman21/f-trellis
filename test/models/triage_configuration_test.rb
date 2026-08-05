@@ -63,6 +63,24 @@ class TriageConfigurationTest < ActiveSupport::TestCase
     assert_not TriageConfiguration.new.model_configured?
   end
 
+  test "the fallback skips models that are out of circulation" do
+    make_model("anthropic", "claude-aaa").update!(is_deprecated: true)
+    make_model("anthropic", "claude-bbb").update!(is_disabled: true)
+    usable = make_model("anthropic", "claude-ccc")
+
+    assert_equal usable, TriageConfiguration.new.effective_model
+  end
+
+  # Triage runs unattended on every fetched source, so honouring a pin the
+  # provider has since retired would fail every one of them.
+  test "a pinned model that has been deprecated falls back" do
+    fallback = make_model("anthropic", "claude-aaa")
+    pinned   = make_model("openai", "gpt-zzz")
+    pinned.update!(is_deprecated: true)
+
+    assert_equal fallback, TriageConfiguration.new(model: pinned).effective_model
+  end
+
   test "a pinned model wins over the fallback" do
     make_model("anthropic", "claude-aaa")
     pinned = make_model("openai", "gpt-zzz")
