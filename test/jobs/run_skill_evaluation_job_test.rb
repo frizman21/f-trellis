@@ -158,6 +158,27 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
     assert_equal "failed", @result.status
     assert_match(/provider down/, @result.error)
     assert @result.completed_at.present?
+    assert_not @model.reload.is_deprecated?, "a transient failure must not retire the model"
+  end
+
+  # The rest of a run is one job per page, all about to make the same doomed
+  # call, so the first failure is what has to stop them.
+  test "a provider saying the model is finished deprecates it" do
+    error = RuntimeError.new("The model `gpt-eval` has been deprecated, learn more here...")
+
+    with_fake_chat(raise_with: error) { RunSkillEvaluationJob.perform_now(@result) }
+
+    assert_equal "failed", @result.reload.status
+    assert @model.reload.is_deprecated?
+  end
+
+  test "a rate limit leaves the model alone" do
+    with_fake_chat(raise_with: RuntimeError.new("Rate limit reached for gpt-eval")) do
+      RunSkillEvaluationJob.perform_now(@result)
+    end
+
+    assert_equal "failed", @result.reload.status
+    assert_not @model.reload.is_deprecated?
   end
 
   test "a source with no fetched data fails the result rather than sending nothing" do

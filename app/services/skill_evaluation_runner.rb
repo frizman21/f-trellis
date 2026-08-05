@@ -45,6 +45,18 @@ class SkillEvaluationRunner
       return blocked("#{@evaluation.learning_set.name} has no sources; add a page to the set before running.")
     end
 
+    # Empty here means every model on the evaluation has gone out of circulation
+    # since it was configured. Said plainly, because the alternative is queueing
+    # nothing and reporting "Nothing to run", which reads as "already done".
+    if models.empty?
+      reason = if @evaluation.base_model&.unusable?
+        "the baseline #{@evaluation.base_model.model_id} is #{@evaluation.base_model.capability_flag}"
+      else
+        "every model on it is deprecated or disabled"
+      end
+      return blocked("This evaluation has nothing to run: #{reason}.")
+    end
+
     queued  = []
     skipped = []
 

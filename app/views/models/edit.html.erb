@@ -1,0 +1,38 @@
+<% content_for :title, "Edit #{@model.model_id}" %>
+
+<h1 class="mb-1"><code><%= @model.model_id %></code></h1>
+<p class="text-muted"><%= @model.provider %> &middot; <%= @model.name %><%= " · #{@model.family}" if @model.family.present? %></p>
+
+<%= form_with model: @model, url: model_path(@model, provider: params[:provider], q: params[:q],
+                                             show_stale: params[:show_stale], page: params[:page]),
+              method: :patch, local: true do |f| %>
+  <div class="form-check mb-3">
+    <%= f.check_box :is_deprecated, class: "form-check-input" %>
+    <%= f.label :is_deprecated, "Deprecated", class: "form-check-label" %>
+    <div class="form-text">
+      The provider will not serve this model — retired, served only by another
+      endpoint, or not available to this account. Set automatically when a run
+      comes back saying so, and cleared here if the provider brings it back.
+    </div>
+  </div>
+
+  <div class="form-check mb-3">
+    <%= f.check_box :is_disabled, class: "form-check-input" %>
+    <%= f.label :is_disabled, "Disabled", class: "form-check-label" %>
+    <div class="form-text">
+      The model works, but we have chosen not to spend on it. Never set
+      automatically.
+    </div>
+  </div>
+
+  <p class="text-muted small">
+    Either one takes the model off every picker, out of every objective's
+    suggestions, and out of runs already configured to use it. Everything else on
+    this row comes from the provider and is rewritten at the next refresh.
+  </p>
+
+  <%= f.submit "Save", class: "btn btn-primary" %>
+  <%= link_to "Cancel", models_path(provider: params[:provider], q: params[:q],
+                                    show_stale: params[:show_stale], page: params[:page]),
+              class: "btn btn-outline-secondary" %>
+<% end %>

@@ -60,6 +60,14 @@ end
 # agree: the pointer is what the edit form writes, the revision is the history.
 seed_skill_model = Model.selectable.first
 
+# So the models page shows both out-of-circulation states without waiting for a
+# run to fail. Chosen from models that already carry a capability flag — an
+# embedding or audio model nothing would have picked anyway — so seeding this
+# never takes a working model away from the rest of the seeds.
+Model.current.usable.reject(&:chat_capable?).first(2).each_with_index do |model, index|
+  model.update!(index.zero? ? { is_deprecated: true } : { is_disabled: true })
+end
+
 if seed_skill_model
   pull_organization_names.update!(preferred_model: seed_skill_model)
   current = pull_organization_names.skill_revisions.order(:sequence).last

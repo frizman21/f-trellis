@@ -147,6 +147,26 @@ class SkillEvaluationsControllerTest < ActionDispatch::IntegrationTest
     assert_select "dd", text: /gpt-fast/
   end
 
+  test "show says which ticked models are out of circulation" do
+    evaluation = evaluation_with(models: [ @slow ])
+    @slow.update!(is_deprecated: true)
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_match(/Not run: gpt-slow/, @response.body)
+  end
+
+  test "show says the run cannot happen when the baseline is out of circulation" do
+    evaluation = evaluation_with(models: [ @slow ])
+    @fast.update!(is_disabled: true)
+
+    get skill_evaluation_path(evaluation)
+
+    assert_response :success
+    assert_match(/nothing to measure against/, @response.body)
+  end
+
   test "run queues one job per source and model pair" do
     evaluation = evaluation_with
 

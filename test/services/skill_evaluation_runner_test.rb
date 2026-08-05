@@ -105,6 +105,30 @@ class SkillEvaluationRunnerTest < ActiveJob::TestCase
     assert_match(/Pages under test has no sources/, outcome.summary)
   end
 
+  # Queueing nothing and reporting "Nothing to run" would read as "already done".
+  test "a deprecated baseline blocks the run and says why" do
+    @fast.update!(is_deprecated: true)
+
+    outcome = nil
+    assert_no_enqueued_jobs only: RunSkillEvaluationJob do
+      outcome = SkillEvaluationRunner.call(evaluation: @evaluation.reload)
+    end
+
+    assert outcome.blocked?
+    assert_match(/baseline gpt-fast is deprecated/, outcome.summary)
+  end
+
+  test "a run skips a ticked model that has since been disabled" do
+    @slow.update!(is_disabled: true)
+
+    outcome = nil
+    assert_difference "SkillEvaluationResult.count", 2 do
+      outcome = SkillEvaluationRunner.call(evaluation: @evaluation.reload)
+    end
+
+    assert_equal [ @fast ], outcome.queued.map(&:model).uniq
+  end
+
   test "a page added to the set is picked up by the next run" do
     SkillEvaluationRunner.call(evaluation: @evaluation)
     @set.add_source(fetched_source("https://eval.test/c"))

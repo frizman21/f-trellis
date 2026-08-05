@@ -45,6 +45,27 @@ class ModelSlateTest < ActiveSupport::TestCase
     assert_not_includes ids(suggestions), "text-embedding-9"
   end
 
+  test "cheapest never reaches for a deprecated or disabled model" do
+    @nano.update!(is_deprecated: true)
+    @haiku.update!(is_disabled: true)
+
+    suggestions = ModelSlate.call(objective: "cheapest", models: Model.selectable.to_a, count: 6)
+
+    assert_not_includes ids(suggestions), "gpt-nano-1"
+    assert_not_includes ids(suggestions), "claude-haiku-1"
+  end
+
+  # The boundary: taking out the only member of a family must drop the family,
+  # not leave a suggestion with a nil model in it.
+  test "survey drops a family whose only member is out of circulation" do
+    @haiku.update!(is_deprecated: true)
+
+    suggestions = ModelSlate.call(objective: "survey", models: Model.selectable.to_a)
+
+    assert_not_includes suggestions.map(&:reason), "represents claude-haiku"
+    assert_empty suggestions.select { |s| s.model.nil? }
+  end
+
   test "a model with no published price sorts last, not free" do
     unpriced = build_model("gpt-unpriced", family: "gpt-mystery")
 

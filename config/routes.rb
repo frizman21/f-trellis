@@ -65,7 +65,7 @@ Rails.application.routes.draw do
   end
   resources :skill_evaluation_results, only: [:show]
   resources :chats, only: [:index, :show]
-  resources :models, only: [:index] do
+  resources :models, only: [:index, :edit, :update] do
     collection do
       post :refresh
     end

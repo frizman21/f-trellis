@@ -38,6 +38,10 @@ class RunSkillEvaluationJob < ApplicationJob
     # A failed pair is recorded and left alone: the other pairs in the run are
     # independent, and a raised job would retry the same call and bill for it.
     result&.update(status: "failed", error: "#{e.class}: #{e.message}", completed_at: Time.current)
+    # But if the provider said the model itself is finished, take it out of
+    # circulation now — the rest of this run is one job per page, all of them
+    # about to make the same doomed call.
+    result&.model&.deprecate_for!(e)
   end
 
   private

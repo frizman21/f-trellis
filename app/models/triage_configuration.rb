@@ -48,7 +48,13 @@ class TriageConfiguration < ApplicationRecord
   # Falls back to the same expression SkillTriage used before this record
   # existed. That is alphabetically-first-by-id rather than cheapest, which is
   # exactly the accident this page exists to let someone correct.
+  #
+  # A pinned model that has since been deprecated or disabled falls back too:
+  # triage runs unattended on every fetched source, so honouring the pin would
+  # mean failing every one of them until somebody noticed and came here.
   def effective_model
-    model || Model.selectable.first
+    return model if model && !model.unusable?
+
+    Model.selectable.first
   end
 end

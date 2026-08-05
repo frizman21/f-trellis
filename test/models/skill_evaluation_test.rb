@@ -144,6 +144,29 @@ class SkillEvaluationTest < ActiveSupport::TestCase
     assert_equal 1, e.models_to_run.count(@model)
   end
 
+  # An evaluation is configured once and run repeatedly, so the set it holds can
+  # name a model that has gone out of circulation since.
+  test "models that went deprecated or disabled are not run" do
+    deprecated = Model.create!(provider: "anthropic", model_id: "claude-gone", name: "Gone",
+                               last_seen_at: Time.current, is_deprecated: true)
+    disabled = Model.create!(provider: "anthropic", model_id: "claude-off", name: "Off",
+                             last_seen_at: Time.current, is_disabled: true)
+    e = evaluation
+    e.models = [ deprecated, disabled ]
+
+    assert_equal [ @model ], e.models_to_run
+  end
+
+  test "an unusable baseline leaves nothing to run" do
+    other = Model.create!(provider: "anthropic", model_id: "claude-eval", name: "Other",
+                          last_seen_at: Time.current)
+    e = evaluation
+    e.models = [ other ]
+    @model.update!(is_deprecated: true)
+
+    assert_empty e.reload.models_to_run
+  end
+
   test "destroying an evaluation takes its models and results with it" do
     e = evaluation
     source = Source.create!(url: "https://eval.test/a")

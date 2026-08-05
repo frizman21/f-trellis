@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_03_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_04_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -149,6 +149,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_130000) do
     t.integer "context_window"
     t.datetime "created_at", null: false
     t.string "family"
+    t.boolean "is_deprecated", default: false, null: false
+    t.boolean "is_disabled", default: false, null: false
     t.date "knowledge_cutoff"
     t.datetime "last_seen_at"
     t.integer "max_output_tokens"
@@ -162,6 +164,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_130000) do
     t.datetime "updated_at", null: false
     t.index ["capabilities"], name: "index_models_on_capabilities", using: :gin
     t.index ["family"], name: "index_models_on_family"
+    t.index ["is_deprecated", "is_disabled"], name: "index_models_on_is_deprecated_and_is_disabled"
     t.index ["last_seen_at"], name: "index_models_on_last_seen_at"
     t.index ["modalities"], name: "index_models_on_modalities", using: :gin
     t.index ["provider", "model_id"], name: "index_models_on_provider_and_model_id", unique: true
@@ -233,6 +236,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_130000) do
     t.index ["organization_a_id", "organization_b_id"], name: "index_org_orgs_on_a_and_b", unique: true
     t.index ["organization_a_id"], name: "index_organization_organizations_on_organization_a_id"
     t.index ["organization_b_id"], name: "index_organization_organizations_on_organization_b_id"
+  end
+
+  create_table "organization_research_runs", force: :cascade do |t|
+    t.jsonb "candidates", default: [], null: false
+    t.datetime "created_at", null: false
+    t.text "error"
+    t.bigint "organization_id", null: false
+    t.integer "pages_crawled", default: 0, null: false
+    t.integer "reports_queued", default: 0, null: false
+    t.string "search_query"
+    t.bigint "seed_source_id"
+    t.string "status", default: "new", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id", "created_at"], name: "idx_on_organization_id_created_at_ae8f96bcd5"
+    t.index ["organization_id"], name: "index_organization_research_runs_on_organization_id"
+    t.index ["seed_source_id"], name: "index_organization_research_runs_on_seed_source_id"
   end
 
   create_table "organization_types", force: :cascade do |t|
@@ -738,6 +757,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_03_130000) do
   add_foreign_key "organization_organizations", "organization_organization_details", column: "current_detail_id"
   add_foreign_key "organization_organizations", "organizations", column: "organization_a_id"
   add_foreign_key "organization_organizations", "organizations", column: "organization_b_id"
+  add_foreign_key "organization_research_runs", "organizations"
+  add_foreign_key "organization_research_runs", "sources", column: "seed_source_id"
   add_foreign_key "organizations", "organization_details", column: "current_detail_id"
   add_foreign_key "part_detail_parameters", "part_details"
   add_foreign_key "part_detail_parameters", "part_type_parameters"
