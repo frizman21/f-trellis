@@ -49,7 +49,7 @@ gem "image_processing", "~> 2.0"
 gem "ruby-vips", "~> 2.2", ">= 2.2.1"
 
 # Zip archive creation for storing fetched source content as SourceDatum payloads.
-gem "rubyzip", "~> 3.3"
+gem "rubyzip", "~> 3.4"
 
 # Pagination for index views.
 gem "kaminari"
