@@ -7,7 +7,8 @@ module DomainsHelper
     "skipped"     => "bg-secondary",
     "unusable"    => "bg-warning text-dark",
     "http_error"  => "bg-danger",
-    "no_response" => "bg-danger"
+    "no_response" => "bg-danger",
+    "disallowed"  => "bg-dark"
   }.freeze
 
   # What started the fetch. Muted because it is context for the row, not its

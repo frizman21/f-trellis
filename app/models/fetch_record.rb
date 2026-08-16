@@ -15,7 +15,8 @@ class FetchRecord < ApplicationRecord
   #                redirect we would not follow — so the status may be 200
   #   no_response  the request produced nothing at all: timeout, DNS, refused
   #   skipped      no request was made; the page was already held
-  OUTCOMES = %w[ok http_error unusable no_response skipped].freeze
+  #   disallowed   robots.txt forbade it, so we never asked
+  OUTCOMES = %w[ok http_error unusable no_response skipped disallowed].freeze
 
   # What started the fetch. Kept because the log used to answer "was this a
   # crawl?" by construction, and recording everything would otherwise lose it.

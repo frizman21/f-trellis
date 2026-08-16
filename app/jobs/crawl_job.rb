@@ -13,10 +13,12 @@ class CrawlJob < ApplicationJob
   # minutes.
   DEFAULT_CRAWL_DELAY_SECONDS = 1
 
-  # An operator's explicit setting wins; otherwise the default. When robots.txt
-  # support lands, the site's own Crawl-delay slots in between the two.
+  # An operator's explicit setting wins, then the site's own Crawl-delay, then
+  # the default. Stated in one place so the precedence is not rediscovered.
   def self.delay_for(domain)
-    domain&.min_crawl_delay_seconds || DEFAULT_CRAWL_DELAY_SECONDS
+    domain&.min_crawl_delay_seconds ||
+      domain&.robots_crawl_delay_seconds ||
+      DEFAULT_CRAWL_DELAY_SECONDS
   end
 
   def perform(seed_source, crawl_type:, max_depth:, max_pages: DEFAULT_MAX_PAGES, pacer: CrawlPacer.new)
@@ -74,12 +76,52 @@ class CrawlJob < ApplicationJob
   #
   # The rescue stays, so one page that blows up does not end the crawl.
   def process_source(source)
+    # Checked at fetch time rather than at link discovery, so it also covers the
+    # seed and any page reached by another route.
+    #
+    # FetchSourceJob itself is deliberately not gated: the "Fetch content"
+    # button is an operator asking for one page, which is a different act from
+    # an automated crawl, and gating it would make a disallowed page
+    # unfetchable even deliberately.
+    if robots_disallow?(source)
+      log_disallowed(source)
+      return
+    end
+
     # Before the request, not after the last page: a one-page crawl never waits.
     @pacer.wait_for(source.domain&.host, self.class.delay_for(source.domain))
 
     FetchSourceJob.perform_now(source, trigger: "crawl")
   rescue StandardError => e
     Rails.logger.error("CrawlJob: failed processing #{source.url}: #{e.class}: #{e.message}")
+  end
+
+  # Policies are cached per host for the run, so a 500-page crawl of one site
+  # asks its robots.txt once.
+  def robots_disallow?(source)
+    return false if source.domain.nil?
+
+    @policies ||= {}
+    policy = (@policies[source.domain.id] ||= RobotsFetcher.policy_for(source.domain))
+
+    policy.disallowed?(RobotsPolicy.path_for(source.url))
+  rescue StandardError => e
+    # A crawl must not die because robots handling did. Failing open here would
+    # be the wrong default, so this fails closed and says why.
+    Rails.logger.error("CrawlJob: robots check failed for #{source.url}: #{e.class}: #{e.message}")
+    true
+  end
+
+  # The one record a crawl still writes itself. Every other outcome is written
+  # by FetchSourceJob, but a disallowed page never reaches it — that is the
+  # point of the check — so there is nothing downstream to do the logging.
+  #
+  # The log must not be the reason a crawl stops, so a record that cannot be
+  # written is logged and swallowed like any other per-page failure.
+  def log_disallowed(source)
+    FetchRecord.create!(url: source.url, status_code: nil, outcome: "disallowed", trigger: "crawl")
+  rescue StandardError => e
+    Rails.logger.error("CrawlJob: could not log #{source.url}: #{e.class}: #{e.message}")
   end
 
   # Returns the links *and* the snapshot they came out of, so the edge write can

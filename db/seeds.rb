@@ -508,11 +508,28 @@ SourceLink.record(from: link_sample_children.first, to: link_sample_source)
 
 # Fetch history for the domain page, covering every outcome so the table shows
 # each badge and the failure count is non-zero, and every trigger so the
-# "Started by" column is not uniformly "Crawl". Guarded on the domain rather
-# than per row so re-seeding does not pile up duplicate history.
+# "Started by" column is not uniformly "Crawl".
 fetch_log_domain = link_sample_source.domain
 
-if fetch_log_domain.fetch_records.none?
+# A robots.txt on the domain page, so the "what it says" panel and the
+# site-requested delay both render without waiting for a real crawl.
+if fetch_log_domain.robots_status.blank?
+  fetch_log_domain.update!(
+    robots_status: "ok",
+    robots_fetched_at: 2.hours.ago,
+    robots_crawl_delay_seconds: 2,
+    robots_txt: <<~ROBOTS
+      User-agent: *
+      Crawl-delay: 2
+      Disallow: /search
+      Disallow: /*/print$
+
+      Sitemap: https://www.nasa.gov/sitemap.xml
+    ROBOTS
+  )
+end
+
+begin
   [
     { url: link_sample_source.url,                    outcome: "ok",          status_code: 200, trigger: "crawl" },
     { url: link_sample_children.first.url,            outcome: "ok",          status_code: 200, trigger: "crawl" },
@@ -522,9 +539,16 @@ if fetch_log_domain.fetch_records.none?
     { url: "#{link_sample_source.url}rate-limited",   outcome: "http_error",  status_code: 429, trigger: "crawl" },
     { url: "#{link_sample_source.url}brochure.pdf",   outcome: "unusable",    status_code: 200, trigger: "manual" },
     { url: "#{link_sample_source.url}slow-endpoint",  outcome: "no_response", status_code: nil, trigger: "crawl" },
-    { url: "#{link_sample_source.url}already-held",   outcome: "skipped",     status_code: nil, trigger: "crawl" }
+    { url: "#{link_sample_source.url}already-held",   outcome: "skipped",     status_code: nil, trigger: "crawl" },
+    { url: "#{link_sample_source.url}search?q=x",     outcome: "disallowed",  status_code: nil, trigger: "crawl" }
   ].each_with_index do |attrs, index|
-    record = FetchRecord.create!(attrs.merge(domain: fetch_log_domain))
+    # Guarded per row rather than on the domain having no history at all, so a
+    # database seeded before a row was added still gains it.
+    record = FetchRecord.find_or_initialize_by(url: attrs[:url], domain: fetch_log_domain)
+    next if record.persisted?
+
+    record.assign_attributes(attrs.except(:url))
+    record.save!
     # Spread over an afternoon so "most recent first" is visibly doing something.
     record.update_columns(created_at: index.hours.ago)
   end
