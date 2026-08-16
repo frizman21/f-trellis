@@ -5,6 +5,14 @@
   <dt>URL</dt>
   <dd><%= external_link_to @source.url, @source.url %></dd>
 
+  <% if @source.resolved_url.present? %>
+    <dt>Served from</dt>
+    <dd>
+      <%= external_link_to @source.resolved_url, @source.resolved_url %>
+      <span class="text-muted">(this page redirects)</span>
+    </dd>
+  <% end %>
+
   <dt>Description</dt>
   <dd><%= @source.description.presence || "—" %></dd>
 
