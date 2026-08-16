@@ -12,8 +12,8 @@ class RobotsFetcher
   # Status handling per RFC 9309. The 5xx branch is the one worth knowing about:
   # a robots.txt we could not read means the site is off limits until we can.
   STATUS_OK          = "ok".freeze          # parsed and stored
-  STATUS_ABSENT      = "absent".freeze      # 404/410 — nothing was asked of us
-  STATUS_UNREACHABLE = "unreachable".freeze # 5xx or a timeout — assume disallowed
+  STATUS_ABSENT      = "absent".freeze      # 4xx — the site stated no rules
+  STATUS_UNREACHABLE = "unreachable".freeze # 5xx, 429 or a timeout — assume disallowed
 
   class << self
     def policy_for(domain, agent: CrawlerIdentity.product_token)
@@ -37,7 +37,12 @@ class RobotsFetcher
 
       case response
       when Net::HTTPSuccess then store(domain, STATUS_OK, response.body.to_s)
-      when Net::HTTPNotFound, Net::HTTPGone then store(domain, STATUS_ABSENT, nil)
+      # RFC 9309 §2.3.1.3: the whole 4xx range is "unavailable", meaning the
+      # site stated no rules and everything is permitted — not just 404 and 410.
+      # A 403 on robots.txt is common behind a WAF, and treating it as
+      # unreachable would make such a site permanently uncrawlable.
+      when Net::HTTPTooManyRequests then store(domain, STATUS_UNREACHABLE, nil)
+      when Net::HTTPClientError then store(domain, STATUS_ABSENT, nil)
       else store(domain, STATUS_UNREACHABLE, nil)
       end
     rescue StandardError => e

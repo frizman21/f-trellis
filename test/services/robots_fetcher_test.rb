@@ -48,6 +48,33 @@ class RobotsFetcherTest < ActiveSupport::TestCase
     assert_equal "absent", @domain.reload.robots_status
   end
 
+  # RFC 9309 §2.3.1.3 makes the whole 4xx range "unavailable", not just 404 and
+  # 410. A 403 on robots.txt is common behind a WAF, and treating it as
+  # unreachable would leave such a site permanently uncrawlable.
+  test "any 4xx means the site stated no rules" do
+    %w[401 403 410 418 451].each do |code|
+      domain = Domain.create!(host: "code#{code}.test")
+
+      with_robots_response(code: code) do
+        assert RobotsFetcher.policy_for(domain).allowed?("/anything"),
+               "expected #{code} to permit crawling"
+      end
+
+      assert_equal "absent", domain.reload.robots_status
+    end
+  end
+
+  # The deliberate exception to the rule above. 429 is inside 4xx, so the strict
+  # reading would have us crawl a site that just told us to slow down. Denying
+  # is the better failure mode: over-cautious rather than rude.
+  test "a 429 is denied rather than read as permission" do
+    with_robots_response(code: "429") do
+      assert RobotsFetcher.policy_for(@domain).disallowed?("/anything")
+    end
+
+    assert_equal "unreachable", @domain.reload.robots_status
+  end
+
   # The conservative branch, and the one most likely to surprise.
   test "a 500 puts the whole site off limits" do
     with_robots_response(code: "500") do
