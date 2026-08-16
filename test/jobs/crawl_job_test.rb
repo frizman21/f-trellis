@@ -208,6 +208,130 @@ class CrawlJobTest < ActiveJob::TestCase
     end
   end
 
+  # --- crawling from a sitemap -----------------------------------------------
+
+  # Stubs the reader rather than the network: what matters here is that the
+  # crawl loop is reused, not that XML parses (sitemap_reader_test covers that).
+  def with_sitemap(entries)
+    SitemapReader.singleton_class.class_eval do
+      alias_method :locations_for_without_stub, :locations_for
+      alias_method :call_without_stub, :call
+      define_method(:locations_for) { |_domain| [ "https://sitemapped.test/sitemap.xml" ] }
+      define_method(:call) do |_url, **|
+        SitemapReader::Result.new(entries: entries)
+      end
+    end
+    yield
+  ensure
+    SitemapReader.singleton_class.class_eval do
+      remove_method :locations_for
+      remove_method :call
+      alias_method :locations_for, :locations_for_without_stub
+      alias_method :call, :call_without_stub
+      remove_method :locations_for_without_stub
+      remove_method :call_without_stub
+    end
+  end
+
+  def entry(url, lastmod = nil)
+    SitemapReader::Entry.new(url: url, lastmod: lastmod)
+  end
+
+  test "from_sitemap creates and fetches a source for each listed url" do
+    seed = make_seed("https://sitemapped.test/", "<p>home</p>")
+    pages = { "https://sitemapped.test/a" => "<p>a</p>", "https://sitemapped.test/b" => "<p>b</p>" }
+
+    with_sitemap([ entry("https://sitemapped.test/a"), entry("https://sitemapped.test/b") ]) do
+      with_fake_fetcher(pages) do
+        CrawlJob.perform_now(seed, crawl_type: "from_sitemap", max_depth: 0)
+      end
+    end
+
+    assert Source.find_by(url: "https://sitemapped.test/a").source_data.any?
+    assert Source.find_by(url: "https://sitemapped.test/b").source_data.any?
+  end
+
+  test "urls outside the seed's host are dropped" do
+    seed = make_seed("https://sitemapped.test/", "<p>home</p>")
+
+    with_sitemap([ entry("https://sitemapped.test/ours"), entry("https://elsewhere.test/theirs") ]) do
+      with_fake_fetcher("https://sitemapped.test/ours" => "<p>ours</p>") do
+        CrawlJob.perform_now(seed, crawl_type: "from_sitemap", max_depth: 0)
+      end
+    end
+
+    assert_not_nil Source.find_by(url: "https://sitemapped.test/ours")
+    assert_nil Source.find_by(url: "https://elsewhere.test/theirs")
+  end
+
+  test "the exclusion list still applies to sitemap urls" do
+    SourceExclusion.create!(pattern: "https://sitemapped.test/private*", is_enabled: true)
+    seed = make_seed("https://sitemapped.test/", "<p>home</p>")
+
+    with_sitemap([ entry("https://sitemapped.test/private/x"), entry("https://sitemapped.test/open") ]) do
+      with_fake_fetcher("https://sitemapped.test/open" => "<p>open</p>") do
+        CrawlJob.perform_now(seed, crawl_type: "from_sitemap", max_depth: 0)
+      end
+    end
+
+    assert_nil Source.find_by(url: "https://sitemapped.test/private/x")
+    assert_not_nil Source.find_by(url: "https://sitemapped.test/open")
+  end
+
+  test "max_pages still caps a sitemap larger than the budget" do
+    seed = make_seed("https://sitemapped.test/", "<p>home</p>")
+    entries = (1..10).map { |i| entry("https://sitemapped.test/p#{i}") }
+    pages = (1..10).index_with { "<p>page</p>" }.transform_keys { |i| "https://sitemapped.test/p#{i}" }
+
+    with_sitemap(entries) do
+      with_fake_fetcher(pages) do
+        CrawlJob.perform_now(seed, crawl_type: "from_sitemap", max_depth: 0, max_pages: 3)
+      end
+    end
+
+    assert_equal 3, Source.where("url LIKE ?", "https://sitemapped.test/p%").count
+  end
+
+  # The reason the ordinary loop is reused rather than a second traversal.
+  test "links found on a sitemap-seeded page are still followed" do
+    seed = make_seed("https://sitemapped.test/", "<p>home</p>")
+
+    with_sitemap([ entry("https://sitemapped.test/hub") ]) do
+      with_fake_fetcher("https://sitemapped.test/hub" => '<a href="/leaf">leaf</a>',
+                        "https://sitemapped.test/leaf" => "<p>leaf</p>") do
+        CrawlJob.perform_now(seed, crawl_type: "from_sitemap", max_depth: 1)
+      end
+    end
+
+    assert_not_nil Source.find_by(url: "https://sitemapped.test/leaf")
+  end
+
+  test "lastmod is recorded when the sitemap states one" do
+    seed = make_seed("https://sitemapped.test/", "<p>home</p>")
+    stamp = Time.zone.parse("2026-05-06 07:08:09 UTC")
+
+    with_sitemap([ entry("https://sitemapped.test/dated", stamp) ]) do
+      with_fake_fetcher("https://sitemapped.test/dated" => "<p>dated</p>") do
+        CrawlJob.perform_now(seed, crawl_type: "from_sitemap", max_depth: 0)
+      end
+    end
+
+    assert_equal stamp, Source.find_by(url: "https://sitemapped.test/dated").sitemap_lastmod_at
+  end
+
+  # Better than silently crawling nothing and looking like a success.
+  test "a site with no usable sitemap fails with a stated reason" do
+    seed = make_seed("https://sitemapped.test/", "<p>home</p>")
+
+    with_sitemap([]) do
+      with_fake_fetcher do
+        assert_raises(CrawlJob::NoSitemap) do
+          CrawlJob.perform_now(seed, crawl_type: "from_sitemap", max_depth: 0)
+        end
+      end
+    end
+  end
+
   # --- page-level directives -------------------------------------------------
 
   test "a nofollowed link is not fetched and no source is created for it" do

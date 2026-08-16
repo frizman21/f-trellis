@@ -44,6 +44,24 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name=?]", "max_pages"
   end
 
+  test "the crawl form offers the sitemap crawl type" do
+    get source_path(sources(:one))
+
+    assert_response :success
+    assert_select "select[name=?] option[value=?]", "crawl_type", "from_sitemap"
+  end
+
+  test "crawl accepts from_sitemap and enqueues it" do
+    source = sources(:one)
+
+    assert_enqueued_with(job: CrawlJob) do
+      post crawl_source_path(source),
+           params: { crawl_type: "from_sitemap", max_depth: 0, max_pages: 10 }
+    end
+
+    assert_redirected_to source_path(source)
+  end
+
   test "triage refuses a noindex source rather than spending on a page we will not use" do
     source = sources(:one)
     source.update!(is_noindex: true)
