@@ -4,7 +4,17 @@ require "zip"
 class FetchSourceJob < ApplicationJob
   queue_as :default
 
-  class SourceNotFetchable < StandardError; end
+  # The status code travels on the exception rather than only inside its
+  # message. The message is human-facing prose that any later change may
+  # reword; a regex over it would fail silently rather than loudly.
+  class SourceNotFetchable < StandardError
+    attr_reader :status_code
+
+    def initialize(message = nil, status_code: nil)
+      super(message)
+      @status_code = status_code
+    end
+  end
 
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 30
@@ -26,9 +36,9 @@ class FetchSourceJob < ApplicationJob
   # tolerates whatever it gets.
   DEFAULT_CONTENT_TYPE = "text/html".freeze
 
-  # What came back, where it came from after any redirects, and what the server
-  # said it was.
-  Fetched = Struct.new(:body, :final_url, :content_type, keyword_init: true)
+  # What came back, where it came from after any redirects, what the server
+  # said it was, and the status that ended the attempt.
+  Fetched = Struct.new(:body, :final_url, :content_type, :status_code, keyword_init: true)
 
   # Only untouched sources are fetched by default, so a crawl revisiting a page
   # does not refetch it. `force: true` is for an explicit request from the UI to
@@ -48,6 +58,11 @@ class FetchSourceJob < ApplicationJob
     )
 
     source.update!(status: "complete", resolved_url: resolved_url_for(source, fetched))
+
+    # Returned so the crawl can log what the server actually answered. nil from
+    # the guard above means no request was made at all, which is a different
+    # fact and is recorded as such.
+    fetched.status_code
   rescue StandardError => e
     source.update!(status: "failed") if source.persisted?
     Rails.logger.error("FetchSourceJob failed for source ##{source.id}: #{e.class}: #{e.message}")
@@ -71,7 +86,8 @@ class FetchSourceJob < ApplicationJob
       case classify(response)
       when :success  then return read(response, current)
       when :redirect then current = redirect_target(response, uri, seen)
-      else raise SourceNotFetchable, "HTTP #{response.code} fetching #{current}"
+      else raise SourceNotFetchable.new("HTTP #{response.code} fetching #{current}",
+                                        status_code: response.code.to_i)
       end
     end
 
@@ -86,10 +102,14 @@ class FetchSourceJob < ApplicationJob
     type = response.content_type.to_s.downcase.presence
 
     if type && ACCEPTED_CONTENT_TYPES.exclude?(type)
-      raise SourceNotFetchable, "unsupported content type: #{type} at #{url}"
+      # The status travels even though the request succeeded: the server
+      # answered fine, we are the ones refusing what it sent.
+      raise SourceNotFetchable.new("unsupported content type: #{type} at #{url}",
+                                   status_code: response.code.to_i)
     end
 
-    Fetched.new(body: decode(response), final_url: url, content_type: type || DEFAULT_CONTENT_TYPE)
+    Fetched.new(body: decode(response), final_url: url,
+                content_type: type || DEFAULT_CONTENT_TYPE, status_code: response.code.to_i)
   end
 
   def decode(response)
