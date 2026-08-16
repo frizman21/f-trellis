@@ -1,13 +1,26 @@
 require "zip"
 
 class SourceDataController < ApplicationController
+  # The legacy content type: every row written before the payload's own type was
+  # recorded says this, and none of them can be backfilled — the original header
+  # was never captured.
+  ZIPPED = "application/zip".freeze
+
+  # The zip is how the payload is stored, not what it is. Since content_type
+  # started describing the page inside the container, a download hands back the
+  # page. Rows written before that change carry the container's own type and are
+  # still sent as the zip they are.
   def download
     datum = SourceDatum.find(params[:id])
 
-    send_data datum.data,
-              type: datum.content_type.presence || "application/octet-stream",
-              filename: filename_for(datum),
-              disposition: "attachment"
+    if datum.content_type == ZIPPED
+      send_data datum.data, type: ZIPPED, filename: filename_for(datum), disposition: "attachment"
+    else
+      send_data datum.html.to_s,
+                type: datum.content_type.presence || "application/octet-stream",
+                filename: filename_for(datum),
+                disposition: "attachment"
+    end
   end
 
   # Unzip the payload, pull out its links (the same extraction CrawlJob uses),

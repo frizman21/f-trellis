@@ -23,9 +23,15 @@ class CrawlJobTest < ActiveJob::TestCase
     source
   end
 
-  def with_fake_fetcher(pages = {})
+  # `refuses` names URLs the fetcher rejects outright — a PDF, a 404 — so a
+  # test can check the crawl survives a page it cannot read. Positional rather
+  # than a keyword: callers pass `pages` as a bare hash, which Ruby would read
+  # as keywords if this method declared any.
+  def with_fake_fetcher(pages = {}, refuses = [])
     test = self
     FetchSourceJob.define_singleton_method(:perform_now) do |source|
+      raise FetchSourceJob::SourceNotFetchable, "refused #{source.url}" if refuses.include?(source.url)
+
       html = pages[source.url]
       test.install_data(source, html) if html
     end
@@ -112,6 +118,25 @@ class CrawlJobTest < ActiveJob::TestCase
         CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
       end
     end
+  end
+
+  # A crawl of a real site hits things it cannot read — a linked PDF, a dead
+  # page. One of them must not end the crawl.
+  test "a page the fetcher refuses does not stop the crawl" do
+    seed = make_seed("https://mixed.test/start",
+                     '<a href="/doc.pdf">datasheet</a><a href="/next">next</a>')
+
+    with_fake_fetcher({ "https://mixed.test/next" => "<p>reached</p>" },
+                      [ "https://mixed.test/doc.pdf" ]) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    refused = Source.find_by(url: "https://mixed.test/doc.pdf")
+    reached = Source.find_by(url: "https://mixed.test/next")
+
+    assert_not_nil refused, "the refused page is still recorded as a source"
+    assert_empty refused.source_data, "nothing is stored for a page that could not be read"
+    assert reached.source_data.any?, "the crawl continued past the refused page"
   end
 
   test "respects max_pages cap" do
