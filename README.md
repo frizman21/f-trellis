@@ -80,6 +80,40 @@ docker-compose exec web bundle exec rails console
 User.create!(email: "you@example.com", password: "set-a-good-one")
 ```
 
+## The crawler's identity
+
+The crawler reads other people's servers, so it identifies itself rather than
+pretending to be a browser. Every outbound request carries:
+
+```
+f-agents/<commit> (+https://github.com/f-agents)
+```
+
+The name is **`f-agents`, not `f-dod`**, and that is deliberate. This
+application is f-dod; f-agents is the project the crawler belongs to, and it is
+the token a site operator sees in their logs, looks up, and writes a
+`robots.txt` rule against. A stable public identity that outlives any single
+application is worth more than one that matches this repository's name — so
+please do not "fix" it to match.
+
+The contact URL is what makes the crawler accountable: an operator who finds
+our traffic has somewhere to go to learn what it does and how to ask it to
+stop. It defaults to a real, already-public address rather than a path on
+whatever host this is deployed to, because it has to resolve from the outside,
+from any environment, without depending on this app being reachable.
+
+Two settings override the defaults, read from `ENV` with a credentials
+fallback, the same way the LLM keys are:
+
+| Variable | Effect |
+|---|---|
+| `CRAWLER_USER_AGENT` | Replaces the agent portion. The contact URL is still appended unless the value already carries one. |
+| `CRAWLER_CONTACT_URL` | Replaces the contact URL. Set it to an empty value to send none at all. |
+
+Sending a fake browser user-agent is explicitly not supported: it would make
+`robots.txt` compliance unverifiable from the server side and the traffic
+unattributable, which defeats the point of identifying at all.
+
 ## The LLM model registry
 
 Model pickers (skills, source processing reports) read from the `models` table,
