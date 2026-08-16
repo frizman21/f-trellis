@@ -1,0 +1,71 @@
+<% content_for :title, @domain.host %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0"><%= @domain.host %></h1>
+  <%= link_to "Edit", edit_domain_path(@domain), class: "btn btn-outline-primary" %>
+</div>
+
+<dl class="row">
+  <dt class="col-sm-3">Min crawl delay</dt>
+  <dd class="col-sm-9">
+    <% if @domain.min_crawl_delay_seconds.present? %>
+      <%= pluralize(@domain.min_crawl_delay_seconds, "second") %>
+    <% else %>
+      <span class="text-muted">— (the crawler's default)</span>
+    <% end %>
+  </dd>
+
+  <dt class="col-sm-3">Sources</dt>
+  <dd class="col-sm-9"><%= @domain.sources.count %></dd>
+</dl>
+
+<h2 class="h4 mt-4">Crawl history</h2>
+
+<% if @crawled_count.positive? %>
+  <p class="text-muted">
+    <%= pluralize(@crawled_count, "page") %> crawled from this site.
+    <% if @failed_count.positive? %>
+      <span class="text-danger"><%= @failed_count %> did not come back.</span>
+    <% else %>
+      All came back.
+    <% end %>
+  </p>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>URL</th>
+        <th>Status</th>
+        <th>Outcome</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @records.each do |record| %>
+        <tr>
+          <td><%= record.created_at.to_fs(:short) %></td>
+          <td>
+            <% source = @sources_by_url[record.url] %>
+            <% if source %>
+              <%= link_to truncate(record.url, length: 70), source_path(source) %>
+            <% else %>
+              <%= truncate(record.url, length: 70) %>
+            <% end %>
+          </td>
+          <td><%= crawl_status_code(record) %></td>
+          <td><%= crawl_outcome_badge(record) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= paginate @records %>
+  <p class="text-muted small">
+    Showing <%= @records.size %> of <%= @records.total_count %>.
+  </p>
+<% else %>
+  <p class="text-muted">
+    No crawls recorded for this site. Pages fetched one at a time from a source
+    page do not appear here — only pages a crawl processed.
+  </p>
+<% end %>

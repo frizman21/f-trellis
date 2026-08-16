@@ -25,7 +25,7 @@
     <tbody>
       <% @domains.each do |domain| %>
         <tr>
-          <td><%= domain.host %></td>
+          <td><%= link_to domain.host, domain_path(domain) %></td>
           <td><%= domain.min_crawl_delay_seconds.presence || "—" %></td>
           <td><%= domain.sources_count %></td>
           <td><%= link_to "Edit", edit_domain_path(domain), class: "btn btn-sm btn-outline-primary" %></td>
