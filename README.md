@@ -147,6 +147,12 @@ The crawler waits between requests to the same host. The delay is the domain's
 `min_crawl_delay_seconds` when an operator has set one, otherwise the site's own
 `Crawl-delay`, otherwise one second.
 
+Re-fetching a page sends `If-None-Match` and `If-Modified-Since` from the last
+response, so a page that has not changed costs one small request instead of a
+full download and stores no second copy. The "Re-fetch content" button is
+deliberately unconditional — an operator pressing it wants the content, and a
+`304` with no new payload would read as a broken button.
+
 A server that answers `429` or `5xx` on a *page* request is retried up to four
 times with a growing backoff. A `Retry-After` header overrides that backoff in
 both its forms (seconds and HTTP-date) — it is an instruction, not a suggestion

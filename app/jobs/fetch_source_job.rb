@@ -73,7 +73,9 @@ class FetchSourceJob < ApplicationJob
   # carried. The header is only knowable here — the stored payload is the body
   # alone — which is why it is threaded through rather than re-derived later.
   Fetched = Struct.new(:body, :final_url, :content_type, :status_code, :robots_tag,
-                       keyword_init: true)
+                       :etag, :last_modified_at, :not_modified, keyword_init: true) do
+    def not_modified? = !!not_modified
+  end
 
   # Only untouched sources are fetched by default, so a crawl revisiting a page
   # does not refetch it. `force: true` is for an explicit request from the UI to
@@ -95,8 +97,24 @@ class FetchSourceJob < ApplicationJob
 
     source.update!(status: "in_work")
 
-    fetched = fetch_html(source.url)
-    bytes   = zip_payload(filename_for(source), fetched.body)
+    # A forced fetch is an operator asking for the content again. Sending
+    # validators would answer that with a 304 and no new payload, which reads
+    # as a broken button.
+    fetched = fetch_html(source, conditional: !force)
+
+    if fetched.not_modified?
+      # The page has not changed, so the datum already held is still current
+      # and no second copy is stored.
+      source.update!(status: "complete")
+
+      # Still a successful fetch, and still recorded: we asked, and the server
+      # answered. The 304 on the record is what distinguishes it from a fetch
+      # that stored something, without needing an outcome of its own.
+      log_fetch(source, fetched.status_code, "ok", trigger)
+      return fetched.status_code
+    end
+
+    bytes = zip_payload(filename_for(source), fetched.body)
 
     SourceDatum.create!(
       source: source,
@@ -106,7 +124,9 @@ class FetchSourceJob < ApplicationJob
 
     source.update!(status: "complete",
                    resolved_url: resolved_url_for(source, fetched),
-                   is_noindex: noindex?(fetched))
+                   is_noindex: noindex?(fetched),
+                   etag: fetched.etag,
+                   last_modified_at: fetched.last_modified_at)
 
     log_fetch(source, fetched.status_code, "ok", trigger)
 
@@ -141,17 +161,23 @@ class FetchSourceJob < ApplicationJob
   # again — scheme, exclusion list, and whether we have already been here — so
   # a redirect cannot walk the crawler somewhere a direct request would refuse
   # to go.
-  def fetch_html(url)
+  def fetch_html(source, conditional: false)
+    url     = source.url
     current = url
     seen    = Set.new([ url ])
 
     (MAX_REDIRECTS + 1).times do
-      uri      = parse_uri(current)
-      response = with_retries(current) { request(uri) }
+      uri = parse_uri(current)
+      # Validators describe the original URL, so they are only sent on the first
+      # hop — an ETag from A would provoke a spurious 304 from B.
+      headers  = conditional && current == url ? conditional_headers(source) : {}
+      response = with_retries(current) { request(uri, headers) }
 
       case classify(response)
-      when :success  then return read(response, current)
-      when :redirect then current = redirect_target(response, uri, seen)
+      when :success      then return read(response, current)
+      when :not_modified then return Fetched.new(final_url: current, not_modified: true,
+                                                 status_code: response.code.to_i)
+      when :redirect     then current = redirect_target(response, uri, seen)
       else raise SourceNotFetchable.new("HTTP #{response.code} fetching #{current}",
                                         status_code: response.code.to_i)
       end
@@ -176,7 +202,9 @@ class FetchSourceJob < ApplicationJob
 
     Fetched.new(body: decode(response), final_url: url,
                 content_type: type || DEFAULT_CONTENT_TYPE, status_code: response.code.to_i,
-                robots_tag: response["X-Robots-Tag"])
+                robots_tag: response["X-Robots-Tag"],
+                etag: response["ETag"].presence,
+                last_modified_at: parse_http_date(response["Last-Modified"]))
   end
 
   def decode(response)
@@ -192,14 +220,25 @@ class FetchSourceJob < ApplicationJob
   end
 
   # The one place a response's status becomes a decision.
+  # 304 is checked before the redirect branch: Net::HTTPNotModified is itself a
+  # Net::HTTPRedirection, so the obvious ordering would treat every unchanged
+  # page as a redirect with no Location and fail it.
   def classify(response)
     case response
     when Net::HTTPSuccess          then :success
+    when Net::HTTPNotModified      then :not_modified
     when Net::HTTPRedirection      then :redirect
     when Net::HTTPTooManyRequests,
          Net::HTTPServerError      then :transient
     else :error
     end
+  end
+
+  def conditional_headers(source)
+    headers = {}
+    headers["If-None-Match"] = source.etag if source.etag.present?
+    headers["If-Modified-Since"] = source.last_modified_at.httpdate if source.last_modified_at.present?
+    headers
   end
 
   # Retries live around the request rather than in ActiveJob's retry_on,
@@ -259,6 +298,14 @@ class FetchSourceJob < ApplicationJob
 
   def sleep_for(seconds)
     Kernel.sleep(seconds)
+  end
+
+  def parse_http_date(value)
+    return nil if value.blank?
+
+    Time.httpdate(value)
+  rescue ArgumentError
+    nil
   end
 
   # A worker that died mid-fetch leaves a source in_work, and the guard in

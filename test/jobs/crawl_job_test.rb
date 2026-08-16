@@ -102,7 +102,10 @@ class CrawlJobTest < ActiveJob::TestCase
     install_robots(robots)
     FetchSourceJob.class_eval do
       alias_method :fetch_html_without_stub, :fetch_html
-      define_method(:fetch_html) do |url|
+      # Mirrors the real signature, which takes the source and a conditional
+      # flag rather than a bare URL.
+      define_method(:fetch_html) do |source, conditional: false|
+        url = source.url
         failure = failures[url]
         raise Net::ReadTimeout if failure == :timeout
 

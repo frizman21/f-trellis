@@ -235,6 +235,129 @@ class FetchSourceJobTest < ActiveJob::TestCase
     assert_nil source.reload.resolved_url
   end
 
+  # --- conditional requests --------------------------------------------------
+
+  test "a source with no validators sends no conditional headers" do
+    source = Source.create!(url: "https://fresh.test/page")
+
+    with_fake_http do |requests|
+      FetchSourceJob.perform_now(source)
+
+      assert_nil requests.first[:headers]["If-None-Match"]
+      assert_nil requests.first[:headers]["If-Modified-Since"]
+    end
+  end
+
+  test "an etag is sent back as If-None-Match" do
+    source = Source.create!(url: "https://etagged.test/page", etag: 'W/"abc"')
+
+    with_fake_http do |requests|
+      FetchSourceJob.perform_now(source)
+
+      assert_equal 'W/"abc"', requests.first[:headers]["If-None-Match"]
+    end
+  end
+
+  test "a last-modified is sent back as an HTTP-date" do
+    modified = Time.zone.parse("2026-01-02 03:04:05 UTC")
+    source = Source.create!(url: "https://dated-page.test/page", last_modified_at: modified)
+
+    with_fake_http do |requests|
+      FetchSourceJob.perform_now(source)
+
+      assert_equal modified.httpdate, requests.first[:headers]["If-Modified-Since"]
+    end
+  end
+
+  test "a 200 records the validators the response carried" do
+    source = Source.create!(url: "https://records.test/page")
+    headers = { "Content-Type" => "text/html", "ETag" => '"xyz"',
+                "Last-Modified" => "Wed, 21 Oct 2026 07:28:00 GMT" }
+
+    with_fake_http(headers: headers) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_equal '"xyz"', source.reload.etag
+    assert_equal Time.utc(2026, 10, 21, 7, 28, 0), source.last_modified_at
+  end
+
+  test "a response that stops sending an ETag clears the stored one" do
+    source = Source.create!(url: "https://dropped.test/page", etag: '"old"')
+
+    with_fake_http do
+      FetchSourceJob.perform_now(source, force: true)
+    end
+
+    assert_nil source.reload.etag
+  end
+
+  # The core case. 304 is not a Net::HTTPSuccess, so without the classification
+  # change this would fail every unchanged page.
+  test "a 304 stores no new datum and leaves the source complete" do
+    source = Source.create!(url: "https://unchanged.test/page", etag: '"same"')
+
+    with_fake_http { FetchSourceJob.perform_now(source, force: true) }
+
+    assert_equal 1, source.reload.source_data.count
+    original = source.source_data.last
+
+    with_fake_http(code: "304") do
+      assert_no_difference -> { SourceDatum.count } do
+        FetchSourceJob.perform_now(source, force: false)
+      end
+    end
+
+    assert_equal "complete", source.reload.status
+    assert_equal original, source.latest_datum, "the datum already held is still current"
+  end
+
+  test "a forced refetch sends no conditional headers, so the button always returns content" do
+    source = Source.create!(url: "https://forced.test/page", etag: '"same"',
+                            last_modified_at: 1.day.ago)
+
+    with_fake_http do |requests|
+      FetchSourceJob.perform_now(source, force: true)
+
+      assert_nil requests.first[:headers]["If-None-Match"]
+      assert_nil requests.first[:headers]["If-Modified-Since"]
+    end
+  end
+
+  test "a malformed Last-Modified is ignored rather than raising" do
+    source = Source.create!(url: "https://badly-dated.test/page")
+
+    with_fake_http(headers: { "Content-Type" => "text/html", "Last-Modified" => "whenever" }) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_equal "complete", source.reload.status
+    assert_nil source.last_modified_at
+  end
+
+  # Proves the relaxed status check did not widen into accepting everything.
+  test "a 404 still fails once 304 is a success" do
+    source = Source.create!(url: "https://still-gone.test/page")
+
+    with_fake_http(code: "404") do
+      assert_raises(FetchSourceJob::SourceNotFetchable) { FetchSourceJob.perform_now(source) }
+    end
+
+    assert_equal "failed", source.reload.status
+  end
+
+  test "validators are only sent on the first hop of a redirect chain" do
+    source = Source.create!(url: "https://hopped.test/page", etag: '"first"')
+
+    with_fake_http(responses: [ redirect_to("https://hopped.test/final"), ok ]) do |requests|
+      FetchSourceJob.perform_now(source)
+
+      assert_equal '"first"', requests.first[:headers]["If-None-Match"]
+      assert_nil requests.last[:headers]["If-None-Match"],
+                 "an ETag for one URL would provoke a spurious 304 from another"
+    end
+  end
+
   # --- backoff and retry -----------------------------------------------------
 
   test "a 429 is retried and can succeed" do
