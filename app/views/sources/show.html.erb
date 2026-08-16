@@ -191,6 +191,15 @@
     Depth 0 only fetches this page. Stay-in-domain follows links only on
     <code><%= @source.domain&.host %></code>. Already-known URLs are skipped.
   </div>
+  <div class="form-text">
+    <% delay = CrawlJob.delay_for(@source.domain) %>
+    The crawler waits <%= pluralize(delay, "second") %> between requests to
+    <code><%= @source.domain&.host %></code><%
+      %><% if @source.domain&.min_crawl_delay_seconds.blank? %> (the default)<% end %>,
+    so a full <%= CrawlJob::DEFAULT_MAX_PAGES %>-page crawl of this site takes at
+    least <%= distance_of_time_in_words(delay * CrawlJob::DEFAULT_MAX_PAGES) %>.
+    <%= link_to "Change it", edit_domain_path(@source.domain) if @source.domain %>
+  </div>
 <% end %>
 
 <h2>Source Data</h2>

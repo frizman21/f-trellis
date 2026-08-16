@@ -38,7 +38,32 @@ class CrawlJobTest < ActiveJob::TestCase
   #
   # Positional rather than keyword args: callers pass `pages` as a bare hash,
   # which Ruby would read as keywords if this method declared any.
+  #
+  # Every crawl in this file also runs through a pacer that records instead of
+  # sleeping. Without it each page would really wait DEFAULT_CRAWL_DELAY_SECONDS
+  # and the suite would take minutes — at which point it would stop being run.
+  # Injected here rather than through a hook in CrawlJob, so production code
+  # carries no seam that exists only for tests.
+  attr_reader :slept
+
+  def install_test_pacer
+    @slept = []
+    @pacer_clock = 0.0
+    pacer = CrawlPacer.new(clock: -> { @pacer_clock },
+                           sleeper: ->(seconds) { @slept << seconds; @pacer_clock += seconds })
+
+    original = CrawlJob.method(:perform_now)
+    CrawlJob.define_singleton_method(:perform_now) do |seed, **kwargs|
+      original.call(seed, **{ pacer: pacer }.merge(kwargs))
+    end
+  end
+
+  def remove_test_pacer
+    CrawlJob.singleton_class.send(:remove_method, :perform_now)
+  end
+
   def with_fake_fetcher(pages = {}, failures = {})
+    install_test_pacer
     FetchSourceJob.class_eval do
       alias_method :fetch_html_without_stub, :fetch_html
       define_method(:fetch_html) do |url|
@@ -60,6 +85,7 @@ class CrawlJobTest < ActiveJob::TestCase
       alias_method :fetch_html, :fetch_html_without_stub
       remove_method :fetch_html_without_stub
     end
+    remove_test_pacer
   end
 
   test "crawls seed only when depth is zero" do
@@ -140,6 +166,72 @@ class CrawlJobTest < ActiveJob::TestCase
         CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
       end
     end
+  end
+
+  # --- pacing ----------------------------------------------------------------
+
+  test "a two-page crawl of one host waits once, for the domain's delay" do
+    seed = make_seed("https://paced.test/start", '<a href="/leaf">leaf</a>')
+    seed.domain.update!(min_crawl_delay_seconds: 4)
+
+    with_fake_fetcher("https://paced.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_equal [ 4.0 ], slept
+  end
+
+  test "a one-page crawl never waits" do
+    seed = make_seed("https://single.test/start", "<p>nothing linked</p>")
+    seed.domain.update!(min_crawl_delay_seconds: 4)
+
+    with_fake_fetcher do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 0)
+    end
+
+    assert_empty slept
+  end
+
+  test "a crawl across two hosts does not pace one against the other" do
+    seed = make_seed("https://hostA.test/start", '<a href="https://hostB.test/page">out</a>')
+    seed.domain.update!(min_crawl_delay_seconds: 4)
+
+    with_fake_fetcher("https://hostB.test/page" => "<p>elsewhere</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "follow_external_links", max_depth: 1)
+    end
+
+    assert_empty slept
+  end
+
+  # The promise the domain form has always made and never kept.
+  test "a domain with no delay set uses the crawler's default" do
+    seed = make_seed("https://defaulted.test/start", '<a href="/leaf">leaf</a>')
+
+    assert_nil seed.domain.min_crawl_delay_seconds
+
+    with_fake_fetcher("https://defaulted.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_equal [ CrawlJob::DEFAULT_CRAWL_DELAY_SECONDS.to_f ], slept
+  end
+
+  test "an explicit delay is preferred over the default" do
+    assert_equal 9, CrawlJob.delay_for(Domain.new(host: "x.test", min_crawl_delay_seconds: 9))
+    assert_equal CrawlJob::DEFAULT_CRAWL_DELAY_SECONDS, CrawlJob.delay_for(Domain.new(host: "x.test"))
+    assert_equal CrawlJob::DEFAULT_CRAWL_DELAY_SECONDS, CrawlJob.delay_for(nil)
+  end
+
+  # Zero is a real setting: an operator saying "this site is ours, go fast".
+  test "a delay of zero disables waiting" do
+    seed = make_seed("https://fast.test/start", '<a href="/leaf">leaf</a>')
+    seed.domain.update!(min_crawl_delay_seconds: 0)
+
+    with_fake_fetcher("https://fast.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_empty slept
   end
 
   test "edges name the snapshot the links were read out of" do

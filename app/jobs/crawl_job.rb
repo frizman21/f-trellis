@@ -7,7 +7,21 @@ class CrawlJob < ApplicationJob
   DEFAULT_MAX_PAGES = 500
   MAX_MAX_PAGES = 5_000
 
-  def perform(seed_source, crawl_type:, max_depth:, max_pages: DEFAULT_MAX_PAGES)
+  # What "the crawler's default" in the domain form has always promised, and
+  # never delivered. One second is slow enough to be unremarkable in a server
+  # log and fast enough that a 500-page crawl still finishes in under ten
+  # minutes.
+  DEFAULT_CRAWL_DELAY_SECONDS = 1
+
+  # An operator's explicit setting wins; otherwise the default. When robots.txt
+  # support lands, the site's own Crawl-delay slots in between the two.
+  def self.delay_for(domain)
+    domain&.min_crawl_delay_seconds || DEFAULT_CRAWL_DELAY_SECONDS
+  end
+
+  def perform(seed_source, crawl_type:, max_depth:, max_pages: DEFAULT_MAX_PAGES, pacer: CrawlPacer.new)
+    @pacer = pacer
+
     crawl_type = crawl_type.to_s
     raise ArgumentError, "invalid crawl_type: #{crawl_type.inspect}" unless CRAWL_TYPES.include?(crawl_type)
 
@@ -60,6 +74,9 @@ class CrawlJob < ApplicationJob
   #
   # The rescue stays, so one page that blows up does not end the crawl.
   def process_source(source)
+    # Before the request, not after the last page: a one-page crawl never waits.
+    @pacer.wait_for(source.domain&.host, self.class.delay_for(source.domain))
+
     FetchSourceJob.perform_now(source, trigger: "crawl")
   rescue StandardError => e
     Rails.logger.error("CrawlJob: failed processing #{source.url}: #{e.class}: #{e.message}")
