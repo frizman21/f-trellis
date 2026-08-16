@@ -120,6 +120,30 @@ class CrawlJobTest < ActiveJob::TestCase
     end
   end
 
+  test "crawl records are attributable to the host they were fetched from" do
+    seed = make_seed("https://attributed.test/start", '<a href="/leaf">leaf</a>')
+
+    with_fake_fetcher("https://attributed.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    hosts = CrawlRecord.where(url: [ "https://attributed.test/start", "https://attributed.test/leaf" ])
+                       .map { |record| record.domain.host }
+
+    assert_equal [ "attributed.test" ], hosts.uniq
+  end
+
+  test "a crawl across two hosts writes records against both domains" do
+    seed = make_seed("https://first.test/start", '<a href="https://second.test/page">out</a>')
+
+    with_fake_fetcher("https://second.test/page" => "<p>elsewhere</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "follow_external_links", max_depth: 1)
+    end
+
+    assert_equal "first.test", CrawlRecord.find_by(url: "https://first.test/start").domain.host
+    assert_equal "second.test", CrawlRecord.find_by(url: "https://second.test/page").domain.host
+  end
+
   # A crawl of a real site hits things it cannot read — a linked PDF, a dead
   # page. One of them must not end the crawl.
   test "a page the fetcher refuses does not stop the crawl" do

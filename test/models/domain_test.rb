@@ -34,4 +34,34 @@ class DomainTest < ActiveSupport::TestCase
     assert_not domain.destroy
     assert_includes domain.errors[:base].join, "Cannot delete"
   end
+
+  test "for_url returns the domain already known for a host" do
+    assert_equal domains(:example_com), Domain.for_url("https://example.com/some/page")
+  end
+
+  test "for_url creates a domain the first time a host is seen" do
+    assert_difference -> { Domain.count }, 1 do
+      assert_equal "brand-new.test", Domain.for_url("https://brand-new.test/page").host
+    end
+  end
+
+  test "for_url downcases the host" do
+    assert_equal "example.com", Domain.for_url("HTTPS://Example.COM/page").host
+  end
+
+  test "for_url returns nil rather than raising on an unusable url" do
+    assert_nil Domain.for_url("not a url")
+    assert_nil Domain.for_url("")
+    assert_nil Domain.for_url(nil)
+  end
+
+  # A log is about the domain and means nothing without it, unlike a source.
+  test "destroying a domain takes its crawl records with it" do
+    domain = Domain.create!(host: "logs-only.test")
+    CrawlRecord.create!(url: "https://logs-only.test/a", domain: domain)
+
+    assert_difference -> { CrawlRecord.count }, -1 do
+      assert domain.destroy
+    end
+  end
 end
