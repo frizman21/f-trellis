@@ -30,6 +30,12 @@ class Source < ApplicationRecord
 
   scope :promotable_pending, -> { where(is_promotable: true, is_fixtured: false) }
 
+  # A page that asked not to be kept as a retrievable record. Still readable in
+  # the app; simply not turned into knowledge-graph facts.
+  def indexable?
+    !is_noindex
+  end
+
   before_validation :assign_domain_from_url
 
   # A page is identified by its URL. Two people pasting the same link must land

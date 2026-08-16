@@ -44,6 +44,27 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name=?]", "max_pages"
   end
 
+  test "triage refuses a noindex source rather than spending on a page we will not use" do
+    source = sources(:one)
+    source.update!(is_noindex: true)
+
+    get triage_source_path(source)
+
+    assert_redirected_to source_path(source)
+    follow_redirect!
+    assert_match(/noindex/, response.body)
+  end
+
+  test "the source page says when a page asked not to be indexed" do
+    source = sources(:one)
+    source.update!(is_noindex: true)
+
+    get source_path(source)
+
+    assert_response :success
+    assert_match(/noindex/, response.body)
+  end
+
   # The cost of a large crawl should be visible before it is started, not after.
   test "the crawl form states the effective delay for this source's domain" do
     source = sources(:one)

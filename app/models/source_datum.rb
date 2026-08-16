@@ -38,7 +38,7 @@ class SourceDatum < ApplicationRecord
   # silently dropped — see the "Extract links" page.
   def extract_links
     content = html
-    return LinkExtractor::Result.new(internal: [], external: [], excluded: []) if content.blank?
+    return LinkExtractor::Result.new(internal: [], external: [], excluded: [], nofollowed: []) if content.blank?
 
     exclude(LinkExtractor.call(content, base_url: source.url))
   end
@@ -53,7 +53,8 @@ class SourceDatum < ApplicationRecord
     external, excluded_external = SourceExclusion.partition_urls(result.external, patterns)
 
     LinkExtractor::Result.new(internal: internal, external: external,
-                              excluded: excluded_internal + excluded_external)
+                              excluded: excluded_internal + excluded_external,
+                              nofollowed: result.nofollowed)
   end
 
   def assign_content_hash

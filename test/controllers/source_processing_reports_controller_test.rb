@@ -132,6 +132,20 @@ class SourceProcessingReportsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/has no revisions/, response.body)
   end
 
+  # The page asked not to be kept as a retrievable record, and turning it into
+  # graph facts is exactly that.
+  test "a noindex source is refused with a stated reason" do
+    @source.update!(is_noindex: true)
+
+    assert_no_difference "SourceProcessingReport.count" do
+      submit
+    end
+
+    follow_redirect!
+    assert_match(/noindex/, response.body)
+    assert_match(/still readable/, response.body)
+  end
+
   test "the uniqueness rule is enforced at the model too" do
     submit
     hash = @source.source_data.last.content_hash

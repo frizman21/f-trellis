@@ -37,8 +37,11 @@ class FetchSourceJob < ApplicationJob
   DEFAULT_CONTENT_TYPE = "text/html".freeze
 
   # What came back, where it came from after any redirects, what the server
-  # said it was, and the status that ended the attempt.
-  Fetched = Struct.new(:body, :final_url, :content_type, :status_code, keyword_init: true)
+  # said it was, the status that ended the attempt, and any X-Robots-Tag it
+  # carried. The header is only knowable here — the stored payload is the body
+  # alone — which is why it is threaded through rather than re-derived later.
+  Fetched = Struct.new(:body, :final_url, :content_type, :status_code, :robots_tag,
+                       keyword_init: true)
 
   # Only untouched sources are fetched by default, so a crawl revisiting a page
   # does not refetch it. `force: true` is for an explicit request from the UI to
@@ -69,7 +72,9 @@ class FetchSourceJob < ApplicationJob
       data: bytes
     )
 
-    source.update!(status: "complete", resolved_url: resolved_url_for(source, fetched))
+    source.update!(status: "complete",
+                   resolved_url: resolved_url_for(source, fetched),
+                   is_noindex: noindex?(fetched))
 
     log_fetch(source, fetched.status_code, "ok", trigger)
 
@@ -138,7 +143,8 @@ class FetchSourceJob < ApplicationJob
     end
 
     Fetched.new(body: decode(response), final_url: url,
-                content_type: type || DEFAULT_CONTENT_TYPE, status_code: response.code.to_i)
+                content_type: type || DEFAULT_CONTENT_TYPE, status_code: response.code.to_i,
+                robots_tag: response["X-Robots-Tag"])
   end
 
   def decode(response)
@@ -182,6 +188,15 @@ class FetchSourceJob < ApplicationJob
   # consulted during link extraction, which a redirect never passes through.
   def excluded?(url)
     SourceExclusion.enabled.any? { |exclusion| exclusion.matches?(url) }
+  end
+
+  # The page's own directives and the response header both count, and the more
+  # restrictive wins — either is the site asking.
+  def noindex?(fetched)
+    page = RobotsDirectives.from_html(fetched.body)
+    header = fetched.robots_tag.presence && RobotsDirectives.from_content(fetched.robots_tag)
+
+    page.merge(header).noindex?
   end
 
   # Recorded only when it differs, so the column answers "was this moved?"
