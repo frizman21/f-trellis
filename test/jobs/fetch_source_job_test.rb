@@ -235,6 +235,158 @@ class FetchSourceJobTest < ActiveJob::TestCase
     assert_nil source.reload.resolved_url
   end
 
+  # --- backoff and retry -----------------------------------------------------
+
+  test "a 429 is retried and can succeed" do
+    source = Source.create!(url: "https://limited.test/page")
+
+    with_fake_http(responses: [ { code: "429", body: "" }, ok ]) do |requests|
+      FetchSourceJob.perform_now(source)
+
+      assert_equal 2, requests.size
+    end
+
+    assert_equal "complete", source.reload.status
+    assert_equal 1, source.source_data.count, "a retry must not store the page twice"
+  end
+
+  test "a 503 is retried and a 404 is not" do
+    transient = Source.create!(url: "https://blip.test/page")
+
+    with_fake_http(responses: [ { code: "503", body: "" }, ok ]) do
+      FetchSourceJob.perform_now(transient)
+    end
+
+    assert_equal "complete", transient.reload.status
+
+    permanent = Source.create!(url: "https://gone-for-good.test/page")
+
+    with_fake_http(code: "404") do |requests|
+      assert_raises(FetchSourceJob::SourceNotFetchable) { FetchSourceJob.perform_now(permanent) }
+
+      assert_equal 1, requests.size, "a definite answer is not worth asking for twice"
+    end
+  end
+
+  test "a timeout is retried" do
+    source = Source.create!(url: "https://slow.test/page")
+
+    with_fake_http(responses: [ { raise: Net::ReadTimeout.new }, ok ]) do |requests|
+      FetchSourceJob.perform_now(source)
+
+      assert_equal 2, requests.size
+    end
+
+    assert_equal "complete", source.reload.status
+  end
+
+  test "retries are bounded and the source then fails" do
+    source = Source.create!(url: "https://always-down.test/page")
+
+    with_fake_http(code: "503") do |requests|
+      assert_raises(FetchSourceJob::SourceTemporarilyUnavailable) { FetchSourceJob.perform_now(source) }
+
+      assert_equal FetchSourceJob::MAX_ATTEMPTS, requests.size
+    end
+
+    assert_equal "failed", source.reload.status
+  end
+
+  test "the backoff grows between attempts" do
+    source = Source.create!(url: "https://backoff.test/page")
+
+    with_fake_http(code: "503") do
+      assert_raises(FetchSourceJob::SourceTemporarilyUnavailable) { FetchSourceJob.perform_now(source) }
+    end
+
+    assert_equal [ 1, 2, 4 ], fake_http_slept
+  end
+
+  # An instruction, not a suggestion.
+  test "Retry-After in seconds overrides our own backoff" do
+    source = Source.create!(url: "https://polite.test/page")
+
+    with_fake_http(responses: [ { code: "429", body: "", headers: { "Retry-After" => "42" } }, ok ]) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_equal [ 42 ], fake_http_slept
+  end
+
+  test "Retry-After as an HTTP-date is converted to a delay from now" do
+    source = Source.create!(url: "https://dated.test/page")
+    header = 30.seconds.from_now.httpdate
+
+    with_fake_http(responses: [ { code: "503", body: "", headers: { "Retry-After" => header } }, ok ]) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_in_delta 30, fake_http_slept.first, 2
+  end
+
+  test "a Retry-After beyond the ceiling gives up rather than parking a worker" do
+    source = Source.create!(url: "https://very-slow.test/page")
+    header = (FetchSourceJob::MAX_RETRY_AFTER + 1.hour).to_i.to_s
+
+    with_fake_http(code: "503", headers: { "Retry-After" => header }) do |requests|
+      assert_raises(FetchSourceJob::SourceTemporarilyUnavailable) { FetchSourceJob.perform_now(source) }
+
+      assert_equal 1, requests.size
+    end
+
+    assert_empty fake_http_slept
+    assert_equal "failed", source.reload.status
+  end
+
+  test "a malformed Retry-After is ignored rather than raising" do
+    source = Source.create!(url: "https://garbled.test/page")
+
+    with_fake_http(responses: [ { code: "503", body: "", headers: { "Retry-After" => "soon-ish" } }, ok ]) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_equal "complete", source.reload.status
+    assert_equal [ 1 ], fake_http_slept
+  end
+
+  # The regression this card is most likely to introduce.
+  test "an intermediate retry does not mark the source failed" do
+    source = Source.create!(url: "https://recovers.test/page")
+
+    with_fake_http(responses: [ { code: "503", body: "" }, ok ]) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_equal "complete", source.reload.status
+  end
+
+  # --- stuck sources ---------------------------------------------------------
+
+  test "a source left in_work by a dead worker becomes fetchable again" do
+    source = Source.create!(url: "https://stuck.test/page")
+    source.update!(status: "in_work")
+    source.update_columns(updated_at: 2.hours.ago)
+
+    with_fake_http do
+      assert_difference -> { SourceDatum.count }, 1 do
+        FetchSourceJob.perform_now(source)
+      end
+    end
+
+    assert_equal "complete", source.reload.status
+  end
+
+  test "a source in_work recently is left alone, since it is probably running" do
+    source = Source.create!(url: "https://running.test/page")
+    source.update!(status: "in_work")
+
+    with_fake_http do
+      assert_no_difference -> { SourceDatum.count } do
+        FetchSourceJob.perform_now(source)
+      end
+    end
+  end
+
   # --- noindex ---------------------------------------------------------------
 
   test "a page with no directives is indexable" do

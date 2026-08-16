@@ -16,6 +16,38 @@ class FetchSourceJob < ApplicationJob
     end
   end
 
+  # Worth asking again: a rate limiter, a deploy, a network blip. Distinct from
+  # SourceNotFetchable, which is a definite answer — retrying a 404 is just a
+  # second request for the same answer.
+  class SourceTemporarilyUnavailable < SourceNotFetchable
+    attr_reader :retry_after
+
+    def initialize(message = nil, status_code: nil, retry_after: nil)
+      super(message, status_code: status_code)
+      @retry_after = retry_after
+    end
+  end
+
+  # Four attempts over a few minutes covers a deploy window or a brief limiter
+  # without turning one bad host into an unbounded queue of retries.
+  MAX_ATTEMPTS = 4
+
+  # A server asking us to come back later than this is not worth parking a
+  # worker for; the crawl gives up and records why.
+  MAX_RETRY_AFTER = 15.minutes
+
+  # Transport failures that never produced a response. Worth one more try for
+  # the same reason a 503 is.
+  TRANSIENT_ERRORS = [
+    Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET,
+    Errno::ECONNREFUSED, Errno::EHOSTUNREACH, SocketError
+  ].freeze
+
+  # A source left in_work by a worker that died is otherwise unreachable
+  # forever: the guard below only lets `new` through. Retries widen that window,
+  # so the recovery lands with them.
+  STALE_IN_WORK_AFTER = 1.hour
+
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 30
 
@@ -55,7 +87,7 @@ class FetchSourceJob < ApplicationJob
   # are: the status code, the exception and the guard result are all in hand,
   # and none of them have to be reconstructed by a caller.
   def perform(source, force: false, trigger: "manual")
-    unless force || source.status == "new"
+    unless force || source.status == "new" || stale_in_work?(source)
       # No request went out, which is a different fact from one that failed.
       log_fetch(source, nil, "skipped", trigger)
       return
@@ -115,7 +147,7 @@ class FetchSourceJob < ApplicationJob
 
     (MAX_REDIRECTS + 1).times do
       uri      = parse_uri(current)
-      response = request(uri)
+      response = with_retries(current) { request(uri) }
 
       case classify(response)
       when :success  then return read(response, current)
@@ -159,15 +191,80 @@ class FetchSourceJob < ApplicationJob
     body
   end
 
-  # The one place a response's status becomes a decision. Later work — treating
-  # 429 and 5xx as transient, admitting 304 as a success — extends this rather
-  # than adding another branch to the caller.
+  # The one place a response's status becomes a decision.
   def classify(response)
     case response
-    when Net::HTTPSuccess     then :success
-    when Net::HTTPRedirection then :redirect
+    when Net::HTTPSuccess          then :success
+    when Net::HTTPRedirection      then :redirect
+    when Net::HTTPTooManyRequests,
+         Net::HTTPServerError      then :transient
     else :error
     end
+  end
+
+  # Retries live around the request rather than in ActiveJob's retry_on,
+  # because CrawlJob calls perform_now — which bypasses the retry machinery
+  # entirely. Wiring retry_on alone would fix the "Fetch content" button and
+  # leave every crawl exactly as it is today, which is the trap this card is
+  # most likely to fall into.
+  #
+  # The cost of doing it here is that a worker waits during the backoff.
+  # MAX_RETRY_AFTER bounds that.
+  def with_retries(url)
+    attempt = 0
+
+    begin
+      attempt += 1
+      response = yield
+
+      return response unless classify(response) == :transient
+
+      raise SourceTemporarilyUnavailable.new(
+        "HTTP #{response.code} fetching #{url}",
+        status_code: response.code.to_i,
+        retry_after: retry_after_seconds(response)
+      )
+    rescue SourceTemporarilyUnavailable, *TRANSIENT_ERRORS => e
+      delay = backoff_for(e, attempt)
+      raise if attempt >= MAX_ATTEMPTS || delay.nil?
+
+      sleep_for(delay)
+      retry
+    end
+  end
+
+  # A Retry-After the server stated wins over our own backoff — it is an
+  # instruction, not a suggestion. nil means "do not wait at all", which ends
+  # the retries.
+  def backoff_for(error, attempt)
+    stated = error.respond_to?(:retry_after) ? error.retry_after : nil
+
+    return stated if stated && stated <= MAX_RETRY_AFTER
+    return nil if stated
+
+    2**(attempt - 1)
+  end
+
+  # Both forms the header takes: a number of seconds, and an HTTP-date.
+  def retry_after_seconds(response)
+    raw = response["Retry-After"].to_s.strip
+    return nil if raw.empty?
+    return raw.to_i if raw.match?(/\A\d+\z/)
+
+    seconds = (Time.httpdate(raw) - Time.current).to_i
+    seconds.positive? ? seconds : 0
+  rescue ArgumentError
+    nil
+  end
+
+  def sleep_for(seconds)
+    Kernel.sleep(seconds)
+  end
+
+  # A worker that died mid-fetch leaves a source in_work, and the guard in
+  # #perform then means nothing ever picks it up again.
+  def stale_in_work?(source)
+    source.status == "in_work" && source.updated_at < STALE_IN_WORK_AFTER.ago
   end
 
   def redirect_target(response, uri, seen)
