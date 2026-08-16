@@ -74,7 +74,7 @@ class SourceDataController < ApplicationController
         @created << target
       end
 
-      link = SourceLink.record(from: @source, to: target)
+      link = SourceLink.record(from: @source, to: target, datum: @datum)
       @new_links += 1 if link&.previously_new_record?
     end
   end

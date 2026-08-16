@@ -142,6 +142,38 @@ class CrawlJobTest < ActiveJob::TestCase
     end
   end
 
+  test "edges name the snapshot the links were read out of" do
+    seed = make_seed("https://prov.test/start", '<a href="/leaf">leaf</a>')
+
+    with_fake_fetcher("https://prov.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    link = SourceLink.find_by(from_source: seed)
+
+    assert_equal seed.latest_datum, link.source_datum
+  end
+
+  test "re-crawling a re-fetched page leaves the original snapshot on the edge" do
+    seed = make_seed("https://stable.test/start", '<a href="/leaf">leaf</a>')
+
+    with_fake_fetcher("https://stable.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    first_datum = seed.latest_datum
+
+    # A second fetch appends a snapshot; the crawl then reads links from it.
+    install_data(seed, '<a href="/leaf">leaf</a>')
+
+    with_fake_fetcher("https://stable.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_not_equal first_datum, seed.reload.latest_datum, "the page was re-fetched"
+    assert_equal first_datum, SourceLink.find_by(from_source: seed).source_datum
+  end
+
   # --- the crawl log ---------------------------------------------------------
 
   test "records written during a crawl say a crawl started them" do

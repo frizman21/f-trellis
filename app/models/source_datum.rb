@@ -4,6 +4,10 @@ require "digest"
 
 class SourceDatum < ApplicationRecord
   belongs_to :source
+  # Edges found in this snapshot. Nullified rather than destroyed: deleting an
+  # old copy of a page must not delete links that are still true. The edge
+  # outlives the evidence.
+  has_many :source_links, dependent: :nullify
 
   before_save :assign_content_hash
 

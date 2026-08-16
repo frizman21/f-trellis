@@ -31,6 +31,21 @@ class SourceDataControllerTest < ActionDispatch::IntegrationTest
     assert_equal datum.data, response.body
   end
 
+  # The datum the action was invoked against — not simply the latest, which is
+  # what the crawl happens to use.
+  test "extract_links names the datum it was run against on the edges it creates" do
+    older = zipped_datum('<html><body><a href="/from-older">older</a></body></html>')
+    zipped_datum('<html><body><a href="/from-newer">newer</a></body></html>')
+
+    post extract_links_source_datum_path(older)
+
+    target = Source.find_by(url: "https://example.com/from-older")
+    link = SourceLink.find_by(from_source: @source, to_source: target)
+
+    assert_not_nil link, "the run should have recorded an edge for the link it found"
+    assert_equal older, link.source_datum
+  end
+
   test "extract_links lists internal and external links from the zipped payload" do
     datum = zipped_datum(<<~HTML)
       <html><body>
