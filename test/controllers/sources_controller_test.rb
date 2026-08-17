@@ -44,6 +44,26 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name=?]", "max_pages"
   end
 
+  # The cost of a large crawl should be visible before it is started, not after.
+  test "the crawl form states the effective delay for this source's domain" do
+    source = sources(:one)
+    source.domain.update!(min_crawl_delay_seconds: 3)
+
+    get source_path(source)
+
+    assert_response :success
+    assert_match(/waits 3 seconds between requests/, response.body)
+  end
+
+  test "the crawl form says when the delay is the crawler's default" do
+    sources(:one).domain.update!(min_crawl_delay_seconds: nil)
+
+    get source_path(sources(:one))
+
+    assert_response :success
+    assert_match(/\(the default\)/, response.body)
+  end
+
   test "show page names the parent source and links to both link pages with counts" do
     parent = sources(:two)
     source = Source.create!(url: "https://example.com/middle", parent_source: parent)
