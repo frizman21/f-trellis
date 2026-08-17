@@ -9,6 +9,15 @@ class FetchSourceJob < ApplicationJob
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 30
 
+  # http -> https, apex -> www and trailing-slash normalization are the ordinary
+  # ways a site expresses itself, so a redirect is not an error. Five hops is
+  # well past any legitimate chain and short enough that a misconfigured site
+  # cannot hold a worker.
+  MAX_REDIRECTS = 5
+
+  # What came back, and where it came from after any redirects were followed.
+  Fetched = Struct.new(:body, :final_url, keyword_init: true)
+
   # Only untouched sources are fetched by default, so a crawl revisiting a page
   # does not refetch it. `force: true` is for an explicit request from the UI to
   # grab the content again whatever the current status.
@@ -17,8 +26,8 @@ class FetchSourceJob < ApplicationJob
 
     source.update!(status: "in_work")
 
-    html  = fetch_html(source.url)
-    bytes = zip_payload(filename_for(source), html)
+    fetched = fetch_html(source.url)
+    bytes   = zip_payload(filename_for(source), fetched.body)
 
     SourceDatum.create!(
       source: source,
@@ -26,7 +35,7 @@ class FetchSourceJob < ApplicationJob
       data: bytes
     )
 
-    source.update!(status: "complete")
+    source.update!(status: "complete", resolved_url: resolved_url_for(source, fetched))
   rescue StandardError => e
     source.update!(status: "failed") if source.persisted?
     Rails.logger.error("FetchSourceJob failed for source ##{source.id}: #{e.class}: #{e.message}")
@@ -35,12 +44,63 @@ class FetchSourceJob < ApplicationJob
 
   private
 
+  # Follows redirects to the page that actually answers. Every hop is checked
+  # again — scheme, exclusion list, and whether we have already been here — so
+  # a redirect cannot walk the crawler somewhere a direct request would refuse
+  # to go.
   def fetch_html(url)
-    response = request(parse_uri(url))
+    current = url
+    seen    = Set.new([ url ])
 
-    raise SourceNotFetchable, "HTTP #{response.code} fetching #{url}" unless response.is_a?(Net::HTTPSuccess)
+    (MAX_REDIRECTS + 1).times do
+      uri      = parse_uri(current)
+      response = request(uri)
 
-    response.body.to_s
+      case classify(response)
+      when :success  then return Fetched.new(body: response.body.to_s, final_url: current)
+      when :redirect then current = redirect_target(response, uri, seen)
+      else raise SourceNotFetchable, "HTTP #{response.code} fetching #{current}"
+      end
+    end
+
+    raise SourceNotFetchable, "too many redirects from #{url}"
+  end
+
+  # The one place a response's status becomes a decision. Later work — treating
+  # 429 and 5xx as transient, admitting 304 as a success — extends this rather
+  # than adding another branch to the caller.
+  def classify(response)
+    case response
+    when Net::HTTPSuccess     then :success
+    when Net::HTTPRedirection then :redirect
+    else :error
+    end
+  end
+
+  def redirect_target(response, uri, seen)
+    location = response["Location"].presence
+    raise SourceNotFetchable, "redirect with no Location from #{uri}" if location.nil?
+
+    target = URI.join(uri, location).to_s
+    raise SourceNotFetchable, "redirect loop at #{target}" if seen.include?(target)
+    raise SourceNotFetchable, "redirect to an excluded URL: #{target}" if excluded?(target)
+
+    seen << target
+    target
+  rescue URI::InvalidURIError, ArgumentError
+    raise SourceNotFetchable, "unusable redirect target #{location.inspect} from #{uri}"
+  end
+
+  # A hop must not bypass the exclusion list. The list is otherwise only
+  # consulted during link extraction, which a redirect never passes through.
+  def excluded?(url)
+    SourceExclusion.enabled.any? { |exclusion| exclusion.matches?(url) }
+  end
+
+  # Recorded only when it differs, so the column answers "was this moved?"
+  # rather than repeating `url` on every row.
+  def resolved_url_for(source, fetched)
+    fetched.final_url == source.url ? nil : fetched.final_url
   end
 
   def parse_uri(url)
