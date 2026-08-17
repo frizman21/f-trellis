@@ -58,9 +58,9 @@ class DomainTest < ActiveSupport::TestCase
   # A log is about the domain and means nothing without it, unlike a source.
   test "destroying a domain takes its crawl records with it" do
     domain = Domain.create!(host: "logs-only.test")
-    CrawlRecord.create!(url: "https://logs-only.test/a", domain: domain)
+    FetchRecord.create!(url: "https://logs-only.test/a", domain: domain)
 
-    assert_difference -> { CrawlRecord.count }, -1 do
+    assert_difference -> { FetchRecord.count }, -1 do
       assert domain.destroy
     end
   end

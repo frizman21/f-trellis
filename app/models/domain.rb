@@ -3,7 +3,7 @@ class Domain < ApplicationRecord
   # History of what the crawler fetched from this site. Destroyed with the
   # domain rather than restricting it: a log is about the domain and means
   # nothing without it, unlike a source, which is content worth protecting.
-  has_many :crawl_records, dependent: :destroy
+  has_many :fetch_records, dependent: :destroy
 
   # The domain a URL belongs to, created if this is the first time the host has
   # been seen. The single place a host becomes a Domain — two copies of this

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_16_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -49,23 +49,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_140000) do
     t.index ["model_id"], name: "index_chats_on_model_id"
   end
 
-  create_table "crawl_records", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.bigint "domain_id", null: false
-    t.string "outcome", default: "ok", null: false
-    t.integer "status_code"
-    t.datetime "updated_at", null: false
-    t.string "url", null: false
-    t.index ["created_at"], name: "index_crawl_records_on_created_at"
-    t.index ["domain_id"], name: "index_crawl_records_on_domain_id"
-    t.index ["outcome"], name: "index_crawl_records_on_outcome"
-    t.index ["url"], name: "index_crawl_records_on_url"
-  end
-
   create_table "domains", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "host", null: false
     t.integer "min_crawl_delay_seconds"
+    t.integer "robots_crawl_delay_seconds"
+    t.datetime "robots_fetched_at"
+    t.string "robots_status"
+    t.text "robots_txt"
     t.datetime "updated_at", null: false
     t.index ["host"], name: "index_domains_on_host", unique: true
   end
@@ -107,6 +98,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_140000) do
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_facility_types_on_name", unique: true
+  end
+
+  create_table "fetch_records", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "domain_id", null: false
+    t.string "outcome", default: "ok", null: false
+    t.integer "status_code"
+    t.string "trigger", default: "manual", null: false
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["created_at"], name: "index_fetch_records_on_created_at"
+    t.index ["domain_id"], name: "index_fetch_records_on_domain_id"
+    t.index ["outcome"], name: "index_fetch_records_on_outcome"
+    t.index ["trigger"], name: "index_fetch_records_on_trigger"
+    t.index ["url"], name: "index_fetch_records_on_url"
   end
 
   create_table "learning_set_sources", force: :cascade do |t|
@@ -663,10 +669,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_140000) do
   create_table "source_links", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "from_source_id", null: false
+    t.bigint "source_datum_id"
     t.bigint "to_source_id", null: false
     t.datetime "updated_at", null: false
     t.index ["from_source_id", "to_source_id"], name: "index_source_links_on_from_source_id_and_to_source_id", unique: true
     t.index ["from_source_id"], name: "index_source_links_on_from_source_id"
+    t.index ["source_datum_id"], name: "index_source_links_on_source_datum_id"
     t.index ["to_source_id"], name: "index_source_links_on_to_source_id"
   end
 
@@ -693,14 +701,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_140000) do
     t.datetime "created_at", null: false
     t.text "description"
     t.bigint "domain_id", null: false
+    t.string "etag"
     t.boolean "is_fixtured", default: false, null: false
+    t.boolean "is_noindex", default: false, null: false
     t.boolean "is_promotable", default: false, null: false
+    t.datetime "last_modified_at"
     t.bigint "parent_source_id"
     t.string "resolved_url"
+    t.datetime "sitemap_lastmod_at"
     t.string "status", default: "new", null: false
     t.datetime "updated_at", null: false
     t.string "url"
     t.index ["domain_id"], name: "index_sources_on_domain_id"
+    t.index ["is_noindex"], name: "index_sources_on_is_noindex"
     t.index ["is_promotable", "is_fixtured"], name: "index_sources_on_is_promotable_and_is_fixtured"
     t.index ["parent_source_id"], name: "index_sources_on_parent_source_id"
     t.index ["status"], name: "index_sources_on_status"
@@ -743,12 +756,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_140000) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "chats", "models"
-  add_foreign_key "crawl_records", "domains"
   add_foreign_key "facilities", "facility_details", column: "current_detail_id"
   add_foreign_key "facility_detail_facility_types", "facility_details"
   add_foreign_key "facility_detail_facility_types", "facility_types"
   add_foreign_key "facility_details", "facilities"
   add_foreign_key "facility_details", "source_processing_reports"
+  add_foreign_key "fetch_records", "domains"
   add_foreign_key "learning_set_sources", "learning_sets", on_delete: :cascade
   add_foreign_key "learning_set_sources", "sources"
   add_foreign_key "messages", "chats"
@@ -823,6 +836,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_140000) do
   add_foreign_key "skill_revisions", "skills"
   add_foreign_key "skills", "models", column: "preferred_model_id"
   add_foreign_key "source_data", "sources"
+  add_foreign_key "source_links", "source_data"
   add_foreign_key "source_links", "sources", column: "from_source_id", on_delete: :cascade
   add_foreign_key "source_links", "sources", column: "to_source_id", on_delete: :cascade
   add_foreign_key "source_processing_reports", "chats"

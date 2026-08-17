@@ -129,6 +129,17 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Showing 50 of 60/, response.body)
   end
 
+  # The domain page carries the fetch history and the crawl delay for this
+  # host, and was previously reachable only from the domains index.
+  test "show links to the domain the source belongs to" do
+    source = Source.create!(url: "https://linked.test/page")
+
+    get source_path(source)
+
+    assert_response :success
+    assert_select "a[href=?]", domain_path(source.domain), text: "linked.test"
+  end
+
   test "show page always offers a fetch button" do
     new_source = sources(:one)
     done_source = Source.create!(url: "https://example.com/done")
@@ -146,7 +157,7 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
   test "fetch enqueues a forced FetchSourceJob for a source in status new" do
     source = sources(:one)
 
-    assert_enqueued_with(job: FetchSourceJob, args: [ source, { force: true } ]) do
+    assert_enqueued_with(job: FetchSourceJob, args: [ source, { force: true, trigger: "manual" } ]) do
       post fetch_source_path(source)
     end
 
@@ -159,7 +170,7 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     source = Source.create!(url: "https://example.com/already-done")
     source.update!(status: "complete")
 
-    assert_enqueued_with(job: FetchSourceJob, args: [ source, { force: true } ]) do
+    assert_enqueued_with(job: FetchSourceJob, args: [ source, { force: true, trigger: "manual" } ]) do
       post fetch_source_path(source)
     end
 
@@ -177,6 +188,22 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Both fetch paths below used to leave the domain's history untouched: only
+  # CrawlJob wrote records, so a page fetched by hand was invisible there.
+  test "fetching by hand records the fetch against the domain" do
+    source = Source.create!(url: "https://byhand.test/page")
+
+    perform_enqueued_jobs(only: FetchSourceJob) do
+      with_fake_http { post fetch_source_path(source) }
+    end
+
+    record = FetchRecord.find_by(url: "https://byhand.test/page")
+
+    assert_not_nil record, "fetching by hand must leave a record"
+    assert_equal "manual", record.trigger
+    assert_equal "byhand.test", record.domain.host
+  end
+
   # --- create -------------------------------------------------------------
 
   # Unforced, unlike the manual button above: the job returns unless the status
@@ -188,10 +215,23 @@ class SourcesControllerTest < ActionDispatch::IntegrationTest
 
     source = Source.find_by(url: "https://example.com/fresh")
     assert_not_nil source
-    assert_enqueued_with(job: FetchSourceJob, args: [ source ])
+    assert_enqueued_with(job: FetchSourceJob, args: [ source, { trigger: "initial" } ])
     assert_redirected_to source_path(source)
     follow_redirect!
     assert_match(/fetch queued/i, response.body)
+  end
+
+  test "creating a source records the fetch it queues for itself" do
+    perform_enqueued_jobs(only: FetchSourceJob) do
+      with_fake_http do
+        post sources_path, params: { source: { url: "https://oncreate.test/fresh" } }
+      end
+    end
+
+    record = FetchRecord.find_by(url: "https://oncreate.test/fresh")
+
+    assert_not_nil record, "the fetch a new source queues must leave a record"
+    assert_equal "initial", record.trigger
   end
 
   test "create with an unusable url re-renders and enqueues nothing" do
