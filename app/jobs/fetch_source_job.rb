@@ -15,8 +15,20 @@ class FetchSourceJob < ApplicationJob
   # cannot hold a worker.
   MAX_REDIRECTS = 5
 
-  # What came back, and where it came from after any redirects were followed.
-  Fetched = Struct.new(:body, :final_url, keyword_init: true)
+  # What this system can actually read. Anything else — a PDF, an image, a JSON
+  # document — was reachable but is not a web page, and storing it as one means
+  # Nokogiri parses the binary and a model is paid to read the noise that falls
+  # out of it.
+  ACCEPTED_CONTENT_TYPES = %w[text/html application/xhtml+xml].freeze
+
+  # Assumed when a server sends no Content-Type at all. Some do; refusing them
+  # would be stricter than the situation warrants, and the parse path already
+  # tolerates whatever it gets.
+  DEFAULT_CONTENT_TYPE = "text/html".freeze
+
+  # What came back, where it came from after any redirects, and what the server
+  # said it was.
+  Fetched = Struct.new(:body, :final_url, :content_type, keyword_init: true)
 
   # Only untouched sources are fetched by default, so a crawl revisiting a page
   # does not refetch it. `force: true` is for an explicit request from the UI to
@@ -31,7 +43,7 @@ class FetchSourceJob < ApplicationJob
 
     SourceDatum.create!(
       source: source,
-      content_type: "application/zip",
+      content_type: fetched.content_type,
       data: bytes
     )
 
@@ -57,13 +69,39 @@ class FetchSourceJob < ApplicationJob
       response = request(uri)
 
       case classify(response)
-      when :success  then return Fetched.new(body: response.body.to_s, final_url: current)
+      when :success  then return read(response, current)
       when :redirect then current = redirect_target(response, uri, seen)
       else raise SourceNotFetchable, "HTTP #{response.code} fetching #{current}"
       end
     end
 
     raise SourceNotFetchable, "too many redirects from #{url}"
+  end
+
+  # Checks what the server actually sent before it is stored as a web page, and
+  # decodes it while the declared charset is still in hand. By the time
+  # SourceDatum#html reads the bytes back the charset is long gone, which is why
+  # its force_encoding raises on invalid sequences far from the cause.
+  def read(response, url)
+    type = response.content_type.to_s.downcase.presence
+
+    if type && ACCEPTED_CONTENT_TYPES.exclude?(type)
+      raise SourceNotFetchable, "unsupported content type: #{type} at #{url}"
+    end
+
+    Fetched.new(body: decode(response), final_url: url, content_type: type || DEFAULT_CONTENT_TYPE)
+  end
+
+  def decode(response)
+    body    = response.body.to_s
+    charset = response.type_params["charset"].presence
+    return body if charset.nil?
+
+    body.dup.force_encoding(charset).encode("UTF-8", invalid: :replace, undef: :replace)
+  rescue ArgumentError, EncodingError
+    # An unknown or lying charset is not worth failing a fetch over; the bytes
+    # are still the page.
+    body
   end
 
   # The one place a response's status becomes a decision. Later work — treating

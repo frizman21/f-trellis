@@ -6,6 +6,31 @@ class SourceDataControllerTest < ActionDispatch::IntegrationTest
     @source = sources(:one)
   end
 
+  # The zip is storage, not identity. Once content_type describes the page, a
+  # download hands back the page rather than the container it was stored in.
+  test "download returns the page itself for a datum typed as html" do
+    datum = zipped_datum("<html><body><p>downloaded</p></body></html>", content_type: "text/html")
+
+    get download_source_datum_path(datum)
+
+    assert_response :success
+    assert_equal "text/html", response.media_type
+    assert_equal "<html><body><p>downloaded</p></body></html>", response.body
+    assert_match(/\.html"?$/, response.headers["Content-Disposition"].split("filename=").last.delete('"'))
+  end
+
+  # Rows written before that change cannot be backfilled — the original header
+  # was never captured — so they are still served as the zip they are.
+  test "download still returns the archive for a legacy zip-typed datum" do
+    datum = zipped_datum("<html><body><p>legacy</p></body></html>")
+
+    get download_source_datum_path(datum)
+
+    assert_response :success
+    assert_equal "application/zip", response.media_type
+    assert_equal datum.data, response.body
+  end
+
   test "extract_links lists internal and external links from the zipped payload" do
     datum = zipped_datum(<<~HTML)
       <html><body>
@@ -220,13 +245,13 @@ class SourceDataControllerTest < ActionDispatch::IntegrationTest
 
   private
 
-  def zipped_datum(html)
+  def zipped_datum(html, content_type: "application/zip")
     buffer = Zip::OutputStream.write_buffer do |zos|
       zos.put_next_entry("page.html")
       zos.write(html)
     end
     buffer.rewind
 
-    SourceDatum.create!(source: @source, content_type: "application/zip", data: buffer.read)
+    SourceDatum.create!(source: @source, content_type: content_type, data: buffer.read)
   end
 end

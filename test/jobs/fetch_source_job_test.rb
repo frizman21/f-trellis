@@ -15,7 +15,7 @@ class FetchSourceJobTest < ActiveJob::TestCase
     end
 
     assert_equal "complete", source.reload.status
-    assert_equal "application/zip", source.source_data.last.content_type
+    assert_equal "text/html", source.source_data.last.content_type
   end
 
   test "skips a source that is not new unless forced" do
@@ -117,7 +117,7 @@ class FetchSourceJobTest < ActiveJob::TestCase
   end
 
   def ok(body = "<html><body>moved here</body></html>")
-    { code: "200", body: body }
+    { code: "200", body: body, headers: { "Content-Type" => "text/html" } }
   end
 
   test "a 301 to an absolute URL fetches the target and stores its body" do
@@ -233,6 +233,97 @@ class FetchSourceJobTest < ActiveJob::TestCase
     end
 
     assert_nil source.reload.resolved_url
+  end
+
+  # --- content types ---------------------------------------------------------
+
+  def fetch_with_type(url, content_type, body: "<html><body>hi</body></html>")
+    source = Source.create!(url: url)
+    headers = content_type.nil? ? {} : { "Content-Type" => content_type }
+
+    with_fake_http(body, headers: headers) do
+      yield source
+    end
+
+    source
+  end
+
+  test "html content types are accepted" do
+    [ "text/html", "text/html; charset=utf-8", "TEXT/HTML", "application/xhtml+xml" ].each_with_index do |type, i|
+      source = fetch_with_type("https://type#{i}.test/page", type) do |s|
+        FetchSourceJob.perform_now(s)
+      end
+
+      assert_equal "complete", source.reload.status, "expected #{type} to be accepted"
+    end
+  end
+
+  test "a response with no Content-Type is accepted" do
+    source = fetch_with_type("https://notype.test/page", nil) do |s|
+      FetchSourceJob.perform_now(s)
+    end
+
+    assert_equal "complete", source.reload.status
+    assert_equal "text/html", source.source_data.last.content_type
+  end
+
+  test "non-html content types are refused and store nothing" do
+    %w[application/pdf image/png application/json].each_with_index do |type, i|
+      source = Source.create!(url: "https://bad#{i}.test/file")
+
+      with_fake_http("%PDF-1.4 binary", headers: { "Content-Type" => type }) do
+        assert_no_difference -> { SourceDatum.count } do
+          error = assert_raises(FetchSourceJob::SourceNotFetchable) { FetchSourceJob.perform_now(source) }
+          assert_match(/unsupported content type: #{Regexp.escape(type)}/, error.message)
+        end
+      end
+
+      assert_equal "failed", source.reload.status
+    end
+  end
+
+  # The parameter is stripped before comparing, and the stored type is the bare
+  # media type rather than the header verbatim.
+  test "the stored content type describes the payload, not the zip container" do
+    source = fetch_with_type("https://stored.test/page", "text/html; charset=utf-8") do |s|
+      FetchSourceJob.perform_now(s)
+    end
+
+    assert_equal "text/html", source.source_data.last.content_type
+  end
+
+  test "a body declared as ISO-8859-1 round-trips as valid UTF-8" do
+    latin1 = "<html><body><p>caf\xE9</p></body></html>".dup.force_encoding("ASCII-8BIT")
+    source = Source.create!(url: "https://latin1.test/page")
+
+    with_fake_http(latin1, headers: { "Content-Type" => "text/html; charset=ISO-8859-1" }) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    html = source.reload.source_data.last.html
+
+    assert html.valid_encoding?, "stored html should be valid UTF-8"
+    assert_includes html, "café"
+  end
+
+  test "bytes that are invalid for the declared charset are replaced rather than raising" do
+    broken = "<html><body>\xFF\xFEbad</body></html>".dup.force_encoding("ASCII-8BIT")
+    source = Source.create!(url: "https://broken.test/page")
+
+    with_fake_http(broken, headers: { "Content-Type" => "text/html; charset=UTF-8" }) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_equal "complete", source.reload.status
+    assert source.source_data.last.html.valid_encoding?
+  end
+
+  test "an unknown charset does not fail the fetch" do
+    source = fetch_with_type("https://charset.test/page", "text/html; charset=not-a-charset") do |s|
+      FetchSourceJob.perform_now(s)
+    end
+
+    assert_equal "complete", source.reload.status
   end
 
   test "an unsupported scheme fails without making a request" do
