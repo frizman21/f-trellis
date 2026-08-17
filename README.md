@@ -147,6 +147,13 @@ The crawler waits between requests to the same host. The delay is the domain's
 `min_crawl_delay_seconds` when an operator has set one, otherwise the site's own
 `Crawl-delay`, otherwise one second.
 
+A crawl can start from the site's own sitemap instead of following links from
+one page. Sitemaps are found from the `Sitemap:` directives in `robots.txt`,
+falling back to `/sitemap.xml`; index files are resolved one level down, gzipped
+sitemaps are decompressed, and URLs outside the seed's host are dropped. The
+listed pages seed the ordinary crawl, so the page cap, exclusions, `robots.txt`
+and pacing all apply exactly as they do to any other crawl.
+
 Re-fetching a page sends `If-None-Match` and `If-Modified-Since` from the last
 response, so a page that has not changed costs one small request instead of a
 full download and stores no second copy. The "Re-fetch content" button is

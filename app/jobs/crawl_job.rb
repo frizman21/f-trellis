@@ -3,7 +3,9 @@ require "set"
 class CrawlJob < ApplicationJob
   queue_as :default
 
-  CRAWL_TYPES = %w[stay_in_domain follow_external_links].freeze
+  class NoSitemap < StandardError; end
+
+  CRAWL_TYPES = %w[stay_in_domain follow_external_links from_sitemap].freeze
   DEFAULT_MAX_PAGES = 500
   MAX_MAX_PAGES = 5_000
 
@@ -30,8 +32,8 @@ class CrawlJob < ApplicationJob
     max_depth = max_depth.to_i
     max_pages = [[max_pages.to_i, 1].max, MAX_MAX_PAGES].min
 
-    queue = [[seed_source, 0]]
-    seen_urls = Set.new([seed_source.url])
+    queue = starting_queue(seed_source, crawl_type, max_pages)
+    seen_urls = Set.new(queue.map { |source, _depth| source.url })
     processed = 0
 
     until queue.empty? || processed >= max_pages
@@ -41,7 +43,7 @@ class CrawlJob < ApplicationJob
 
       next if depth >= max_depth
 
-      urls, datum = discovered_links(current, crawl_type)
+      urls, datum = discovered_links(current, link_mode(crawl_type))
 
       urls.each do |url|
         target = Source.find_by(url: url)
@@ -124,6 +126,62 @@ class CrawlJob < ApplicationJob
     Rails.logger.error("CrawlJob: could not log #{source.url}: #{e.class}: #{e.message}")
   end
 
+  # A sitemap crawl seeds the queue with everything the site listed and then
+  # runs the ordinary loop, so max_pages, exclusions, robots, pacing, parentage
+  # and the link graph all behave exactly as they do on any other crawl. A
+  # second traversal would have to reimplement all of it.
+  def starting_queue(seed_source, crawl_type, max_pages)
+    return [ [ seed_source, 0 ] ] unless crawl_type == "from_sitemap"
+
+    sources = sitemap_sources(seed_source, max_pages)
+    raise NoSitemap, "no sitemap found for #{seed_source.domain&.host}" if sources.empty?
+
+    sources.map { |source| [ source, 0 ] }
+  end
+
+  def sitemap_sources(seed_source, max_pages)
+    host = seed_source.domain&.host
+    entries = SitemapReader.locations_for(seed_source.domain)
+                           .flat_map { |location| SitemapReader.call(location).entries }
+
+    # A sitemap naming another host is either a mistake or an attempt to send
+    # our crawl elsewhere; neither is worth following implicitly.
+    entries = entries.select { |entry| same_host?(entry.url, host) }
+    entries = entries.uniq(&:url).first(max_pages)
+
+    exclusions = SourceExclusion.enabled.to_a
+    entries.reject! { |entry| exclusions.any? { |rule| rule.matches?(entry.url) } }
+
+    Rails.logger.info("CrawlJob: sitemap for #{host} offered #{entries.size} usable urls")
+
+    entries.filter_map { |entry| source_for_sitemap_entry(entry, seed_source) }
+  end
+
+  def source_for_sitemap_entry(entry, seed_source)
+    source = Source.find_by(url: entry.url) ||
+             Source.create!(url: entry.url,
+                            parent_source: seed_source,
+                            description: "Listed in the sitemap for #{seed_source.domain&.host}")
+
+    source.update_columns(sitemap_lastmod_at: entry.lastmod) if entry.lastmod
+    source
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.warn("CrawlJob: skipping sitemap url #{entry.url}: #{e.message}")
+    nil
+  end
+
+  def same_host?(url, host)
+    URI.parse(url).host&.downcase == host&.downcase
+  rescue URI::InvalidURIError
+    false
+  end
+
+  # Links found on sitemap-seeded pages are followed within the domain, the
+  # same as a stay-in-domain crawl.
+  def link_mode(crawl_type)
+    crawl_type == "from_sitemap" ? "stay_in_domain" : crawl_type
+  end
+
   # Returns the links *and* the snapshot they came out of, so the edge write can
   # name it. Looking the datum up a second time at the write would risk a
   # different answer if a fetch landed in between.
@@ -132,10 +190,12 @@ class CrawlJob < ApplicationJob
     return [ [], nil ] unless datum
 
     result = datum.extract_links
-    urls = case crawl_type
-           when "stay_in_domain"        then result.internal
-           when "follow_external_links" then result.internal + result.external
-           end
+
+    urls =
+      case crawl_type
+      when "stay_in_domain"        then result.internal
+      when "follow_external_links" then result.internal + result.external
+      end
 
     [ urls, datum ]
   end

@@ -182,7 +182,9 @@
     <div class="col-md-4">
       <%= f.label :crawl_type, "Crawl type", class: "form-label" %>
       <%= f.select :crawl_type,
-                   [["Stay in domain", "stay_in_domain"], ["Follow external links", "follow_external_links"]],
+                   [["Stay in domain", "stay_in_domain"],
+                    ["Follow external links", "follow_external_links"],
+                    ["From the site's sitemap", "from_sitemap"]],
                    {},
                    class: "form-select" %>
     </div>
@@ -201,6 +203,8 @@
   <div class="form-text">
     Depth 0 only fetches this page. Stay-in-domain follows links only on
     <code><%= @source.domain&.host %></code>. Already-known URLs are skipped.
+    From-the-sitemap starts with every page the site lists rather than this one,
+    then follows links within the domain from there.
   </div>
   <div class="form-text">
     <% delay = CrawlJob.delay_for(@source.domain) %>
