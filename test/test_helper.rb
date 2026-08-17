@@ -59,6 +59,93 @@ module FakeHttp
     @fake_http_slept || []
   end
 
+  # Stubs one level lower than with_fake_http — at Net::HTTP itself — so
+  # FetchSourceJob#request runs for real.
+  #
+  # Everything about the streamed read is only observable through this seam: the
+  # Content-Length pre-check, the running size cap, and whether the body is
+  # assembled from chunks byte-identically. with_fake_http replaces #request
+  # outright and would hide all of it.
+  #
+  # Yields a Transfer recording what the read actually did, so "it stopped
+  # early" is assertable rather than assumed.
+  def with_streaming_http(chunks:, code: "200", headers: {}, on_read: nil)
+    transfer = FakeHttp::Transfer.new(chunks: chunks, on_read: on_read)
+    response = FakeHttp.build_streaming_response(code: code, headers: headers, transfer: transfer)
+    http     = FakeHttp::Connection.new(response, transfer)
+
+    Net::HTTP.singleton_class.class_eval do
+      alias_method :start_without_stub, :start
+      define_method(:start) { |*, **, &blk| blk.call(http) }
+    end
+
+    yield transfer
+  ensure
+    Net::HTTP.singleton_class.class_eval do
+      remove_method :start
+      alias_method :start, :start_without_stub
+      remove_method :start_without_stub
+    end
+  end
+
+  # Records what a streamed read did, so a test can tell "refused after reading
+  # nothing" from "refused after buffering the lot".
+  class Transfer
+    attr_reader :delivered, :request_path, :request_headers
+
+    def initialize(chunks:, on_read: nil)
+      @chunks    = chunks
+      @on_read   = on_read
+      @delivered = 0
+    end
+
+    def each_chunk
+      @on_read&.call
+
+      @chunks.each do |chunk|
+        @delivered += chunk.bytesize
+        yield chunk
+      end
+    end
+
+    def record_request(path, headers)
+      @request_path    = path
+      @request_headers = headers
+    end
+  end
+
+  class Connection
+    def initialize(response, transfer)
+      @response = response
+      @transfer = transfer
+    end
+
+    def request_get(path, headers = {}, &block)
+      @transfer.record_request(path, headers)
+      block.call(@response)
+    end
+  end
+
+  # A real Net::HTTPResponse whose #read_body streams from the Transfer rather
+  # than from a socket, so the production code path is unchanged.
+  def self.build_streaming_response(code:, headers:, transfer:)
+    response = build_response({ code: code, body: "", headers: headers })
+    response.instance_variable_set(:@read, false)
+    response.instance_variable_set(:@body, nil)
+
+    # Same contract as the real one: once the body has been read, hand it back
+    # rather than going to the socket again. Without this, calling #body on the
+    # returned response re-streams the transfer with no block.
+    response.define_singleton_method(:read_body) do |&block|
+      return @body if @read
+
+      transfer.each_chunk { |chunk| block.call(chunk) }
+      nil
+    end
+
+    response
+  end
+
   # A real Net::HTTPResponse subclass, so `is_a?(Net::HTTPSuccess)` and friends
   # behave exactly as they do against a live server.
   def self.build_response(spec)

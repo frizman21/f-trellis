@@ -258,7 +258,31 @@ class SourceDataControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action=?][method=?]", extract_links_source_datum_path(datum), "post"
   end
 
+  # Through the html branch this would arrive as datum.html.to_s — an empty
+  # string now, mojibake before — either way a file that will not open.
+  test "download returns an openable pdf for a datum typed as pdf" do
+    bytes = File.binread(Rails.root.join("test/fixtures/files/two_page_text.pdf"))
+    datum = pdf_datum(bytes)
+
+    get download_source_datum_path(datum)
+
+    assert_response :success
+    assert_equal "application/pdf", response.media_type
+    assert_equal bytes, response.body
+    assert_match(/\.pdf"?$/, response.headers["Content-Disposition"].split("filename=").last.delete('"'))
+  end
+
   private
+
+  def pdf_datum(bytes)
+    buffer = Zip::OutputStream.write_buffer do |zos|
+      zos.put_next_entry("document.pdf")
+      zos.write(bytes)
+    end
+    buffer.rewind
+
+    SourceDatum.create!(source: @source, content_type: "application/pdf", data: buffer.read)
+  end
 
   def zipped_datum(html, content_type: "application/zip")
     buffer = Zip::OutputStream.write_buffer do |zos|

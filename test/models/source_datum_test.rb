@@ -101,6 +101,54 @@ class SourceDatumTest < ActiveSupport::TestCase
     assert_nil datum.content_hash
   end
 
+  # A PDF is stored exactly like a page — zipped bytes — and differs only by its
+  # content_type. #text is the one dispatch point; every reader in the system
+  # already goes through it, so none of them changes.
+  test "#text extracts the text of a pdf payload" do
+    datum = zipped_pdf("two_page_text.pdf")
+
+    assert_includes datum.text, "Marriage Divorce Remarriage"
+    assert_includes datum.text, "Second Page Heading"
+  end
+
+  # Specifically not mojibake, which is what running these bytes through
+  # #html's force_encoding("UTF-8") would produce.
+  test "#html is nil for a pdf payload rather than corrupted text" do
+    datum = zipped_pdf("two_page_text.pdf")
+
+    assert_nil datum.html
+  end
+
+  test "#extract_links on a pdf payload returns an empty result and does not raise" do
+    datum = zipped_pdf("two_page_text.pdf")
+
+    result = datum.extract_links
+
+    assert_empty result.internal
+    assert_empty result.external
+    assert_empty result.excluded
+  end
+
+  test "#raw_bytes returns the stored document byte-identically" do
+    datum = zipped_pdf("two_page_text.pdf")
+
+    assert_equal pdf_fixture("two_page_text.pdf"), datum.raw_bytes
+  end
+
+  test "content_hash is set from a pdf's text and collapses for the same document" do
+    a = zipped_pdf("two_page_text.pdf")
+    b = zipped_pdf("two_page_text.pdf")
+
+    assert a.content_hash.present?
+    assert_equal a.content_hash, b.content_hash
+  end
+
+  # An empty text layer produces no hash, exactly as an HTML page with no
+  # extractable text already does.
+  test "content_hash is nil for a pdf with no text layer" do
+    assert_nil zipped_pdf("image_only.pdf").content_hash
+  end
+
   private
 
   def zipped(html)
@@ -111,5 +159,19 @@ class SourceDatumTest < ActiveSupport::TestCase
     bytes.rewind
 
     SourceDatum.create!(source: sources(:one), content_type: "application/zip", data: bytes.read)
+  end
+
+  def pdf_fixture(name)
+    File.binread(Rails.root.join("test/fixtures/files", name))
+  end
+
+  def zipped_pdf(name)
+    bytes = Zip::OutputStream.write_buffer do |zos|
+      zos.put_next_entry(name)
+      zos.write(pdf_fixture(name))
+    end
+    bytes.rewind
+
+    SourceDatum.create!(source: sources(:one), content_type: "application/pdf", data: bytes.read)
   end
 end
