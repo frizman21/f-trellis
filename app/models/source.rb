@@ -58,7 +58,7 @@ class Source < ApplicationRecord
   # its own crawl, and link extraction can create hundreds of rows from one
   # click and would turn that click into hundreds of outbound requests.
   def queue_initial_fetch
-    FetchSourceJob.perform_later(self)
+    FetchSourceJob.perform_later(self, trigger: "initial")
   end
 
   # Tolerates what people actually paste: surrounding space, a missing scheme,

@@ -88,7 +88,7 @@ class SourcesController < ApplicationController
   def fetch
     source = Source.find(params[:id])
 
-    FetchSourceJob.perform_later(source, force: true)
+    FetchSourceJob.perform_later(source, force: true, trigger: "manual")
 
     notice = if source.status == "new"
       "Fetch queued for source ##{source.id}."

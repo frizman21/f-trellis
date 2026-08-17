@@ -13,12 +13,12 @@ class DomainsController < ApplicationController
 
   def show
     @domain = Domain.find(params[:id])
-    @records = @domain.crawl_records.recent.page(params[:page]).per(25)
+    @records = @domain.fetch_records.recent.page(params[:page]).per(25)
 
     # Counted in the database rather than over the loaded page — a
     # well-crawled site has thousands of records and only 25 are on screen.
-    counts = @domain.crawl_records.group(:outcome).count
-    @crawled_count = counts.values.sum
+    counts = @domain.fetch_records.group(:outcome).count
+    @fetched_count = counts.values.sum
     @failed_count  = counts.except("ok", "skipped").values.sum
 
     # The log holds a bare URL string, so most but not all of these still have
@@ -34,7 +34,7 @@ class DomainsController < ApplicationController
     @domain = Domain.find(params[:id])
 
     if @domain.update(domain_params)
-      redirect_to domains_path, notice: "Domain \"#{@domain.host}\" updated."
+      redirect_to domain_path(@domain), notice: "Domain \"#{@domain.host}\" updated."
     else
       render :edit, status: :unprocessable_entity
     end

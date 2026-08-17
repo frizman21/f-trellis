@@ -27,37 +27,46 @@ class CrawlJobTest < ActiveJob::TestCase
   # SourceNotFetchable carrying it, :timeout raises something that never
   # produced a response at all.
   #
-  # The return value matters as much as the side effect — the real job returns
-  # the status the server answered with, or nil when its guard declined to make
-  # a request, and the crawl log records the difference. Positional rather than
-  # keyword args: callers pass `pages` as a bare hash, which Ruby would read as
-  # keywords if this method declared any.
+  # Stubs #fetch_html rather than the whole of .perform_now, so the real job
+  # still runs: its guard, its status transitions, its SourceDatum write and —
+  # the reason this matters — its FetchRecord write and outcome classification.
+  # Replacing .perform_now would leave the crawl log tests below asserting
+  # against the stub instead of against the code that writes the log.
+  #
+  # A URL in neither hash fetches as an empty page. Only the tests that supply
+  # a page or a failure assert anything about that URL's record.
+  #
+  # Positional rather than keyword args: callers pass `pages` as a bare hash,
+  # which Ruby would read as keywords if this method declared any.
   def with_fake_fetcher(pages = {}, failures = {})
-    test = self
-    FetchSourceJob.define_singleton_method(:perform_now) do |source|
-      failure = failures[source.url]
-      raise Net::ReadTimeout if failure == :timeout
+    FetchSourceJob.class_eval do
+      alias_method :fetch_html_without_stub, :fetch_html
+      define_method(:fetch_html) do |url|
+        failure = failures[url]
+        raise Net::ReadTimeout if failure == :timeout
 
-      if failure
-        raise FetchSourceJob::SourceNotFetchable.new("refused #{source.url}", status_code: failure)
+        if failure
+          raise FetchSourceJob::SourceNotFetchable.new("refused #{url}", status_code: failure)
+        end
+
+        FetchSourceJob::Fetched.new(body: pages.fetch(url, ""), final_url: url,
+                                    content_type: "text/html", status_code: 200)
       end
-
-      html = pages[source.url]
-      next nil if html.nil?
-
-      test.install_data(source, html)
-      200
     end
     yield
   ensure
-    FetchSourceJob.singleton_class.send(:remove_method, :perform_now)
+    FetchSourceJob.class_eval do
+      remove_method :fetch_html
+      alias_method :fetch_html, :fetch_html_without_stub
+      remove_method :fetch_html_without_stub
+    end
   end
 
   test "crawls seed only when depth is zero" do
     seed = make_seed("https://depth-zero.test/start", '<a href="/a">a</a>')
 
     with_fake_fetcher do
-      assert_difference -> { CrawlRecord.count } => 1, -> { Source.count } => 0 do
+      assert_difference -> { FetchRecord.count } => 1, -> { Source.count } => 0 do
         CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 0)
       end
     end
@@ -123,17 +132,27 @@ class CrawlJobTest < ActiveJob::TestCase
     end
   end
 
-  test "logs a CrawlRecord for every page processed" do
+  test "logs a FetchRecord for every page processed" do
     seed = make_seed("https://log.test/start", '<a href="/leaf">leaf</a>')
 
     with_fake_fetcher("https://log.test/leaf" => "<p>leaf</p>") do
-      assert_difference -> { CrawlRecord.count }, 2 do
+      assert_difference -> { FetchRecord.count }, 2 do
         CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
       end
     end
   end
 
   # --- the crawl log ---------------------------------------------------------
+
+  test "records written during a crawl say a crawl started them" do
+    seed = make_seed("https://trigger.test/start", '<a href="/leaf">leaf</a>')
+
+    with_fake_fetcher("https://trigger.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_equal [ "crawl" ], FetchRecord.where("url LIKE ?", "https://trigger.test/%").distinct.pluck(:trigger)
+  end
 
   test "a page fetched successfully records its status" do
     seed = make_seed("https://status.test/start", '<a href="/leaf">leaf</a>')
@@ -142,7 +161,7 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
     end
 
-    record = CrawlRecord.find_by(url: "https://status.test/leaf")
+    record = FetchRecord.find_by(url: "https://status.test/leaf")
 
     assert_equal 200, record.status_code
     assert_equal "ok", record.outcome
@@ -154,12 +173,12 @@ class CrawlJobTest < ActiveJob::TestCase
     seed = make_seed("https://failing.test/start", '<a href="/gone">gone</a>')
 
     with_fake_fetcher({}, "https://failing.test/gone" => 404) do
-      assert_difference -> { CrawlRecord.count }, 2 do
+      assert_difference -> { FetchRecord.count }, 2 do
         CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
       end
     end
 
-    record = CrawlRecord.find_by(url: "https://failing.test/gone")
+    record = FetchRecord.find_by(url: "https://failing.test/gone")
 
     assert_equal 404, record.status_code
     assert_equal "http_error", record.outcome
@@ -172,7 +191,7 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
     end
 
-    record = CrawlRecord.find_by(url: "https://refused.test/doc.pdf")
+    record = FetchRecord.find_by(url: "https://refused.test/doc.pdf")
 
     assert_equal 200, record.status_code, "the server answered fine; we declined what it sent"
     assert_equal "unusable", record.outcome
@@ -185,7 +204,7 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
     end
 
-    record = CrawlRecord.find_by(url: "https://timeout.test/slow")
+    record = FetchRecord.find_by(url: "https://timeout.test/slow")
 
     assert_nil record.status_code
     assert_equal "no_response", record.outcome
@@ -198,7 +217,7 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 0)
     end
 
-    record = CrawlRecord.find_by(url: "https://held.test/start")
+    record = FetchRecord.find_by(url: "https://held.test/start")
 
     assert_equal "skipped", record.outcome
     assert_nil record.status_code
@@ -211,7 +230,7 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
     end
 
-    assert_equal 1, CrawlRecord.where(url: "https://once.test/bad").count
+    assert_equal 1, FetchRecord.where(url: "https://once.test/bad").count
   end
 
   # The existing exclusion guard, kept: the new write path must not start
@@ -224,7 +243,7 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
     end
 
-    assert_not CrawlRecord.exists?(url: "https://logskip.test/private/x")
+    assert_not FetchRecord.exists?(url: "https://logskip.test/private/x")
   end
 
   test "crawl records are attributable to the host they were fetched from" do
@@ -234,7 +253,7 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
     end
 
-    hosts = CrawlRecord.where(url: [ "https://attributed.test/start", "https://attributed.test/leaf" ])
+    hosts = FetchRecord.where(url: [ "https://attributed.test/start", "https://attributed.test/leaf" ])
                        .map { |record| record.domain.host }
 
     assert_equal [ "attributed.test" ], hosts.uniq
@@ -247,8 +266,8 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "follow_external_links", max_depth: 1)
     end
 
-    assert_equal "first.test", CrawlRecord.find_by(url: "https://first.test/start").domain.host
-    assert_equal "second.test", CrawlRecord.find_by(url: "https://second.test/page").domain.host
+    assert_equal "first.test", FetchRecord.find_by(url: "https://first.test/start").domain.host
+    assert_equal "second.test", FetchRecord.find_by(url: "https://second.test/page").domain.host
   end
 
   # A crawl of a real site hits things it cannot read — a linked PDF, a dead
@@ -279,7 +298,7 @@ class CrawlJobTest < ActiveJob::TestCase
       CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1, max_pages: 3)
     end
 
-    crawled = CrawlRecord.where("url LIKE ?", "https://cap.test/%").count
+    crawled = FetchRecord.where("url LIKE ?", "https://cap.test/%").count
     assert crawled <= 3, "expected at most 3 pages crawled, got #{crawled}"
   end
 
@@ -367,7 +386,7 @@ class CrawlJobTest < ActiveJob::TestCase
       "an excluded link must not become a source"
     assert_not Source.exists?(url: "https://excluded.test/item?id=2"),
       "an excluded link must not be discovered a level deeper either"
-    assert_not CrawlRecord.exists?(url: "https://excluded.test/item?id=1"),
+    assert_not FetchRecord.exists?(url: "https://excluded.test/item?id=1"),
       "an excluded link must not be fetched"
   end
 

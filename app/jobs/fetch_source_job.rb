@@ -43,8 +43,20 @@ class FetchSourceJob < ApplicationJob
   # Only untouched sources are fetched by default, so a crawl revisiting a page
   # does not refetch it. `force: true` is for an explicit request from the UI to
   # grab the content again whatever the current status.
-  def perform(source, force: false)
-    return unless force || source.status == "new"
+  #
+  # Every path through this method leaves a FetchRecord. This is the one place
+  # every fetch passes through — a crawl's `perform_now`, the "Fetch content"
+  # button, and the fetch a new source queues for itself all arrive here — so
+  # logging here is what makes "no fetch without a record" true, rather than
+  # three call sites that each have to remember. It is also where the facts
+  # are: the status code, the exception and the guard result are all in hand,
+  # and none of them have to be reconstructed by a caller.
+  def perform(source, force: false, trigger: "manual")
+    unless force || source.status == "new"
+      # No request went out, which is a different fact from one that failed.
+      log_fetch(source, nil, "skipped", trigger)
+      return
+    end
 
     source.update!(status: "in_work")
 
@@ -59,17 +71,34 @@ class FetchSourceJob < ApplicationJob
 
     source.update!(status: "complete", resolved_url: resolved_url_for(source, fetched))
 
-    # Returned so the crawl can log what the server actually answered. nil from
-    # the guard above means no request was made at all, which is a different
-    # fact and is recorded as such.
+    log_fetch(source, fetched.status_code, "ok", trigger)
+
+    # Still returned for callers that want the status without reading it back
+    # off the record.
     fetched.status_code
+  rescue SourceNotFetchable => e
+    # Rescued ahead of StandardError, which it is. A refused content type
+    # answered 200, so the outcome cannot be derived from the status alone.
+    source.update!(status: "failed") if source.persisted?
+    log_fetch(source, e.status_code, e.status_code.to_i >= 400 ? "http_error" : "unusable", trigger)
+    Rails.logger.error("FetchSourceJob failed for source ##{source.id}: #{e.class}: #{e.message}")
+    raise
   rescue StandardError => e
     source.update!(status: "failed") if source.persisted?
+    log_fetch(source, nil, "no_response", trigger)
     Rails.logger.error("FetchSourceJob failed for source ##{source.id}: #{e.class}: #{e.message}")
     raise
   end
 
   private
+
+  # The log must never be the reason a fetch fails, so a record that cannot be
+  # written is logged and swallowed.
+  def log_fetch(source, status_code, outcome, trigger)
+    FetchRecord.create!(url: source.url, status_code: status_code, outcome: outcome, trigger: trigger)
+  rescue StandardError => e
+    Rails.logger.error("FetchSourceJob: could not log #{source.url}: #{e.class}: #{e.message}")
+  end
 
   # Follows redirects to the page that actually answers. Every hop is checked
   # again — scheme, exclusion list, and whether we have already been here — so

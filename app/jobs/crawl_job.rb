@@ -50,35 +50,17 @@ class CrawlJob < ApplicationJob
 
   private
 
-  # Every page the crawl processes leaves a record, including the ones that
-  # failed. Previously the write sat after the fetch inside this rescue, so a
-  # failed page left nothing behind while still consuming the page budget —
-  # a crawl where everything failed produced an empty log, indistinguishable
-  # from a crawl that never ran.
+  # Every page the crawl processes leaves a FetchRecord, including the ones
+  # that failed — but the write lives in FetchSourceJob now, which is the one
+  # place every fetch passes through and the place that holds the status code
+  # and the exception firsthand. A crawl no longer reconstructs an outcome from
+  # a return value; it just fetches and keeps going.
   #
-  # One record per page, carrying the outcome that ended the attempt. A page
-  # that redirected twice before answering logs the final status, because the
-  # unit of this log is a page processed, matching `processed` and `max_pages`.
+  # The rescue stays, so one page that blows up does not end the crawl.
   def process_source(source)
-    status_code = FetchSourceJob.perform_now(source)
-
-    # nil without an exception means the fetch guard declined: the page was
-    # already held, so no request went out.
-    log_crawl(source, status_code, status_code.nil? ? "skipped" : "ok")
-  rescue FetchSourceJob::SourceNotFetchable => e
-    log_crawl(source, e.status_code, e.status_code.to_i >= 400 ? "http_error" : "unusable")
-    Rails.logger.error("CrawlJob: failed processing #{source.url}: #{e.class}: #{e.message}")
+    FetchSourceJob.perform_now(source, trigger: "crawl")
   rescue StandardError => e
-    log_crawl(source, nil, "no_response")
     Rails.logger.error("CrawlJob: failed processing #{source.url}: #{e.class}: #{e.message}")
-  end
-
-  # The log must not be the reason a crawl stops, so a record that cannot be
-  # written is logged and swallowed like any other per-page failure.
-  def log_crawl(source, status_code, outcome)
-    CrawlRecord.create!(url: source.url, status_code: status_code, outcome: outcome)
-  rescue StandardError => e
-    Rails.logger.error("CrawlJob: could not log #{source.url}: #{e.class}: #{e.message}")
   end
 
   def discovered_links(source, crawl_type)

@@ -13,6 +13,15 @@
     </dd>
   <% end %>
 
+  <dt>Domain</dt>
+  <dd>
+    <% if @source.domain %>
+      <%= link_to @source.domain.host, domain_path(@source.domain) %>
+    <% else %>
+      —
+    <% end %>
+  </dd>
+
   <dt>Description</dt>
   <dd><%= @source.description.presence || "—" %></dd>
 

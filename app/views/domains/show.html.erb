@@ -19,11 +19,11 @@
   <dd class="col-sm-9"><%= @domain.sources.count %></dd>
 </dl>
 
-<h2 class="h4 mt-4">Crawl history</h2>
+<h2 class="h4 mt-4">Fetch history</h2>
 
-<% if @crawled_count.positive? %>
+<% if @fetched_count.positive? %>
   <p class="text-muted">
-    <%= pluralize(@crawled_count, "page") %> crawled from this site.
+    <%= pluralize(@fetched_count, "page") %> fetched from this site.
     <% if @failed_count.positive? %>
       <span class="text-danger"><%= @failed_count %> did not come back.</span>
     <% else %>
@@ -36,6 +36,7 @@
       <tr>
         <th>When</th>
         <th>URL</th>
+        <th>Started by</th>
         <th>Status</th>
         <th>Outcome</th>
       </tr>
@@ -43,7 +44,9 @@
     <tbody>
       <% @records.each do |record| %>
         <tr>
-          <td><%= record.created_at.to_fs(:short) %></td>
+          <%# Seconds included: a crawl fetches many pages inside one minute,
+              and without them the column cannot order its own rows. %>
+          <td><%= record.created_at.strftime("%d %b %H:%M:%S") %></td>
           <td>
             <% source = @sources_by_url[record.url] %>
             <% if source %>
@@ -52,8 +55,9 @@
               <%= truncate(record.url, length: 70) %>
             <% end %>
           </td>
-          <td><%= crawl_status_code(record) %></td>
-          <td><%= crawl_outcome_badge(record) %></td>
+          <td><%= fetch_trigger_label(record) %></td>
+          <td><%= fetch_status_code(record) %></td>
+          <td><%= fetch_outcome_badge(record) %></td>
         </tr>
       <% end %>
     </tbody>
@@ -65,7 +69,6 @@
   </p>
 <% else %>
   <p class="text-muted">
-    No crawls recorded for this site. Pages fetched one at a time from a source
-    page do not appear here — only pages a crawl processed.
+    No fetches recorded for this site — nothing here has been downloaded yet.
   </p>
 <% end %>

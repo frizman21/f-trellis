@@ -338,4 +338,121 @@ class FetchSourceJobTest < ActiveJob::TestCase
       assert_empty requests
     end
   end
+
+  # Every fetch leaves a record — that is the whole point of moving the write
+  # here from CrawlJob, so these assert the guarantee rather than the mechanism.
+
+  test "a successful fetch writes exactly one record carrying the status the server sent" do
+    source = Source.create!(url: "https://logged.test/page")
+
+    with_fake_http do
+      assert_difference -> { FetchRecord.count }, 1 do
+        FetchSourceJob.perform_now(source, trigger: "crawl")
+      end
+    end
+
+    record = FetchRecord.order(:id).last
+    assert_equal "https://logged.test/page", record.url
+    assert_equal "ok", record.outcome
+    assert_equal 200, record.status_code
+    assert_equal "crawl", record.trigger
+    assert_equal "logged.test", record.domain.host
+  end
+
+  test "a fetch the guard declines is recorded as skipped with no status" do
+    source = Source.create!(url: "https://declined.test/page")
+    source.update!(status: "complete")
+
+    with_fake_http do
+      assert_difference -> { FetchRecord.count }, 1 do
+        FetchSourceJob.perform_now(source)
+      end
+    end
+
+    record = FetchRecord.order(:id).last
+    assert_equal "skipped", record.outcome
+    assert_nil record.status_code
+  end
+
+  test "an error status is recorded as http_error with that status" do
+    source = Source.create!(url: "https://gone.test/page")
+
+    with_fake_http(code: "404") do
+      assert_difference -> { FetchRecord.count }, 1 do
+        assert_raises(FetchSourceJob::SourceNotFetchable) { FetchSourceJob.perform_now(source) }
+      end
+    end
+
+    record = FetchRecord.order(:id).last
+    assert_equal "http_error", record.outcome
+    assert_equal 404, record.status_code
+  end
+
+  # The outcome cannot be derived from the status alone: this one answered 200.
+  test "a refused content type is recorded as unusable even though the server said 200" do
+    source = Source.create!(url: "https://brochure.test/doc.pdf")
+
+    with_fake_http("%PDF-1.4", headers: { "Content-Type" => "application/pdf" }) do
+      assert_difference -> { FetchRecord.count }, 1 do
+        assert_raises(FetchSourceJob::SourceNotFetchable) { FetchSourceJob.perform_now(source) }
+      end
+    end
+
+    record = FetchRecord.order(:id).last
+    assert_equal "unusable", record.outcome
+    assert_equal 200, record.status_code
+  end
+
+  test "a request that got no answer at all is recorded as no_response" do
+    source = Source.create!(url: "https://silent.test/page")
+
+    with_fake_http(responses: [ { raise: Timeout::Error.new("execution expired") } ]) do
+      assert_difference -> { FetchRecord.count }, 1 do
+        assert_raises(Timeout::Error) { FetchSourceJob.perform_now(source) }
+      end
+    end
+
+    record = FetchRecord.order(:id).last
+    assert_equal "no_response", record.outcome
+    assert_nil record.status_code
+  end
+
+  test "the manual and initial triggers reach the record" do
+    manual  = Source.create!(url: "https://byhand.test/page")
+    initial = Source.create!(url: "https://oncreate.test/page")
+
+    with_fake_http do
+      FetchSourceJob.perform_now(manual, trigger: "manual")
+      FetchSourceJob.perform_now(initial, trigger: "initial")
+    end
+
+    assert_equal "manual",  FetchRecord.find_by(url: "https://byhand.test/page").trigger
+    assert_equal "initial", FetchRecord.find_by(url: "https://oncreate.test/page").trigger
+  end
+
+  # The log must never be the reason a fetch fails.
+  test "a record that cannot be written does not fail the fetch" do
+    source = Source.create!(url: "https://logbroken.test/page")
+
+    FetchRecord.singleton_class.class_eval do
+      alias_method :create_without_stub!, :create!
+      define_method(:create!) { |*| raise ActiveRecord::StatementInvalid, "log is down" }
+    end
+
+    begin
+      with_fake_http do
+        assert_difference -> { SourceDatum.count }, 1 do
+          FetchSourceJob.perform_now(source)
+        end
+      end
+    ensure
+      FetchRecord.singleton_class.class_eval do
+        remove_method :create!
+        alias_method :create!, :create_without_stub!
+        remove_method :create_without_stub!
+      end
+    end
+
+    assert_equal "complete", source.reload.status
+  end
 end

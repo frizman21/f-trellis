@@ -506,22 +506,25 @@ SourceLink.record(from: link_sample_source, to: apollo_source)
 # outbound edges.
 SourceLink.record(from: link_sample_children.first, to: link_sample_source)
 
-# Crawl history for the domain page, covering every outcome so the table shows
-# each badge and the failure count is non-zero. Guarded on the domain rather
+# Fetch history for the domain page, covering every outcome so the table shows
+# each badge and the failure count is non-zero, and every trigger so the
+# "Started by" column is not uniformly "Crawl". Guarded on the domain rather
 # than per row so re-seeding does not pile up duplicate history.
-crawl_log_domain = link_sample_source.domain
+fetch_log_domain = link_sample_source.domain
 
-if crawl_log_domain.crawl_records.none?
+if fetch_log_domain.fetch_records.none?
   [
-    { url: link_sample_source.url,                    outcome: "ok",          status_code: 200 },
-    { url: link_sample_children.first.url,            outcome: "ok",          status_code: 200 },
-    { url: "#{link_sample_source.url}missing-page",   outcome: "http_error",  status_code: 404 },
-    { url: "#{link_sample_source.url}rate-limited",   outcome: "http_error",  status_code: 429 },
-    { url: "#{link_sample_source.url}brochure.pdf",   outcome: "unusable",    status_code: 200 },
-    { url: "#{link_sample_source.url}slow-endpoint",  outcome: "no_response", status_code: nil },
-    { url: "#{link_sample_source.url}already-held",   outcome: "skipped",     status_code: nil }
+    { url: link_sample_source.url,                    outcome: "ok",          status_code: 200, trigger: "crawl" },
+    { url: link_sample_children.first.url,            outcome: "ok",          status_code: 200, trigger: "crawl" },
+    { url: "#{link_sample_source.url}by-hand",        outcome: "ok",          status_code: 200, trigger: "manual" },
+    { url: "#{link_sample_source.url}just-added",     outcome: "ok",          status_code: 200, trigger: "initial" },
+    { url: "#{link_sample_source.url}missing-page",   outcome: "http_error",  status_code: 404, trigger: "crawl" },
+    { url: "#{link_sample_source.url}rate-limited",   outcome: "http_error",  status_code: 429, trigger: "crawl" },
+    { url: "#{link_sample_source.url}brochure.pdf",   outcome: "unusable",    status_code: 200, trigger: "manual" },
+    { url: "#{link_sample_source.url}slow-endpoint",  outcome: "no_response", status_code: nil, trigger: "crawl" },
+    { url: "#{link_sample_source.url}already-held",   outcome: "skipped",     status_code: nil, trigger: "crawl" }
   ].each_with_index do |attrs, index|
-    record = CrawlRecord.create!(attrs.merge(domain: crawl_log_domain))
+    record = FetchRecord.create!(attrs.merge(domain: fetch_log_domain))
     # Spread over an afternoon so "most recent first" is visibly doing something.
     record.update_columns(created_at: index.hours.ago)
   end

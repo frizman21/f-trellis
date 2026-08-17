@@ -1,10 +1,11 @@
-# One page the crawler processed, and when. The log of what a crawl actually
-# did, as distinct from the sources it produced — a page that was fetched and
-# yielded nothing still happened.
+# One fetch the system performed, and what came back. Every fetch leaves a
+# record — a crawl's pages, a page somebody fetched by hand, and the fetch a
+# new source queues for itself — because the difference between them is which
+# button started them, not what the remote server experienced.
 #
 # The domain is filled from the URL here rather than at the call site, so the
-# invariant holds for seeds and tests as well as for CrawlJob.
-class CrawlRecord < ApplicationRecord
+# invariant holds for seeds and tests as well as for FetchSourceJob.
+class FetchRecord < ApplicationRecord
   # Why the attempt ended as it did. A null status_code alone cannot tell these
   # apart, which is the whole reason this column exists.
   #
@@ -16,10 +17,19 @@ class CrawlRecord < ApplicationRecord
   #   skipped      no request was made; the page was already held
   OUTCOMES = %w[ok http_error unusable no_response skipped].freeze
 
+  # What started the fetch. Kept because the log used to answer "was this a
+  # crawl?" by construction, and recording everything would otherwise lose it.
+  #
+  #   crawl    a page CrawlJob processed
+  #   manual   the "Fetch content" button on a source page
+  #   initial  the unforced fetch a newly created source queues for itself
+  TRIGGERS = %w[crawl manual initial].freeze
+
   belongs_to :domain
 
   validates :url, presence: true
   validates :outcome, inclusion: { in: OUTCOMES }
+  validates :trigger, inclusion: { in: TRIGGERS }
 
   scope :recent, -> { order(created_at: :desc) }
 

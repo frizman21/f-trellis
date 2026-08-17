@@ -37,9 +37,19 @@ class DomainsControllerTest < ActionDispatch::IntegrationTest
   # --- show ------------------------------------------------------------------
 
   def crawl(domain, url, outcome: "ok", status_code: 200, at: nil)
-    record = CrawlRecord.create!(url: url, domain: domain, outcome: outcome, status_code: status_code)
+    record = FetchRecord.create!(url: url, domain: domain, outcome: outcome, status_code: status_code)
     record.update_columns(created_at: at) if at
     record
+  end
+
+  # A crawl fetches many pages inside one minute, so a minute-resolution
+  # timestamp cannot order its own rows.
+  test "show renders the time of a fetch down to the second" do
+    crawl(domains(:example_com), "https://example.com/timed", at: Time.utc(2026, 8, 17, 15, 57, 36))
+
+    get domain_path(domains(:example_com))
+
+    assert_select "td", text: /15:57:36/
   end
 
   test "show lists the crawl records for the domain" do
@@ -87,15 +97,15 @@ class DomainsControllerTest < ActionDispatch::IntegrationTest
 
     get domain_path(domain)
 
-    assert_match(/4 pages crawled/, response.body)
+    assert_match(/4 pages fetched/, response.body)
     assert_match(/2 did not come back/, response.body)
   end
 
-  test "show says so when nothing has been crawled rather than showing an empty table" do
+  test "show says so when nothing has been fetched rather than showing an empty table" do
     get domain_path(domains(:example_com))
 
     assert_response :success
-    assert_match(/No crawls recorded/, response.body)
+    assert_match(/No fetches recorded/, response.body)
     assert_select "table", count: 0
   end
 
@@ -125,17 +135,23 @@ class DomainsControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name=?]", "domain[min_crawl_delay_seconds]"
   end
 
-  test "update saves the crawl delay and redirects" do
+  # Back to the domain itself, not the index: the edit was reached from the
+  # show page and its effect is visible there.
+  test "update saves the crawl delay and returns to the domain" do
     domain = domains(:example_com)
     patch domain_path(domain), params: { domain: { min_crawl_delay_seconds: 5 } }
-    assert_redirected_to domains_path
+    assert_redirected_to domain_path(domain)
     assert_equal 5, domain.reload.min_crawl_delay_seconds
+
+    follow_redirect!
+    assert_match(/Domain &quot;example.com&quot; updated\./, response.body)
+    assert_match(/5 seconds/, response.body)
   end
 
   test "update clears the crawl delay when set to blank" do
     domain = domains(:example_com)
     patch domain_path(domain), params: { domain: { min_crawl_delay_seconds: "" } }
-    assert_redirected_to domains_path
+    assert_redirected_to domain_path(domain)
     assert_nil domain.reload.min_crawl_delay_seconds
   end
 
