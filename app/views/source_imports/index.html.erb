@@ -1,0 +1,45 @@
+<% content_for :title, "Source Imports" %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Source Imports</h1>
+  <%= link_to "Bulk add sources", new_source_import_path, class: "btn btn-primary" %>
+</div>
+
+<p class="text-muted">
+  Pasted lists of URLs, and what became of each one. Imported pages are created
+  in status <code>new</code> and are not fetched — crawling or fetching them is
+  a separate, deliberate act.
+</p>
+
+<% if @imports.any? %>
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>Status</th>
+        <th class="text-end">Submitted</th>
+        <th class="text-end">Created</th>
+        <th class="text-end">Already known</th>
+        <th class="text-end">Rejected</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @imports.each do |import| %>
+        <tr>
+          <td><%= import.created_at.strftime("%d %b %Y %H:%M") %></td>
+          <td><%= render "status", import: import %></td>
+          <td class="text-end"><%= import.submitted_count %></td>
+          <td class="text-end"><%= import.created_count %></td>
+          <td class="text-end"><%= import.existing_count %></td>
+          <td class="text-end"><%= import.rejected_entries.size %></td>
+          <td class="text-end"><%= link_to "View", source_import_path(import) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%= paginate @imports %>
+<% else %>
+  <p class="text-muted">No imports yet.</p>
+<% end %>

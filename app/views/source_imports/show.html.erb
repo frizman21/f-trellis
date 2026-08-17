@@ -1,0 +1,64 @@
+<% content_for :title, "Import ##{@import.id}" %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Import #<%= @import.id %></h1>
+  <%= link_to "All imports", source_imports_path, class: "btn btn-outline-secondary" %>
+</div>
+
+<p class="text-muted">
+  Started <%= @import.created_at.strftime("%d %b %Y %H:%M:%S") %>.
+  <%= render "status", import: @import %>
+</p>
+
+<% unless @import.finished? %>
+  <%# Deliberately not live: refreshing is how progress is seen, and streaming
+      updates is a separate concern from getting the URLs in. %>
+  <div class="alert alert-info">
+    Still running — reload this page for the current counts.
+  </div>
+<% end %>
+
+<% if @import.status == "failed" %>
+  <div class="alert alert-danger">
+    <strong>The import did not finish.</strong>
+    <div class="font-monospace small mt-1"><%= @import.error_message %></div>
+  </div>
+<% end %>
+
+<dl class="row">
+  <dt class="col-sm-3">Submitted</dt>
+  <dd class="col-sm-9"><%= @import.submitted_count %></dd>
+
+  <dt class="col-sm-3">Created</dt>
+  <dd class="col-sm-9"><%= @import.created_count %></dd>
+
+  <dt class="col-sm-3">Already known</dt>
+  <dd class="col-sm-9"><%= @import.existing_count %></dd>
+
+  <dt class="col-sm-3">Rejected</dt>
+  <dd class="col-sm-9"><%= @import.rejected_entries.size %></dd>
+</dl>
+
+<% if @import.rejected_entries.any? %>
+  <h2 class="h5 mt-4">Rejected lines</h2>
+  <p class="text-muted">
+    These are the only lines that need your attention — the rest are in.
+  </p>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Line</th>
+        <th>Why</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @import.rejected_entries.each do |entry| %>
+        <tr>
+          <td class="font-monospace small"><%= entry["value"] %></td>
+          <td><%= entry["reason"] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

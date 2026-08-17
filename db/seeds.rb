@@ -431,6 +431,35 @@ end
   end
 end
 
+# Bulk imports, so the index and the show page have something to render.
+# Deliberately three different shapes: one clean, one carrying the rejections
+# that are the whole point of the report, and one that fell over.
+#
+# Keyed on raw_urls so re-running seeds does not stack up copies. No Sources are
+# created here — these are the record of an import, not the import itself, and
+# ImportSourcesJob is what creates rows.
+[
+  { raw_urls: "https://www.darpa.mil/research/programs\nhttps://www.darpa.mil/about-us/offices\n",
+    status: "complete", submitted: 2, created: 2, existing: 0, rejected: [] },
+  { raw_urls: "https://www.nasa.gov/directorates\nhttps://www.nasa.gov/directorates\n" \
+              "nasa.gov/centers\nnot a url at all\nhttps://\n",
+    status: "complete", submitted: 5, created: 2, existing: 1,
+    rejected: [ { "value" => "not a url at all", "reason" => "not a usable web address" },
+                { "value" => "https://",         "reason" => "not a usable web address" } ] },
+  { raw_urls: "https://www.energy.gov/national-laboratories\n",
+    status: "failed", submitted: 0, created: 0, existing: 0, rejected: [],
+    error: "ActiveRecord::StatementInvalid: PG::ConnectionBad: server closed the connection" }
+].each do |attrs|
+  SourceImport.find_or_create_by!(raw_urls: attrs[:raw_urls]) do |import|
+    import.status          = attrs[:status]
+    import.submitted_count = attrs[:submitted]
+    import.created_count   = attrs[:created]
+    import.existing_count  = attrs[:existing]
+    import.rejected        = attrs[:rejected]
+    import.error_message   = attrs[:error]
+  end
+end
+
 # A fetched source with a real zipped payload attached, so the Source Data
 # table on the source show page — and its "Extract links" action — can be
 # exercised in the browser without hitting the network.
