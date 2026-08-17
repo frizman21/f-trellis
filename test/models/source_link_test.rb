@@ -1,4 +1,5 @@
 require "test_helper"
+require "zip"
 
 class SourceLinkTest < ActiveSupport::TestCase
   setup do
@@ -66,5 +67,60 @@ class SourceLinkTest < ActiveSupport::TestCase
     assert_difference "SourceLink.count", -2 do
       @from.destroy
     end
+  end
+
+  # --- which snapshot the link came out of ------------------------------------
+
+  def datum_for(source, html = "<html><body>hi</body></html>")
+    buffer = Zip::OutputStream.write_buffer do |zos|
+      zos.put_next_entry("page.html")
+      zos.write(html)
+    end
+    buffer.rewind
+
+    SourceDatum.create!(source: source, content_type: "text/html", data: buffer.read)
+  end
+
+  test "record stores the datum the link was found in" do
+    datum = datum_for(@from)
+
+    link = SourceLink.record(from: @from, to: @to, datum: datum)
+
+    assert_equal datum, link.source_datum
+  end
+
+  # Both callers supply one, but the graph already holds rows that never can.
+  test "record without a datum still works and stores null" do
+    link = SourceLink.record(from: @from, to: @to)
+
+    assert_nil link.source_datum
+  end
+
+  # The "first finder" rule. A careless implementation that assigns on every
+  # call turns this column into "most recent finder" the first time a page is
+  # re-crawled, which is a different fact.
+  test "re-recording an edge from a newer snapshot does not move the datum" do
+    first  = datum_for(@from)
+    second = datum_for(@from)
+
+    SourceLink.record(from: @from, to: @to, datum: first)
+    link = SourceLink.record(from: @from, to: @to, datum: second)
+
+    assert_equal first, link.reload.source_datum
+  end
+
+  # Deleting an old copy of a page must not delete links that are still true.
+  test "destroying a datum nullifies its edges rather than removing them" do
+    datum = datum_for(@from)
+    SourceLink.record(from: @from, to: @to, datum: datum)
+
+    assert_no_difference "SourceLink.count" do
+      datum.destroy
+    end
+
+    link = SourceLink.find_by(from_source: @from, to_source: @to)
+
+    assert_nil link.source_datum_id
+    assert_equal @to, link.to_source
   end
 end

@@ -25,7 +25,9 @@ class CrawlJob < ApplicationJob
 
       next if depth >= max_depth
 
-      discovered_links(current, crawl_type).each do |url|
+      urls, datum = discovered_links(current, crawl_type)
+
+      urls.each do |url|
         target = Source.find_by(url: url)
 
         # Only URLs we have not seen and have no source for get created and
@@ -43,7 +45,7 @@ class CrawlJob < ApplicationJob
 
         # Record the edge either way, so links back to pages we already know
         # about still show up in the graph.
-        SourceLink.record(from: current, to: target) if target
+        SourceLink.record(from: current, to: target, datum: datum) if target
       end
     end
   end
@@ -63,14 +65,19 @@ class CrawlJob < ApplicationJob
     Rails.logger.error("CrawlJob: failed processing #{source.url}: #{e.class}: #{e.message}")
   end
 
+  # Returns the links *and* the snapshot they came out of, so the edge write can
+  # name it. Looking the datum up a second time at the write would risk a
+  # different answer if a fetch landed in between.
   def discovered_links(source, crawl_type)
     datum = source.source_data.order(:created_at).last
-    return [] unless datum
+    return [ [], nil ] unless datum
 
     result = datum.extract_links
-    case crawl_type
-    when "stay_in_domain"      then result.internal
-    when "follow_external_links" then result.internal + result.external
-    end
+    urls = case crawl_type
+           when "stay_in_domain"        then result.internal
+           when "follow_external_links" then result.internal + result.external
+           end
+
+    [ urls, datum ]
   end
 end
