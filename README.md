@@ -114,6 +114,43 @@ Sending a fake browser user-agent is explicitly not supported: it would make
 `robots.txt` compliance unverifiable from the server side and the traffic
 unattributable, which defeats the point of identifying at all.
 
+### What the crawler honours
+
+Before crawling a host, the crawler reads its `robots.txt` and obeys it, per
+RFC 9309: the most specific matching `User-agent` group applies, `Allow` and
+`Disallow` are matched by longest pattern with `Allow` winning ties, `*` and
+`$` are supported, and an empty `Disallow` means nothing is off limits.
+
+| Response | Effect |
+|---|---|
+| 2xx | Parsed and obeyed. A `Crawl-delay` is recorded and used. |
+| 4xx | The site stated no rules; everything is permitted. |
+| 429 | **Nothing on that host is crawled** — see below. |
+| 5xx or a timeout | **Nothing on that host is crawled** until it can be read. |
+
+The last row is the conservative branch RFC 9309 specifies, and the one most
+likely to surprise: a site with a flaky `robots.txt` endpoint becomes
+temporarily uncrawlable. The domain's page says so when that is what happened.
+
+The **whole** 4xx range means "permitted" (§2.3.1.3), not only 404. A `403` on
+`/robots.txt` is common behind a WAF, and treating it as unreadable would make
+such a site permanently uncrawlable.
+
+`429` is the one deliberate departure. It sits inside 4xx, so the strict reading
+would have the crawler take a rate-limit response as permission to crawl.
+Denying is the better failure mode: over-cautious rather than rude.
+
+Each domain's page shows what its `robots.txt` said, when it was last read, and
+the crawl history that resulted. Files are re-read once a day.
+
+The crawler waits between requests to the same host. The delay is the domain's
+`min_crawl_delay_seconds` when an operator has set one, otherwise the site's own
+`Crawl-delay`, otherwise one second.
+
+**The manual "Fetch content" button is deliberately not gated by `robots.txt`.**
+An operator asking for one specific page is a different act from an automated
+crawl, and gating it would make a disallowed page unfetchable even deliberately.
+
 ## The LLM model registry
 
 Model pickers (skills, source processing reports) read from the `models` table,

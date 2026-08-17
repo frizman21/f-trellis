@@ -17,6 +17,28 @@
 
   <dt class="col-sm-3">Sources</dt>
   <dd class="col-sm-9"><%= @domain.sources.count %></dd>
+
+  <dt class="col-sm-3">robots.txt</dt>
+  <dd class="col-sm-9">
+    <% case @domain.robots_status %>
+    <% when "ok" %>
+      Read <%= time_ago_in_words(@domain.robots_fetched_at) %> ago.
+      <% if @domain.robots_crawl_delay_seconds.present? %>
+        The site asks for <%= pluralize(@domain.robots_crawl_delay_seconds, "second") %> between requests.
+      <% end %>
+      <details class="mt-2">
+        <summary class="small">What it says</summary>
+        <pre class="small bg-body-secondary p-2 mt-1"><%= @domain.robots_txt %></pre>
+      </details>
+    <% when "absent" %>
+      This site has no robots.txt, so it has not asked for anything.
+    <% when "unreachable" %>
+      <span class="text-danger">Could not be read.</span>
+      Until it can be, nothing on this site will be crawled.
+    <% else %>
+      <span class="text-muted">Not read yet — no crawl has visited this site.</span>
+    <% end %>
+  </dd>
 </dl>
 
 <h2 class="h4 mt-4">Fetch history</h2>

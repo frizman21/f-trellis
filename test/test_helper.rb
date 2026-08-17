@@ -46,7 +46,13 @@ module FakeHttp
   # behave exactly as they do against a live server.
   def self.build_response(spec)
     code = spec[:code].to_s
-    klass = Net::HTTPResponse::CODE_TO_OBJ.fetch(code, Net::HTTPUnknownResponse)
+    # The same resolution Net::HTTP itself uses: an exact match, then the class
+    # for the leading digit, then unknown. Without the middle step a status the
+    # library has no constant for — 418, 451 — would not even be a client error
+    # here, which is less faithful than the real thing.
+    klass = Net::HTTPResponse::CODE_TO_OBJ[code] ||
+            Net::HTTPResponse::CODE_CLASS_TO_OBJ[code[0]] ||
+            Net::HTTPUnknownResponse
     response = klass.new("1.1", code, "")
 
     spec.fetch(:headers, {}).each { |name, value| response[name] = value }

@@ -30,6 +30,13 @@ class CrawlerIdentity
       [ agent, contact_suffix ].compact.join(" ")
     end
 
+    # Just the product token, with no version and no contact URL — the form a
+    # robots.txt group names, and the form a `<meta name="...">` directive uses.
+    # A site writing `User-agent: f-agents` must match us.
+    def product_token
+      agent.split("/").first.to_s.split(" ").first.to_s
+    end
+
     private
 
     def agent

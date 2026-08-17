@@ -62,8 +62,44 @@ class CrawlJobTest < ActiveJob::TestCase
     CrawlJob.singleton_class.send(:remove_method, :perform_now)
   end
 
-  def with_fake_fetcher(pages = {}, failures = {})
+  # Without this, every test host resolves to nothing, robots.txt comes back
+  # unreachable, and RFC 9309 says an unreadable robots.txt puts the site off
+  # limits — so every crawl test would be disallowed. `robots` maps a host to a
+  # robots.txt body; a host not named permits everything.
+  attr_reader :robots_calls
+
+  # Aliased rather than replaced: policy_for is defined directly on
+  # RobotsFetcher's singleton class, so define_singleton_method would overwrite
+  # it and removing the stub would leave the class with no method at all.
+  def install_robots(robots)
+    @robots_calls = 0
+    test = self
+
+    RobotsFetcher.singleton_class.class_eval do
+      alias_method :policy_for_without_stub, :policy_for
+      define_method(:policy_for) do |domain, agent: CrawlerIdentity.product_token|
+        test.count_robots_call
+        body = robots[domain&.host]
+        body.nil? ? RobotsPolicy.allow_all : RobotsPolicy.parse(body, agent: agent)
+      end
+    end
+  end
+
+  def count_robots_call
+    @robots_calls += 1
+  end
+
+  def remove_robots
+    RobotsFetcher.singleton_class.class_eval do
+      remove_method :policy_for
+      alias_method :policy_for, :policy_for_without_stub
+      remove_method :policy_for_without_stub
+    end
+  end
+
+  def with_fake_fetcher(pages = {}, failures = {}, robots = {})
     install_test_pacer
+    install_robots(robots)
     FetchSourceJob.class_eval do
       alias_method :fetch_html_without_stub, :fetch_html
       define_method(:fetch_html) do |url|
@@ -86,6 +122,7 @@ class CrawlJobTest < ActiveJob::TestCase
       remove_method :fetch_html_without_stub
     end
     remove_test_pacer
+    remove_robots
   end
 
   test "crawls seed only when depth is zero" do
@@ -166,6 +203,85 @@ class CrawlJobTest < ActiveJob::TestCase
         CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
       end
     end
+  end
+
+  # --- robots.txt ------------------------------------------------------------
+
+  test "a disallowed url is neither fetched nor turned into a source" do
+    seed = make_seed("https://robotted.test/start", '<a href="/private/x">no</a><a href="/ok">yes</a>')
+    robots = { "robotted.test" => "User-agent: *\nDisallow: /private\n" }
+
+    with_fake_fetcher({ "https://robotted.test/ok" => "<p>fine</p>" }, {}, robots) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    blocked = Source.find_by(url: "https://robotted.test/private/x")
+
+    assert_empty blocked.source_data, "a disallowed page must not be fetched"
+    assert Source.find_by(url: "https://robotted.test/ok").source_data.any?
+  end
+
+  test "a disallowed page is logged as disallowed rather than as a failure" do
+    seed = make_seed("https://logged.test/start", '<a href="/private/x">no</a>')
+    robots = { "logged.test" => "User-agent: *\nDisallow: /private\n" }
+
+    with_fake_fetcher({}, {}, robots) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    record = FetchRecord.find_by(url: "https://logged.test/private/x")
+
+    assert_equal "disallowed", record.outcome
+    assert_nil record.status_code
+  end
+
+  test "a disallowed seed is not fetched and the crawl does not raise" do
+    seed = Source.create!(url: "https://blocked.test/start")
+    robots = { "blocked.test" => "User-agent: *\nDisallow: /\n" }
+
+    with_fake_fetcher({ "https://blocked.test/start" => "<p>never</p>" }, {}, robots) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_empty seed.reload.source_data
+    assert_equal "disallowed", FetchRecord.find_by(url: "https://blocked.test/start").outcome
+  end
+
+  test "a site whose robots.txt names us is held to our own rules" do
+    seed = make_seed("https://named.test/start", '<a href="/admin">a</a><a href="/open">b</a>')
+    robots = {
+      "named.test" => "User-agent: *\nDisallow: /\n\nUser-agent: f-agents\nDisallow: /admin\n"
+    }
+
+    with_fake_fetcher({ "https://named.test/open" => "<p>open</p>" }, {}, robots) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_empty Source.find_by(url: "https://named.test/admin").source_data
+    assert Source.find_by(url: "https://named.test/open").source_data.any?
+  end
+
+  test "robots.txt is consulted once per host, not once per page" do
+    seed = make_seed("https://once-robots.test/start",
+                     '<a href="/a">a</a><a href="/b">b</a><a href="/c">c</a>')
+
+    with_fake_fetcher({ "https://once-robots.test/a" => "<p>a</p>",
+                        "https://once-robots.test/b" => "<p>b</p>",
+                        "https://once-robots.test/c" => "<p>c</p>" }) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_equal 1, robots_calls, "four pages on one host should ask robots.txt once"
+  end
+
+  test "a delay the site asks for is used when no operator setting overrides it" do
+    domain = Domain.create!(host: "asked.test", robots_crawl_delay_seconds: 6)
+
+    assert_equal 6, CrawlJob.delay_for(domain)
+
+    domain.update!(min_crawl_delay_seconds: 2)
+
+    assert_equal 2, CrawlJob.delay_for(domain), "an operator's setting outranks the site's request"
   end
 
   # --- pacing ----------------------------------------------------------------
