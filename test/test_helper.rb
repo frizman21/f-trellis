@@ -22,6 +22,8 @@ module FakeHttp
     queue = Array(specs).dup
     requests = []
 
+    slept = []
+
     FetchSourceJob.class_eval do
       alias_method :request_without_stub, :request
       define_method(:request) do |uri, extra = {}|
@@ -31,15 +33,30 @@ module FakeHttp
 
         FakeHttp.build_response(spec)
       end
+
+      # Backoff must not actually wait, or the suite grows by minutes and stops
+      # being run. Recorded so the wait itself stays assertable.
+      alias_method :sleep_for_without_stub, :sleep_for
+      define_method(:sleep_for) { |seconds| slept << seconds }
     end
 
+    @fake_http_slept = slept
     block.arity.zero? ? yield : yield(requests)
   ensure
     FetchSourceJob.class_eval do
       remove_method :request
       alias_method :request, :request_without_stub
       remove_method :request_without_stub
+
+      remove_method :sleep_for
+      alias_method :sleep_for, :sleep_for_without_stub
+      remove_method :sleep_for_without_stub
     end
+  end
+
+  # What the retry backoff would have waited, in order.
+  def fake_http_slept
+    @fake_http_slept || []
   end
 
   # A real Net::HTTPResponse subclass, so `is_a?(Net::HTTPSuccess)` and friends

@@ -147,6 +147,12 @@ The crawler waits between requests to the same host. The delay is the domain's
 `min_crawl_delay_seconds` when an operator has set one, otherwise the site's own
 `Crawl-delay`, otherwise one second.
 
+A server that answers `429` or `5xx` on a *page* request is retried up to four
+times with a growing backoff. A `Retry-After` header overrides that backoff in
+both its forms (seconds and HTTP-date) — it is an instruction, not a suggestion
+— and one asking for longer than fifteen minutes is refused rather than parking
+a worker. A `404` or `403` is a definite answer and is not retried.
+
 **The manual "Fetch content" button is deliberately not gated by `robots.txt`.**
 An operator asking for one specific page is a different act from an automated
 crawl, and gating it would make a disallowed page unfetchable even deliberately.
