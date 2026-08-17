@@ -506,6 +506,27 @@ SourceLink.record(from: link_sample_source, to: apollo_source)
 # outbound edges.
 SourceLink.record(from: link_sample_children.first, to: link_sample_source)
 
+# Crawl history for the domain page, covering every outcome so the table shows
+# each badge and the failure count is non-zero. Guarded on the domain rather
+# than per row so re-seeding does not pile up duplicate history.
+crawl_log_domain = link_sample_source.domain
+
+if crawl_log_domain.crawl_records.none?
+  [
+    { url: link_sample_source.url,                    outcome: "ok",          status_code: 200 },
+    { url: link_sample_children.first.url,            outcome: "ok",          status_code: 200 },
+    { url: "#{link_sample_source.url}missing-page",   outcome: "http_error",  status_code: 404 },
+    { url: "#{link_sample_source.url}rate-limited",   outcome: "http_error",  status_code: 429 },
+    { url: "#{link_sample_source.url}brochure.pdf",   outcome: "unusable",    status_code: 200 },
+    { url: "#{link_sample_source.url}slow-endpoint",  outcome: "no_response", status_code: nil },
+    { url: "#{link_sample_source.url}already-held",   outcome: "skipped",     status_code: nil }
+  ].each_with_index do |attrs, index|
+    record = CrawlRecord.create!(attrs.merge(domain: crawl_log_domain))
+    # Spread over an afternoon so "most recent first" is visibly doing something.
+    record.update_columns(created_at: index.hours.ago)
+  end
+end
+
 # An example learning set, so the list, the show page and the source page's
 # "add to a learning set" dropdown all have something to work with. `add_url`
 # reuses the source already seeded above rather than creating a second row for

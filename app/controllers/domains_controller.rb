@@ -11,6 +11,21 @@ class DomainsController < ApplicationController
     @domains = scope.page(params[:page]).per(25)
   end
 
+  def show
+    @domain = Domain.find(params[:id])
+    @records = @domain.crawl_records.recent.page(params[:page]).per(25)
+
+    # Counted in the database rather than over the loaded page — a
+    # well-crawled site has thousands of records and only 25 are on screen.
+    counts = @domain.crawl_records.group(:outcome).count
+    @crawled_count = counts.values.sum
+    @failed_count  = counts.except("ok", "skipped").values.sum
+
+    # The log holds a bare URL string, so most but not all of these still have
+    # a source. Resolved in one query rather than per row.
+    @sources_by_url = Source.where(url: @records.map(&:url)).index_by(&:url)
+  end
+
   def edit
     @domain = Domain.find(params[:id])
   end

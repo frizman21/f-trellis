@@ -43,6 +43,18 @@ class ReadOnlyUserTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  # The crawl log is diagnostic, so it must stay readable. The guard is by HTTP
+  # verb, and this asserts a GET added later did not land behind it.
+  test "a read-only user can read a domain's crawl history" do
+    CrawlRecord.create!(url: "https://example.com/crawled", domain: domains(:example_com),
+                        outcome: "http_error", status_code: 404)
+
+    get domain_path(domains(:example_com))
+
+    assert_response :success
+    assert_match(/example\.com\/crawled/, response.body)
+  end
+
   # --- writing is refused --------------------------------------------------
 
   test "PATCH is refused and changes nothing" do
