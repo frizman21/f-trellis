@@ -99,6 +99,21 @@
     </ul>
   <% end %>
 
+  <% if @links.nofollowed.any? %>
+    <h2>Not followed (<%= @links.nofollowed.size %>)</h2>
+    <p class="form-text">
+      The page marked these <code>rel="nofollow"</code> (or <code>ugc</code> /
+      <code>sponsored</code>), or carried a page-wide <code>nofollow</code>
+      directive. The site does not vouch for them, so no source was created and
+      no edge was recorded.
+    </p>
+    <ul>
+      <% @links.nofollowed.each do |url| %>
+        <li><%= external_link_to url, url %></li>
+      <% end %>
+    </ul>
+  <% end %>
+
   <div class="form-text">
     Internal means the same host as the base URL
     (<code><%= @source.domain&.host %></code>). Both internal and external

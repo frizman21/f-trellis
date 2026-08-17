@@ -205,6 +205,46 @@ class CrawlJobTest < ActiveJob::TestCase
     end
   end
 
+  # --- page-level directives -------------------------------------------------
+
+  test "a nofollowed link is not fetched and no source is created for it" do
+    seed = make_seed("https://nofollowed.test/start",
+                     '<a href="/paid" rel="sponsored">ad</a><a href="/real">real</a>')
+
+    with_fake_fetcher("https://nofollowed.test/real" => "<p>real</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert_nil Source.find_by(url: "https://nofollowed.test/paid")
+    assert Source.find_by(url: "https://nofollowed.test/real").source_data.any?
+  end
+
+  test "a nofollowed url that already exists gains no new edge" do
+    seed = make_seed("https://nofollow-edge.test/start", '<a href="/known" rel="nofollow">known</a>')
+    known = Source.create!(url: "https://nofollow-edge.test/known")
+
+    with_fake_fetcher do
+      assert_no_difference -> { SourceLink.count } do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+      end
+    end
+
+    assert_not SourceLink.exists?(from_source: seed, to_source: known)
+  end
+
+  # noindex is not nofollow: the page is still crawled and its links followed.
+  test "a noindex page is still crawled and its links still followed" do
+    seed = make_seed("https://noindexed.test/start",
+                     '<html><head><meta name="robots" content="noindex"></head>' \
+                     '<body><a href="/leaf">leaf</a></body></html>')
+
+    with_fake_fetcher("https://noindexed.test/leaf" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+    end
+
+    assert Source.find_by(url: "https://noindexed.test/leaf").source_data.any?
+  end
+
   # --- robots.txt ------------------------------------------------------------
 
   test "a disallowed url is neither fetched nor turned into a source" do

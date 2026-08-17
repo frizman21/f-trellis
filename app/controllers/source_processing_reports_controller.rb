@@ -24,6 +24,16 @@ class SourceProcessingReportsController < ApplicationController
     end
 
     source = Source.find_by(id: params.dig(:source_processing_report, :source_id))
+
+    # The page asked not to be kept as a retrievable record, and turning it into
+    # graph facts is exactly that. It stays readable in the app.
+    if source&.is_noindex
+      redirect_to new_source_processing_report_path,
+                  alert: "Source ##{source.id} is marked noindex, so it is not processed into " \
+                         "the knowledge graph. Its content is still readable on its page."
+      return
+    end
+
     existing = SourceProcessingReport.covering(source: source, skill_revision: revision)
 
     if existing

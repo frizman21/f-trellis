@@ -22,6 +22,17 @@
     <% end %>
   </dd>
 
+  <% if @source.is_noindex %>
+    <dt>Indexing</dt>
+    <dd>
+      <span class="badge bg-dark">noindex</span>
+      <span class="text-muted">
+        This page asked not to be kept as a retrievable record, so it is not
+        processed into the knowledge graph. Its content is still readable here.
+      </span>
+    </dd>
+  <% end %>
+
   <dt>Description</dt>
   <dd><%= @source.description.presence || "—" %></dd>
 

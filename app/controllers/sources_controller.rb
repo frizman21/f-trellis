@@ -49,6 +49,14 @@ class SourcesController < ApplicationController
   # One cheap call decides which skills are worth running on this page.
   def triage
     @source = Source.find(params[:id])
+
+    if @source.is_noindex
+      redirect_to source_path(@source),
+                  alert: "This page is marked noindex, so it is not processed into the " \
+                         "knowledge graph. Triage would only be spending on a page we will not use."
+      return
+    end
+
     @result = SkillTriage.call(source: @source)
     @existing = existing_reports_for(@source, @result.verdicts.map(&:skill))
   end

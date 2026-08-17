@@ -235,6 +235,66 @@ class FetchSourceJobTest < ActiveJob::TestCase
     assert_nil source.reload.resolved_url
   end
 
+  # --- noindex ---------------------------------------------------------------
+
+  test "a page with no directives is indexable" do
+    source = Source.create!(url: "https://plain.test/page")
+
+    with_fake_http do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_not source.reload.is_noindex
+  end
+
+  test "a meta robots noindex marks the source" do
+    source = Source.create!(url: "https://meta-noindex.test/page")
+    html = '<html><head><meta name="robots" content="noindex"></head><body>x</body></html>'
+
+    with_fake_http(html) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert source.reload.is_noindex
+  end
+
+  # The piece most likely to be dropped: the header is only knowable at fetch
+  # time, since the stored payload is the body alone.
+  test "an X-Robots-Tag header marks the source even with no meta tag" do
+    source = Source.create!(url: "https://header-noindex.test/page")
+
+    with_fake_http(headers: { "Content-Type" => "text/html", "X-Robots-Tag" => "noindex" }) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert source.reload.is_noindex
+  end
+
+  test "an X-Robots-Tag of nofollow does not mark the page noindex" do
+    source = Source.create!(url: "https://header-nofollow.test/page")
+
+    with_fake_http(headers: { "Content-Type" => "text/html", "X-Robots-Tag" => "nofollow" }) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_not source.reload.is_noindex
+  end
+
+  test "re-fetching a page that dropped its noindex clears the flag" do
+    source = Source.create!(url: "https://changed.test/page")
+    html = '<html><head><meta name="robots" content="noindex"></head><body>x</body></html>'
+
+    with_fake_http(html) { FetchSourceJob.perform_now(source) }
+
+    assert source.reload.is_noindex
+
+    with_fake_http("<html><body>now indexable</body></html>") do
+      FetchSourceJob.perform_now(source, force: true)
+    end
+
+    assert_not source.reload.is_noindex
+  end
+
   # --- content types ---------------------------------------------------------
 
   def fetch_with_type(url, content_type, body: "<html><body>hi</body></html>")
