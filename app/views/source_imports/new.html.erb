@@ -1,0 +1,38 @@
+<% content_for :title, "Bulk add sources" %>
+<h1>Bulk add sources</h1>
+
+<%= form_with model: @import, local: true do |f| %>
+  <% if @import.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% @import.errors.full_messages.each do |m| %>
+          <li><%= m %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :raw_urls, "URLs", class: "form-label" %>
+    <%= f.text_area :raw_urls,
+                    class: "form-control font-monospace",
+                    rows: 16,
+                    placeholder: "https://example.com/one\nhttps://example.com/two\nexample.org/three" %>
+    <div class="form-text">
+      One per line — paste a column straight out of a spreadsheet. A missing
+      <code>https://</code>, surrounding spaces and a trailing
+      <code>#fragment</code> are all handled. Blank lines are ignored, and a URL
+      already held is counted rather than duplicated.
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    <strong>Nothing is fetched.</strong> Every page is created in status
+    <code>new</code> and left there, so a paste of two thousand URLs does not
+    become two thousand unpaced requests at somebody's server. Crawl them, or
+    fetch them individually, when you are ready.
+  </div>
+
+  <%= f.submit "Import", class: "btn btn-primary" %>
+  <%= link_to "Cancel", source_imports_path, class: "btn btn-outline-secondary" %>
+<% end %>

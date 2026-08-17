@@ -40,6 +40,7 @@ Rails.application.routes.draw do
       post :add_to_learning_set
     end
   end
+  resources :source_imports, only: [ :index, :new, :create, :show ]
   resources :learning_sets do
     member do
       post :add_source

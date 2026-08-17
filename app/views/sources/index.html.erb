@@ -2,7 +2,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="mb-0">Sources</h1>
-  <%= link_to "New source", new_source_path, class: "btn btn-primary" %>
+  <div>
+    <%= link_to "Bulk add", new_source_import_path, class: "btn btn-outline-primary" %>
+    <%= link_to "New source", new_source_path, class: "btn btn-primary" %>
+  </div>
 </div>
 
 <% if @sources.any? %>
