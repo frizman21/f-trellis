@@ -94,13 +94,7 @@ class Source < ApplicationRecord
 
   def assign_domain_from_url
     return if domain.present?
-    return if url.blank?
 
-    host = URI.parse(url).host&.downcase
-    return if host.blank?
-
-    self.domain = Domain.find_or_create_by!(host: host)
-  rescue URI::InvalidURIError
-    nil
+    self.domain = Domain.for_url(url)
   end
 end
