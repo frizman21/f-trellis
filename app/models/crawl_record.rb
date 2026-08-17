@@ -5,11 +5,29 @@
 # The domain is filled from the URL here rather than at the call site, so the
 # invariant holds for seeds and tests as well as for CrawlJob.
 class CrawlRecord < ApplicationRecord
+  # Why the attempt ended as it did. A null status_code alone cannot tell these
+  # apart, which is the whole reason this column exists.
+  #
+  #   ok           fetched and stored
+  #   http_error   the server answered with an error status
+  #   unusable     we reached the server and refused what it sent — a PDF, a
+  #                redirect we would not follow — so the status may be 200
+  #   no_response  the request produced nothing at all: timeout, DNS, refused
+  #   skipped      no request was made; the page was already held
+  OUTCOMES = %w[ok http_error unusable no_response skipped].freeze
+
   belongs_to :domain
 
   validates :url, presence: true
+  validates :outcome, inclusion: { in: OUTCOMES }
+
+  scope :recent, -> { order(created_at: :desc) }
 
   before_validation :assign_domain_from_url
+
+  def succeeded?
+    outcome == "ok"
+  end
 
   private
 

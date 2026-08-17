@@ -44,6 +44,26 @@ class CrawlRecordTest < ActiveSupport::TestCase
     assert_equal domain, record.domain
   end
 
+  test "status_code may be nil, because a request that got no response has none" do
+    record = CrawlRecord.create!(url: "https://example.com/x", outcome: "no_response")
+
+    assert_nil record.status_code
+  end
+
+  test "outcome defaults to ok and rejects anything outside the permitted set" do
+    assert_equal "ok", CrawlRecord.create!(url: "https://example.com/x").outcome
+
+    record = CrawlRecord.new(url: "https://example.com/y", outcome: "made up")
+
+    assert_not record.valid?
+    assert_includes record.errors[:outcome], "is not included in the list"
+  end
+
+  test "succeeded? distinguishes a stored page from an attempt that failed" do
+    assert CrawlRecord.new(url: "https://example.com/x", outcome: "ok").succeeded?
+    assert_not CrawlRecord.new(url: "https://example.com/x", outcome: "http_error").succeeded?
+  end
+
   test "a url with no usable host is rejected rather than saved without a domain" do
     record = CrawlRecord.new(url: "not a url")
 

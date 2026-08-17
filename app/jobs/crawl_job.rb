@@ -50,11 +50,35 @@ class CrawlJob < ApplicationJob
 
   private
 
+  # Every page the crawl processes leaves a record, including the ones that
+  # failed. Previously the write sat after the fetch inside this rescue, so a
+  # failed page left nothing behind while still consuming the page budget —
+  # a crawl where everything failed produced an empty log, indistinguishable
+  # from a crawl that never ran.
+  #
+  # One record per page, carrying the outcome that ended the attempt. A page
+  # that redirected twice before answering logs the final status, because the
+  # unit of this log is a page processed, matching `processed` and `max_pages`.
   def process_source(source)
-    FetchSourceJob.perform_now(source)
-    CrawlRecord.create!(url: source.url)
-  rescue StandardError => e
+    status_code = FetchSourceJob.perform_now(source)
+
+    # nil without an exception means the fetch guard declined: the page was
+    # already held, so no request went out.
+    log_crawl(source, status_code, status_code.nil? ? "skipped" : "ok")
+  rescue FetchSourceJob::SourceNotFetchable => e
+    log_crawl(source, e.status_code, e.status_code.to_i >= 400 ? "http_error" : "unusable")
     Rails.logger.error("CrawlJob: failed processing #{source.url}: #{e.class}: #{e.message}")
+  rescue StandardError => e
+    log_crawl(source, nil, "no_response")
+    Rails.logger.error("CrawlJob: failed processing #{source.url}: #{e.class}: #{e.message}")
+  end
+
+  # The log must not be the reason a crawl stops, so a record that cannot be
+  # written is logged and swallowed like any other per-page failure.
+  def log_crawl(source, status_code, outcome)
+    CrawlRecord.create!(url: source.url, status_code: status_code, outcome: outcome)
+  rescue StandardError => e
+    Rails.logger.error("CrawlJob: could not log #{source.url}: #{e.class}: #{e.message}")
   end
 
   def discovered_links(source, crawl_type)

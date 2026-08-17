@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_16_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_16_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,10 +52,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_16_130000) do
   create_table "crawl_records", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "domain_id", null: false
+    t.string "outcome", default: "ok", null: false
+    t.integer "status_code"
     t.datetime "updated_at", null: false
     t.string "url", null: false
     t.index ["created_at"], name: "index_crawl_records_on_created_at"
     t.index ["domain_id"], name: "index_crawl_records_on_domain_id"
+    t.index ["outcome"], name: "index_crawl_records_on_outcome"
     t.index ["url"], name: "index_crawl_records_on_url"
   end
 
