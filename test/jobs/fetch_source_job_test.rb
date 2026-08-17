@@ -790,4 +790,66 @@ class FetchSourceJobTest < ActiveJob::TestCase
 
     assert_equal "complete", source.reload.status
   end
+
+  # The unit tests around TruncateSqlLogs drive the subscriber directly, so they
+  # cannot catch the initializer failing to load or the prepend landing on the
+  # wrong class. This is the whole path: fetch, zip, insert, log.
+  test "storing a payload does not write the payload to the sql log" do
+    source = Source.create!(url: "https://sqllog.test/page")
+    # Incompressible on purpose. A repetitive body zips down below the cap and
+    # the test would pass without the subscriber doing anything.
+    body   = "<html><body><p>#{SecureRandom.hex(50_000)}</p></body></html>"
+
+    log = capture_sql_log do
+      without_prepared_statements do
+        with_fake_http(body) { FetchSourceJob.perform_now(source) }
+      end
+    end
+
+    insert = log.lines.find { |line| line.include?('INSERT INTO "source_data"') }
+
+    # Without this the test could pass vacuously: with prepared statements on
+    # the statement is short whatever the subscriber does, and the configuration
+    # that actually produced the defect would go unexercised.
+    assert insert, "expected the insert to be interpolated into the logged statement"
+    assert_includes insert, "characters elided"
+
+    oversized = log.lines.select { |line| line.length > 4_096 }
+    assert_empty oversized, "expected no log line to carry the payload"
+
+    # Truncated in the log, not on the way to the database.
+    assert_equal body, source.reload.source_data.last.html
+  end
+
+  private
+
+  def capture_sql_log
+    io           = StringIO.new
+    logger       = ActiveSupport::Logger.new(io)
+    logger.level = :debug
+
+    original  = ActiveRecord::Base.logger
+    colorize  = ActiveSupport::LogSubscriber.colorize_logging
+    ActiveRecord::Base.logger = logger
+    ActiveSupport::LogSubscriber.colorize_logging = false
+
+    yield
+    io.string
+  ensure
+    ActiveRecord::Base.logger = original
+    ActiveSupport::LogSubscriber.colorize_logging = colorize
+  end
+
+  # Test runs with prepared statements on; development does not, because
+  # `query_log_tags_enabled` turns them off. The defect only appears with them
+  # off, so the connection is flipped for the duration and restored after.
+  def without_prepared_statements
+    connection = ActiveRecord::Base.lease_connection
+    original   = connection.prepared_statements
+    connection.instance_variable_set(:@prepared_statements, false)
+
+    yield
+  ensure
+    connection.instance_variable_set(:@prepared_statements, original)
+  end
 end
