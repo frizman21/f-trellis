@@ -1,4 +1,6 @@
 require "test_helper"
+require "zip"
+require "stringio"
 
 class FetchSourceJobTest < ActiveJob::TestCase
   # with_fake_http lives in test_helper — it stubs the single outbound request
@@ -602,11 +604,19 @@ class FetchSourceJobTest < ActiveJob::TestCase
     assert_equal "text/html", source.source_data.last.content_type
   end
 
-  test "non-html content types are refused and store nothing" do
-    %w[application/pdf image/png application/json].each_with_index do |type, i|
+  # The guard narrows by exactly one type. .docx and .xls are real formats with
+  # real extraction stories, but each needs its own parser and neither is
+  # blocking anything, so they stay refused.
+  test "content types we have no reader for are refused and store nothing" do
+    %w[
+      image/png
+      application/json
+      application/vnd.ms-excel
+      application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    ].each_with_index do |type, i|
       source = Source.create!(url: "https://bad#{i}.test/file")
 
-      with_fake_http("%PDF-1.4 binary", headers: { "Content-Type" => type }) do
+      with_fake_http("binary", headers: { "Content-Type" => type }) do
         assert_no_difference -> { SourceDatum.count } do
           error = assert_raises(FetchSourceJob::SourceNotFetchable) { FetchSourceJob.perform_now(source) }
           assert_match(/unsupported content type: #{Regexp.escape(type)}/, error.message)
@@ -725,9 +735,9 @@ class FetchSourceJobTest < ActiveJob::TestCase
 
   # The outcome cannot be derived from the status alone: this one answered 200.
   test "a refused content type is recorded as unusable even though the server said 200" do
-    source = Source.create!(url: "https://brochure.test/doc.pdf")
+    source = Source.create!(url: "https://brochure.test/doc.xls")
 
-    with_fake_http("%PDF-1.4", headers: { "Content-Type" => "application/pdf" }) do
+    with_fake_http("spreadsheet", headers: { "Content-Type" => "application/vnd.ms-excel" }) do
       assert_difference -> { FetchRecord.count }, 1 do
         assert_raises(FetchSourceJob::SourceNotFetchable) { FetchSourceJob.perform_now(source) }
       end
@@ -821,7 +831,162 @@ class FetchSourceJobTest < ActiveJob::TestCase
     assert_equal body, source.reload.source_data.last.html
   end
 
+  # --- PDFs -----------------------------------------------------------------
+
+  test "a pdf response is stored as a source datum" do
+    source = Source.create!(url: "https://docs.test/paper.pdf")
+
+    with_fake_http(pdf_fixture, headers: { "Content-Type" => "application/pdf" }) do
+      assert_difference -> { SourceDatum.count }, 1 do
+        FetchSourceJob.perform_now(source)
+      end
+    end
+
+    assert_equal "complete", source.reload.status
+    assert_equal "application/pdf", source.source_data.last.content_type
+  end
+
+  # The assertion that matters most here. Both #decode transcoding the binary
+  # and #html's force_encoding reaching it corrupt silently, and would surface
+  # much later as an unexplained extraction failure on a real document.
+  test "the stored pdf round-trips byte-identically" do
+    source = Source.create!(url: "https://docs.test/roundtrip.pdf")
+
+    with_fake_http(pdf_fixture, headers: { "Content-Type" => "application/pdf" }) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    datum = source.reload.source_data.last
+    assert_equal pdf_fixture, datum.raw_bytes
+    assert_includes datum.text, "Marriage Divorce Remarriage"
+  end
+
+  # The specific case a naive `charset` guard slips past: servers really do send
+  # this, and force_encoding + encode(invalid: :replace) over archive bytes
+  # rewrites the document.
+  test "a pdf declaring a charset is still stored byte-identically" do
+    source = Source.create!(url: "https://docs.test/charset.pdf")
+
+    with_fake_http(pdf_fixture, headers: { "Content-Type" => "application/pdf; charset=binary" }) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_equal pdf_fixture, source.reload.source_data.last.raw_bytes
+  end
+
+  test "the zip entry for a pdf is named with a pdf extension" do
+    source = Source.create!(url: "https://docs.test/report.pdf")
+
+    with_fake_http(pdf_fixture, headers: { "Content-Type" => "application/pdf" }) do
+      FetchSourceJob.perform_now(source)
+    end
+
+    assert_equal "report.pdf", zip_entry_name(source.reload.source_data.last)
+  end
+
+  test "the zip entry for a page is still named with an html extension" do
+    source = Source.create!(url: "https://docs.test/page")
+
+    with_fake_http { FetchSourceJob.perform_now(source) }
+
+    assert_equal "page.html", zip_entry_name(source.reload.source_data.last)
+  end
+
+  # --- The size limit -------------------------------------------------------
+
+  # The cheap path has to actually be cheap: a declared size over the limit is
+  # refused before a byte of body is read.
+  test "a pdf declaring a content length over the limit is refused without reading the body" do
+    source = Source.create!(url: "https://docs.test/huge.pdf")
+    size   = FetchSourceJob::MAX_PDF_BYTES + 1
+
+    with_streaming_http(chunks: [],
+                        headers: { "Content-Type" => "application/pdf",
+                                   "Content-Length" => size.to_s },
+                        on_read: -> { flunk "the body must not be read" }) do
+      assert_no_difference -> { SourceDatum.count } do
+        error = assert_raises(FetchSourceJob::SourceNotFetchable) { FetchSourceJob.perform_now(source) }
+
+        assert_match(/#{size}/, error.message)
+        assert_match(/#{FetchSourceJob::MAX_PDF_BYTES}/, error.message)
+      end
+    end
+
+    assert_equal "failed", source.reload.status
+  end
+
+  # Content-Length is optional. This is the case a header-only check misses
+  # entirely, and the one that would put 300 MB in the worker.
+  test "a pdf with no content length is refused on the streamed read and stops early" do
+    chunk = "x" * 1.megabyte
+
+    with_streaming_http(chunks: Enumerator.new { |y| 50.times { y << chunk } },
+                        headers: { "Content-Type" => "application/pdf" }) do |transfer|
+      assert_raises(FetchSourceJob::SourceNotFetchable) { get("https://docs.test/nolength.pdf") }
+
+      assert_operator transfer.delivered, :<=, FetchSourceJob::MAX_PDF_BYTES + chunk.bytesize,
+                      "the read should abort at the limit, not buffer the whole body"
+    end
+  end
+
+  # A header can lie. The streamed check is what makes the limit a limit.
+  test "a pdf whose content length understates the body is refused on the streamed read" do
+    chunk = "x" * 1.megabyte
+
+    with_streaming_http(chunks: Enumerator.new { |y| 50.times { y << chunk } },
+                        headers: { "Content-Type" => "application/pdf",
+                                   "Content-Length" => "1024" }) do
+      assert_raises(FetchSourceJob::SourceNotFetchable) { get("https://docs.test/liar.pdf") }
+    end
+  end
+
+  test "a pdf just under the limit is accepted and assembled byte-identically" do
+    body = "%PDF-1.4 " + ("x" * (FetchSourceJob::MAX_PDF_BYTES - 9))
+
+    with_streaming_http(chunks: [ body ],
+                        headers: { "Content-Type" => "application/pdf",
+                                   "Content-Length" => body.bytesize.to_s }) do
+      assert_equal body, get("https://docs.test/atlimit.pdf").body
+    end
+  end
+
+  # The cap is PDF-specific. This is the test that stops a later cleanup from
+  # quietly globalizing it — a 10 MB page is pathological and worth seeing, a
+  # 10 MB PDF is ordinary and merely useless to us.
+  test "an html response over the pdf limit is not capped" do
+    body = "<html><body>" + ("x" * FetchSourceJob::MAX_PDF_BYTES) + "</body></html>"
+
+    with_streaming_http(chunks: [ body ], headers: { "Content-Type" => "text/html" }) do
+      assert_equal body.bytesize, get("https://docs.test/big.html").body.bytesize
+    end
+  end
+
+  # The direct check on the streamed read that replaced http.get.
+  test "a body delivered in several chunks assembles byte-identically" do
+    { "text/html" => "<html><body>chunked</body></html>", "application/pdf" => pdf_fixture }.each do |type, body|
+      chunks = body.b.scan(/.{1,64}/m)
+
+      with_streaming_http(chunks: chunks, headers: { "Content-Type" => type }) do
+        assert_equal body, get("https://chunked.test/thing").body, "#{type} did not reassemble"
+      end
+    end
+  end
+
   private
+
+  # Runs the real FetchSourceJob#request, which with_fake_http replaces and
+  # with_streaming_http leaves in place.
+  def get(url)
+    FetchSourceJob.new.send(:request, URI.parse(url))
+  end
+
+  def pdf_fixture(name = "two_page_text.pdf")
+    File.binread(Rails.root.join("test/fixtures/files", name))
+  end
+
+  def zip_entry_name(datum)
+    Zip::InputStream.open(StringIO.new(datum.data)) { |io| io.get_next_entry.name }
+  end
 
   def capture_sql_log
     io           = StringIO.new

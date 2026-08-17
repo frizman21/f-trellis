@@ -183,7 +183,31 @@ class LearningSetTest < ActiveSupport::TestCase
     assert_equal 200, @set.reload.estimated_input(cache: cache).tokens
   end
 
+  # The estimate walks #text over every payload in the set. A PDF has to be
+  # counted like anything else rather than skipped, and unzipping it must not
+  # raise part way through the walk.
+  test "the estimate spans a set mixing pages and pdfs" do
+    fetch(@set.add_url("https://learning.test/a").source, "a" * 400)
+    fetch_pdf(@set.add_url("https://learning.test/paper.pdf").source)
+
+    estimate = @set.estimated_input(cache: ActiveSupport::Cache::NullStore.new)
+
+    assert_equal 2, estimate.pages
+    assert_equal 0, estimate.unfetched_pages
+    assert_operator estimate.tokens, :>, 100, "the pdf's text should be counted too"
+  end
+
   private
+
+  def fetch_pdf(source)
+    pdf   = File.binread(Rails.root.join("test/fixtures/files/two_page_text.pdf"))
+    bytes = Zip::OutputStream.write_buffer do |zos|
+      zos.put_next_entry("paper.pdf")
+      zos.write(pdf)
+    end
+    bytes.rewind
+    SourceDatum.create!(source: source, content_type: "application/pdf", data: bytes.read)
+  end
 
   def fetch(source, body)
     bytes = Zip::OutputStream.write_buffer do |zos|

@@ -15,6 +15,14 @@ class SourceDataController < ApplicationController
 
     if datum.content_type == ZIPPED
       send_data datum.data, type: ZIPPED, filename: filename_for(datum), disposition: "attachment"
+    elsif datum.binary?
+      # A document goes back byte-for-byte. Through the branch below it would be
+      # sent as datum.html.to_s, which is now nil for a binary payload and was
+      # mojibake before that — either way a file that will not open.
+      send_data datum.raw_bytes.to_s,
+                type: datum.content_type,
+                filename: filename_for(datum),
+                disposition: "attachment"
     else
       send_data datum.html.to_s,
                 type: datum.content_type.presence || "application/octet-stream",

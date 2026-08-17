@@ -51,6 +51,12 @@ gem "ruby-vips", "~> 2.2", ">= 2.2.1"
 # Zip archive creation for storing fetched source content as SourceDatum payloads.
 gem "rubyzip", "~> 3.4"
 
+# Text extraction from fetched PDFs. Pure Ruby on purpose: shelling out to
+# pdftotext extracts better text on awkward layouts, but poppler is not in the
+# runtime image, and running a spawned binary over attacker-supplied bytes in a
+# background job is a worse trade than the quality delta is worth.
+gem "pdf-reader", "~> 2.14"
+
 # Pagination for index views.
 gem "kaminari"
 

@@ -57,11 +57,42 @@ class FetchSourceJob < ApplicationJob
   # cannot hold a worker.
   MAX_REDIRECTS = 5
 
-  # What this system can actually read. Anything else — a PDF, an image, a JSON
-  # document — was reachable but is not a web page, and storing it as one means
-  # Nokogiri parses the binary and a model is paid to read the noise that falls
-  # out of it.
-  ACCEPTED_CONTENT_TYPES = %w[text/html application/xhtml+xml].freeze
+  # Pages, which are parsed as markup and decoded against a declared charset.
+  TEXT_CONTENT_TYPES = %w[text/html application/xhtml+xml].freeze
+
+  # Documents, which are stored as the bytes they are and read by their own
+  # extractor. #135's guard collapsed two judgments into one — "we cannot parse
+  # this as HTML" and "this is not worth reading" — which coincide for an image
+  # or a JSON endpoint and do not for a PDF.
+  BINARY_CONTENT_TYPES = %w[application/pdf].freeze
+
+  # What this system can actually read. Anything else — an image, a spreadsheet,
+  # a JSON document — was reachable but is not something we have a reader for,
+  # and storing it means a model is paid to read the noise that falls out.
+  ACCEPTED_CONTENT_TYPES = (TEXT_CONTENT_TYPES + BINARY_CONTENT_TYPES).freeze
+
+  # There is no size limit on an HTML fetch, which has been survivable because
+  # pages are small. PDFs are not: a 300 MB document would go into a bytea
+  # column and through a worker's memory twice over, raw and then zipped.
+  #
+  # 10 MB sits well above the documents we want — a BAA runs to a few MB at most
+  # with figures — and what it excludes is the class we have no use for anyway:
+  # scanned-image archives and print-resolution decks, which are image-heavy,
+  # which means pdf-reader would extract little from them even if stored.
+  #
+  # PDF-specific on purpose. Capping HTML would change behaviour no failure has
+  # asked us to change, and the distributions genuinely differ: a 10 MB page is
+  # pathological and worth looking at, a 10 MB PDF is ordinary and merely
+  # useless to us.
+  MAX_PDF_BYTES = 10.megabytes
+
+  # The zip entry's extension. The container is not what the payload is, and a
+  # PDF stored as `page.html` misleads anyone who opens the archive.
+  FILENAME_SUFFIXES = {
+    "text/html"             => [ ".html", ".htm" ],
+    "application/xhtml+xml" => [ ".html", ".htm" ],
+    "application/pdf"       => [ ".pdf" ]
+  }.freeze
 
   # Assumed when a server sends no Content-Type at all. Some do; refusing them
   # would be stricter than the situation warrants, and the parse path already
@@ -114,7 +145,7 @@ class FetchSourceJob < ApplicationJob
       return fetched.status_code
     end
 
-    bytes = zip_payload(filename_for(source), fetched.body)
+    bytes = zip_payload(filename_for(source, fetched.content_type), fetched.body)
 
     SourceDatum.create!(
       source: source,
@@ -209,6 +240,13 @@ class FetchSourceJob < ApplicationJob
 
   def decode(response)
     body    = response.body.to_s
+
+    # A server sending `application/pdf; charset=binary` — they exist — would
+    # otherwise put force_encoding + encode(invalid: :replace) through the
+    # archive bytes and silently corrupt the document. Charset describes text;
+    # a PDF is not text.
+    return body if BINARY_CONTENT_TYPES.include?(response.content_type.to_s.downcase)
+
     charset = response.type_params["charset"].presence
     return body if charset.nil?
 
@@ -337,7 +375,15 @@ class FetchSourceJob < ApplicationJob
   # The page's own directives and the response header both count, and the more
   # restrictive wins — either is the site asking.
   def noindex?(fetched)
-    page = RobotsDirectives.from_html(fetched.body)
+    # A document has no <meta name="robots">, and handing its bytes to a markup
+    # parser would only invite it to find one. The response header still counts:
+    # X-Robots-Tag is how a site marks a PDF, and is the only way it can.
+    page = if TEXT_CONTENT_TYPES.include?(fetched.content_type)
+      RobotsDirectives.from_html(fetched.body)
+    else
+      RobotsDirectives.permissive
+    end
+
     header = fetched.robots_tag.presence && RobotsDirectives.from_content(fetched.robots_tag)
 
     page.merge(header).noindex?
@@ -360,11 +406,67 @@ class FetchSourceJob < ApplicationJob
   # call without stubbing the logic wrapped around it. Stubbing #fetch_html
   # instead — as the tests did before this seam existed — makes headers, status
   # codes, redirects and content types all unobservable.
+  # Streamed rather than buffered, so a size limit can be enforced on the way in.
+  # `http.get` returns only once the whole body is in memory, which would bound
+  # what we *store* while doing nothing about what we *hold* — a server sending
+  # 300 MB with no Content-Length would still put 300 MB in the worker.
+  #
+  # Behaviour-preserving for HTML: same body bytes, same encoding, same
+  # exceptions. The response object handed back is a real Net::HTTPResponse with
+  # its body already read, exactly as before.
   def request(uri, headers = {})
     Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
                     open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
-      http.get(uri.request_uri, request_headers.merge(headers))
+      http.request_get(uri.request_uri, request_headers.merge(headers)) do |response|
+        limit = byte_limit_for(response)
+
+        # The cheap case first: a declared size over the limit is refused before
+        # a byte of body is read.
+        reject_oversize!(response, declared_length(response), limit)
+
+        body = read_body_within(response, limit)
+
+        # Net::HTTP#reading_body reads the body itself once this block returns,
+        # unless it has already been read. Marking it read is what stops a
+        # second pass over a socket we have already drained.
+        response.instance_variable_set(:@body, body)
+        response.instance_variable_set(:@read, true)
+        response
+      end
     end
+  end
+
+  # nil means uncapped. Only the types we know to be large documents are capped;
+  # see MAX_PDF_BYTES.
+  def byte_limit_for(response)
+    BINARY_CONTENT_TYPES.include?(response.content_type.to_s.downcase) ? MAX_PDF_BYTES : nil
+  end
+
+  def declared_length(response)
+    value = response["Content-Length"]
+    value.presence && value.to_i
+  end
+
+  # Content-Length is optional and can lie, so the same limit is applied again
+  # to what actually arrives.
+  def read_body_within(response, limit)
+    buffer = +"".b
+
+    response.read_body do |chunk|
+      buffer << chunk
+      reject_oversize!(response, buffer.bytesize, limit)
+    end
+
+    buffer
+  end
+
+  def reject_oversize!(response, size, limit)
+    return if limit.nil? || size.nil? || size <= limit
+
+    raise SourceNotFetchable.new(
+      "response body of #{size} bytes exceeds the #{limit} byte limit",
+      status_code: response.code.to_i
+    )
   end
 
   def request_headers
@@ -380,9 +482,11 @@ class FetchSourceJob < ApplicationJob
     buffer.read
   end
 
-  def filename_for(source)
+  def filename_for(source, content_type = DEFAULT_CONTENT_TYPE)
     basename = File.basename(URI.parse(source.url).path.to_s)
     basename = "source_#{source.id}" if basename.blank? || basename == "/"
-    basename.end_with?(".html", ".htm") ? basename : "#{basename}.html"
+
+    suffixes = FILENAME_SUFFIXES.fetch(content_type.to_s, FILENAME_SUFFIXES[DEFAULT_CONTENT_TYPE])
+    basename.end_with?(*suffixes) ? basename : "#{basename}#{suffixes.first}"
   end
 end
