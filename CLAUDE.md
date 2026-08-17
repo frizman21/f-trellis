@@ -10,6 +10,19 @@ https://gist.githubusercontent.com/frizman21/8999e3d47a9ee9f40a0ceda4f20be8f9/ra
 
 Read it before starting work on an issue and before opening a PR.
 
+## Dependency Updates
+Dependabot pull requests are worked one dependency at a time, with breaking-change
+fixes in the same PR that introduced them, and existing test coverage preserved
+rather than weakened to make a bump pass.
+
+Canonical rule, applies to every repo:
+https://gist.githubusercontent.com/frizman21/b36ee602d7e5b30061c989fa2f9300f5/raw/faba3c844bcdbdd973a69d1b09ab5095e6825dd2/gistfile1.txt
+
+Read it before touching a Dependabot PR. It covers the baseline suites to run
+before and after — including a production-environment boot with eager loading,
+which the unit tests do not exercise — and when to escalate instead of forcing a
+resolution.
+
 ## Data Model
 See `docs/data-model-spec.md` for the repeating shape used by tier 1 entities
 and their relationships (entity + versioned, confidence-scored detail record).
