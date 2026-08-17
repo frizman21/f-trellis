@@ -6,6 +6,9 @@ class FetchSourceJob < ApplicationJob
 
   class SourceNotFetchable < StandardError; end
 
+  OPEN_TIMEOUT = 10
+  READ_TIMEOUT = 30
+
   # Only untouched sources are fetched by default, so a crawl revisiting a page
   # does not refetch it. `force: true` is for an explicit request from the UI to
   # grab the content again whatever the current status.
@@ -33,16 +36,33 @@ class FetchSourceJob < ApplicationJob
   private
 
   def fetch_html(url)
-    uri = URI.parse(url)
-    raise SourceNotFetchable, "unsupported scheme: #{uri.scheme}" unless %w[http https].include?(uri.scheme)
-
-    response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 30) do |http|
-      http.get(uri.request_uri, "User-Agent" => "f-dod/1.0")
-    end
+    response = request(parse_uri(url))
 
     raise SourceNotFetchable, "HTTP #{response.code} fetching #{url}" unless response.is_a?(Net::HTTPSuccess)
 
     response.body.to_s
+  end
+
+  def parse_uri(url)
+    uri = URI.parse(url)
+    raise SourceNotFetchable, "unsupported scheme: #{uri.scheme}" unless %w[http https].include?(uri.scheme)
+
+    uri
+  end
+
+  # The single outbound request, kept on its own so a test can stub one HTTP
+  # call without stubbing the logic wrapped around it. Stubbing #fetch_html
+  # instead — as the tests did before this seam existed — makes headers, status
+  # codes, redirects and content types all unobservable.
+  def request(uri, headers = {})
+    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
+                    open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
+      http.get(uri.request_uri, request_headers.merge(headers))
+    end
+  end
+
+  def request_headers
+    { "User-Agent" => CrawlerIdentity.user_agent }
   end
 
   def zip_payload(entry_name, content)
