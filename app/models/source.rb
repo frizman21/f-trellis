@@ -1,6 +1,14 @@
 require "uri"
 
 class Source < ApplicationRecord
+  # nullify would orphan a citation and destroy would delete recorded knowledge,
+  # so a source that is still cited cannot be deleted at all. Losing the page a
+  # fact came from must not lose the fact.
+  has_many :entity_sources, dependent: :restrict_with_error
+  has_many :relationship_sources, dependent: :restrict_with_error
+  has_many :entity_attribute_value_sources, dependent: :restrict_with_error
+  has_many :relationship_type_value_sources, dependent: :restrict_with_error
+
   STATUSES = %w[new in_work complete failed].freeze
 
   belongs_to :domain

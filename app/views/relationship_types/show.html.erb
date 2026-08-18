@@ -1,0 +1,48 @@
+<% content_for :title, @relationship_type.name %>
+<%= render "projects/header", project: @project, side: :ontology, section: :relationship_types %>
+
+<div class="d-flex justify-content-between align-items-center mb-1">
+  <h1 class="mb-0"><%= @relationship_type.name %></h1>
+  <div>
+    <%= link_to "Edit", edit_project_relationship_type_path(@project, @relationship_type), class: "btn btn-sm btn-outline-primary" %>
+    <%= button_to "Delete", project_relationship_type_path(@project, @relationship_type), method: :delete,
+                  class: "btn btn-sm btn-outline-danger",
+                  form: { class: "d-inline", data: { turbo_confirm: "Delete this relationship type?" } } %>
+  </div>
+</div>
+<p class="text-muted"><%= @relationship_type.description %></p>
+
+<div class="d-flex justify-content-between align-items-center mb-3 mt-4">
+  <h2 class="h5 mb-0">Attributes</h2>
+  <%= link_to "New attribute", new_project_relationship_type_relationship_type_attribute_path(@project, @relationship_type),
+              class: "btn btn-sm btn-primary" %>
+</div>
+
+<% if @relationship_type.relationship_type_attributes.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @relationship_type.relationship_type_attributes.each do |attribute| %>
+        <tr>
+          <td><%= attribute.name %></td>
+          <td><%= attribute.value_type %></td>
+          <td>
+            <%= link_to "Edit", edit_project_relationship_type_relationship_type_attribute_path(@project, @relationship_type, attribute),
+                        class: "btn btn-sm btn-outline-primary" %>
+            <%= button_to "Delete", project_relationship_type_relationship_type_attribute_path(@project, @relationship_type, attribute),
+                          method: :delete, class: "btn btn-sm btn-outline-danger",
+                          form: { class: "d-inline", data: { turbo_confirm: "Delete this attribute?" } } %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="text-muted">No attributes defined.</p>
+<% end %>

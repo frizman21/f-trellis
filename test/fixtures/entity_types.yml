@@ -1,11 +1,21 @@
 rocket_engine:
+  project: apollo
   name: Rocket Engine
   description: A propulsion device.
 
 launch_vehicle:
+  project: apollo
   name: Launch Vehicle
   description: A rocket that carries something to orbit.
 
 # A type with no attributes, so the empty states are reachable from a fixture.
 bare:
+  project: apollo
   name: Bare Type
+
+# Another project's ontology, so scoping can be asserted as isolation rather
+# than merely as "the page rendered".
+gemini_capsule:
+  project: gemini
+  name: Capsule
+  description: Another project's type entirely.

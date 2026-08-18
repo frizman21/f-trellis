@@ -1,0 +1,14 @@
+powers:
+  project: apollo
+  name: Powers
+  description: The engine provides thrust for the vehicle.
+
+# No attributes, so the relationship edit page's empty state is reachable.
+bare_relation:
+  project: apollo
+  name: Bare Relation
+
+# Another project's, so scoping can be asserted as isolation.
+gemini_docks:
+  project: gemini
+  name: Docks With

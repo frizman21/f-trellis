@@ -6,17 +6,26 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  resources :projects, only: [:index, :new, :create, :edit, :update]
-
-  # The ontology. Attributes are nested because an attribute has no meaning
-  # apart from the type that owns it.
-  resources :entities
-  resources :entity_types do
-    resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+  # A project has two sides: the ontology it describes things with, and the data
+  # recorded against it. Both live under the project — with everything scoped, a
+  # top-level ontology screen would have no project to show.
+  resources :projects, only: [:index, :new, :create, :edit, :update] do
+    resources :entity_types do
+      resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+    end
+    resources :relationship_types do
+      resources :relationship_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+    end
+    resources :entities
+    resources :relationships, only: [:create, :edit, :update, :destroy]
   end
-  resources :relationships, only: [:create, :destroy]
 
   resources :sources, only: [:index, :show, :new, :create] do
+    collection do
+      # Backs the source search field on the ontology's CRUD forms. A select of
+      # every source is not an option: a crawled deployment has thousands.
+      get :search
+    end
     member do
       post :fetch
       post :crawl

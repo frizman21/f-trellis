@@ -1,4 +1,4 @@
-<%= form_with model: [ entity_type, attribute ], local: true do |f| %>
+<%= form_with model: [ project, entity_type, attribute ], local: true do |f| %>
   <% if attribute.errors.any? %>
     <div class="alert alert-danger">
       <ul class="mb-0">
@@ -24,5 +24,5 @@
   </div>
 
   <%= f.submit submit_label, class: "btn btn-primary" %>
-  <%= link_to "Cancel", entity_type_path(entity_type), class: "btn btn-outline-secondary" %>
+  <%= link_to "Cancel", project_entity_type_path(@project, entity_type), class: "btn btn-outline-secondary" %>
 <% end %>

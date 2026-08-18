@@ -1,0 +1,15 @@
+<%# What a recorded fact is cited from. Rendered wherever a fact is shown, so
+    "how do we know this?" is answerable from the page it is stated on. %>
+<% if citations.any? %>
+  <ul class="list-unstyled mb-0 small">
+    <% citations.each do |citation| %>
+      <li>
+        <%= external_link_to citation.source.url.truncate(60), citation.source.url,
+                             class: "text-muted" %>
+        <span class="badge text-bg-light"><%= citation.confidence %>%</span>
+      </li>
+    <% end %>
+  </ul>
+<% else %>
+  <span class="text-muted small">—</span>
+<% end %>

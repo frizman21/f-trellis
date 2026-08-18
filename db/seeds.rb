@@ -22,6 +22,11 @@ end
   "Skylab"
 ].each { |name| Project.find_or_create_by!(name: name) }
 
+# The seeded ontology and data belong to the first project. A project's two
+# sides are its own: seeding one project gives both sides something to show
+# while leaving the others genuinely empty, which is the more useful demo.
+seed_project = Project.order(:id).first
+
 # The ontology — a couple of types with typed attributes, some entities of each,
 # and edges between them, so the entity and entity-type screens have something to
 # show on a fresh database. Idempotent: keyed on the type name and, for entities,
@@ -49,7 +54,9 @@ ontology = {
 seeded_entities = {}
 
 ontology.each do |type_name, spec|
-  type = EntityType.find_or_create_by!(name: type_name) { |t| t.description = spec[:description] }
+  type = seed_project.entity_types.find_or_create_by!(name: type_name) do |t|
+    t.description = spec[:description]
+  end
 
   spec[:attributes].each do |attr_name, value_type|
     type.entity_type_attributes.find_or_create_by!(name: attr_name) { |a| a.value_type = value_type }
@@ -60,7 +67,7 @@ ontology.each do |type_name, spec|
   spec[:entities].each do |values|
     existing = EntityAttributeValue.find_by(entity_type_attribute: name_attribute,
                                             string_value: values["name"])
-    entity = existing&.entity || Entity.create!(entity_type: type)
+    entity = existing&.entity || seed_project.entities.create!(entity_type: type)
 
     values.each do |attr_name, raw|
       attribute = type.entity_type_attributes.find_by!(name: attr_name)
@@ -74,16 +81,38 @@ ontology.each do |type_name, spec|
   end
 end
 
-# Edges are untyped for now, so these say only "these two are connected".
+# Edges say what kind they are, and carry facts of their own.
+powers = seed_project.relationship_types.find_or_create_by!(name: "Powers") do |t|
+  t.description = "The engine provides thrust for the vehicle."
+end
 [
-  [ "Rocketdyne F-1", "Saturn V" ],
-  [ "Raptor 2",       "Starship" ]
-].each do |from_name, to_name|
+  { name: "engine_count", value_type: "int" },
+  { name: "stage",        value_type: "string" }
+].each do |attrs|
+  powers.relationship_type_attributes.find_or_create_by!(name: attrs[:name]) do |a|
+    a.value_type = attrs[:value_type]
+  end
+end
+
+[
+  [ "Rocketdyne F-1", "Saturn V", { "engine_count" => 5, "stage" => "First" } ],
+  [ "Raptor 2",       "Starship", { "engine_count" => 33, "stage" => "Booster" } ]
+].each do |from_name, to_name, values|
   from = seeded_entities[from_name]
   to   = seeded_entities[to_name]
   next if from.nil? || to.nil?
 
-  Relationship.find_or_create_by!(from_entity: from, to_entity: to)
+  relationship = Relationship.find_or_create_by!(from_entity: from, to_entity: to) do |r|
+    r.relationship_type = powers
+  end
+
+  values.each do |attr_name, raw|
+    attribute = powers.relationship_type_attributes.find_by!(name: attr_name)
+    record = RelationshipTypeValue.find_or_initialize_by(relationship: relationship,
+                                                         relationship_type_attribute: attribute)
+    record.value = raw
+    record.save!
+  end
 end
 
 skills = [

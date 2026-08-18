@@ -1,25 +1,36 @@
 engine_name:
+  project: apollo
   entity_type: rocket_engine
   name: name
   value_type: string
 
 engine_thrust:
+  project: apollo
   entity_type: rocket_engine
   name: thrust_kn
   value_type: float
 
 engine_chambers:
+  project: apollo
   entity_type: rocket_engine
   name: chambers
   value_type: int
 
 engine_first_flight:
+  project: apollo
   entity_type: rocket_engine
   name: first_flight
   value_type: datetime
 
 # Deliberately has no `name` attribute, so the #label fallback is reachable.
 vehicle_stages:
+  project: apollo
   entity_type: launch_vehicle
   name: stages
+  value_type: int
+
+capsule_crew:
+  project: gemini
+  entity_type: gemini_capsule
+  name: crew
   value_type: int

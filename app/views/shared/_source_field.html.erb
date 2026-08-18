@@ -1,0 +1,28 @@
+<%# A source search field plus the confidence to record for the citation.
+    `f` is a form builder for a citation row (entity_sources, and friends).
+
+    Leaving the search box empty means "no source": the citation row is
+    rejected server-side when the hidden id is blank, so the confidence beside
+    it is simply never read. %>
+<div class="border rounded p-2 mt-2" data-controller="source-search"
+     data-source-search-url-value="<%= search_sources_path %>">
+  <div class="row g-2">
+    <div class="col-sm-8">
+      <%= label_tag nil, label, class: "form-label small text-muted mb-1" %>
+      <%= text_field_tag nil, f.object.source&.url,
+                         class: "form-control form-control-sm",
+                         placeholder: "Search sources by URL or description…",
+                         autocomplete: "off",
+                         data: { source_search_target: "query",
+                                 action: "input->source-search#search" } %>
+      <%= f.hidden_field :source_id, data: { source_search_target: "id" } %>
+      <div class="list-group list-group-flush mt-1" data-source-search-target="results"></div>
+    </div>
+    <div class="col-sm-4">
+      <%= f.label :confidence, "Confidence", class: "form-label small text-muted mb-1" %>
+      <%= f.number_field :confidence, min: 1, max: 100,
+                         value: f.object.confidence || 100,
+                         class: "form-control form-control-sm" %>
+    </div>
+  </div>
+</div>

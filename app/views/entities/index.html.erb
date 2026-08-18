@@ -1,8 +1,9 @@
 <% content_for :title, "Entities" %>
+<%= render "projects/header", project: @project, side: :data %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="mb-0">Entities</h1>
-  <%= link_to "New entity", new_entity_path, class: "btn btn-primary" %>
+  <%= link_to "New entity", new_project_entity_path(@project), class: "btn btn-primary" %>
 </div>
 
 <% if @entities.any? %>
@@ -17,9 +18,9 @@
     <tbody>
       <% @entities.each do |entity| %>
         <tr>
-          <td><%= link_to entity.label, entity_path(entity) %></td>
-          <td><%= link_to entity.entity_type.name, entity_type_path(entity.entity_type) %></td>
-          <td><%= link_to "Edit", edit_entity_path(entity), class: "btn btn-sm btn-outline-primary" %></td>
+          <td><%= link_to entity.label, project_entity_path(@project, entity) %></td>
+          <td><%= link_to entity.entity_type.name, project_entity_type_path(@project, entity.entity_type) %></td>
+          <td><%= link_to "Edit", edit_project_entity_path(@project, entity), class: "btn btn-sm btn-outline-primary" %></td>
         </tr>
       <% end %>
     </tbody>

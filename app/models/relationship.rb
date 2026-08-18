@@ -1,10 +1,24 @@
-# An untyped edge between two entities. It carries no kind or direction
-# semantics yet — that is coming.
+# An edge between two entities, of a kind the project defines, carrying whatever
+# attributes that kind declares.
 class Relationship < ApplicationRecord
+  include ScopedToProject
+
+  belongs_to :relationship_type
   belongs_to :from_entity, class_name: "Entity"
   belongs_to :to_entity,   class_name: "Entity"
+  scoped_to_project_through :from_entity
+
+  has_many :relationship_type_values, dependent: :destroy
+  has_many :relationship_sources, dependent: :destroy
+  has_many :sources, through: :relationship_sources
+
+  accepts_nested_attributes_for :relationship_type_values,
+                                reject_if: ->(attrs) { attrs["id"].blank? && attrs["value"].blank? }
+  accepts_nested_attributes_for :relationship_sources, reject_if: ->(attrs) { attrs["source_id"].blank? }
 
   validate :ends_are_different
+  validate :ends_share_a_project
+  validate :type_is_in_the_same_project
 
   # The far end, seen from one of them. The show page lists a relationship from
   # either side, and asking each row which entity is "the other one" is what
@@ -13,7 +27,48 @@ class Relationship < ApplicationRecord
     from_entity_id == entity.id ? to_entity : from_entity
   end
 
+  # The type's attributes paired with this relationship's values, including
+  # attributes with nothing recorded — the same shape the entity side shows, so
+  # a blank is a row rather than a missing one.
+  def attribute_rows
+    recorded = relationship_type_values.index_by(&:relationship_type_attribute_id)
+
+    relationship_type.relationship_type_attributes.map do |attribute|
+      [ attribute, recorded[attribute.id] ]
+    end
+  end
+
+  # Every attribute of the type has a value record to bind a form field to,
+  # built unsaved where nothing has been recorded yet.
+  def build_missing_attribute_values
+    recorded = relationship_type_values.index_by(&:relationship_type_attribute_id)
+
+    relationship_type.relationship_type_attributes.each do |attribute|
+      next if recorded.key?(attribute.id)
+
+      relationship_type_values.build(relationship_type_attribute: attribute)
+    end
+  end
+
   private
+
+  # As with an entity and its type: one project's edges cannot be typed by
+  # another project's ontology.
+  def type_is_in_the_same_project
+    return if relationship_type.nil? || project_id.nil?
+    return if relationship_type.project_id == project_id
+
+    errors.add(:relationship_type, "must belong to the same project as the relationship")
+  end
+
+  # An edge across projects would make one project's data reachable from
+  # another's, which is the one thing scoping is for.
+  def ends_share_a_project
+    return if from_entity.nil? || to_entity.nil?
+    return if from_entity.project_id == to_entity.project_id
+
+    errors.add(:to_entity, "must belong to the same project as the from end")
+  end
 
   def ends_are_different
     return if from_entity_id.blank? || to_entity_id.blank?

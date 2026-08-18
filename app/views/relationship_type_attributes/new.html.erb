@@ -1,0 +1,6 @@
+<% content_for :title, "New Attribute" %>
+<%= render "projects/header", project: @project, side: :ontology, section: :relationship_types %>
+<h1>New Attribute</h1>
+<p class="text-muted">On <%= link_to @relationship_type.name, project_relationship_type_path(@project, @relationship_type) %></p>
+
+<%= render "form", project: @project, relationship_type: @relationship_type, attribute: @attribute, submit_label: "Add attribute" %>

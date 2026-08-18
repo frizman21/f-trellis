@@ -21,7 +21,7 @@ class EntityTypeTest < ActiveSupport::TestCase
   end
 
   test "a type with no entities can be deleted, and takes its attributes with it" do
-    type = EntityType.create!(name: "Disposable")
+    type = projects(:apollo).entity_types.create!(name: "Disposable")
     type.entity_type_attributes.create!(name: "whatever", value_type: "string")
 
     assert_difference -> { EntityTypeAttribute.count }, -1 do

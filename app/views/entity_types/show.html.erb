@@ -1,10 +1,11 @@
 <% content_for :title, @entity_type.name %>
+<%= render "projects/header", project: @project, side: :ontology, section: :entity_types %>
 
 <div class="d-flex justify-content-between align-items-center mb-1">
   <h1 class="mb-0"><%= @entity_type.name %></h1>
   <div>
-    <%= link_to "Edit", edit_entity_type_path(@entity_type), class: "btn btn-sm btn-outline-primary" %>
-    <%= button_to "Delete", entity_type_path(@entity_type), method: :delete,
+    <%= link_to "Edit", edit_project_entity_type_path(@project, @entity_type), class: "btn btn-sm btn-outline-primary" %>
+    <%= button_to "Delete", project_entity_type_path(@project, @entity_type), method: :delete,
                   class: "btn btn-sm btn-outline-danger",
                   form: { class: "d-inline", data: { turbo_confirm: "Delete this entity type?" } } %>
   </div>
@@ -13,7 +14,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
   <h2 class="h5 mb-0">Attributes</h2>
-  <%= link_to "New attribute", new_entity_type_entity_type_attribute_path(@entity_type),
+  <%= link_to "New attribute", new_project_entity_type_entity_type_attribute_path(@project, @entity_type),
               class: "btn btn-sm btn-primary" %>
 </div>
 
@@ -32,9 +33,9 @@
           <td><%= attribute.name %></td>
           <td><%= attribute.value_type %></td>
           <td>
-            <%= link_to "Edit", edit_entity_type_entity_type_attribute_path(@entity_type, attribute),
+            <%= link_to "Edit", edit_project_entity_type_entity_type_attribute_path(@project, @entity_type, attribute),
                         class: "btn btn-sm btn-outline-primary" %>
-            <%= button_to "Delete", entity_type_entity_type_attribute_path(@entity_type, attribute),
+            <%= button_to "Delete", project_entity_type_entity_type_attribute_path(@project, @entity_type, attribute),
                           method: :delete, class: "btn btn-sm btn-outline-danger",
                           form: { class: "d-inline", data: { turbo_confirm: "Delete this attribute?" } } %>
           </td>
@@ -50,7 +51,7 @@
 <% if @entity_type.entities.any? %>
   <ul class="list-unstyled">
     <% @entity_type.entities.each do |entity| %>
-      <li><%= link_to entity.label, entity_path(entity) %></li>
+      <li><%= link_to entity.label, project_entity_path(@project, entity) %></li>
     <% end %>
   </ul>
 <% else %>
