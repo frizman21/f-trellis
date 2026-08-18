@@ -20,6 +20,8 @@ class EntitiesController < ApplicationController
     @candidates = @project.entities
                           .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
                           .where.not(id: @entity.id)
+    @new_relationship = @project.relationships.new
+    @new_relationship.relationship_sources.build
   end
 
   # Creating is two steps: pick the type here, fill in its attributes on the
@@ -27,6 +29,9 @@ class EntitiesController < ApplicationController
   # JavaScript to re-render; this needs none.
   def new
     @entity = @project.entities.new
+    # One blank citation row for the form to bind to. Left empty it is rejected,
+    # which is how "no source" is said.
+    @entity.entity_sources.build
   end
 
   def create
@@ -36,6 +41,7 @@ class EntitiesController < ApplicationController
       redirect_to edit_project_entity_path(@project, @entity),
                   notice: "Entity created. Fill in its attributes."
     else
+      @entity.entity_sources.build if @entity.entity_sources.empty?
       render :new, status: :unprocessable_entity
     end
   end
@@ -43,6 +49,7 @@ class EntitiesController < ApplicationController
   def edit
     @entity = find_entity
     @entity.build_missing_attribute_values
+    build_missing_citations
   end
 
   def update
@@ -52,6 +59,7 @@ class EntitiesController < ApplicationController
       redirect_to project_entity_path(@project, @entity), notice: "Entity updated."
     else
       @entity.build_missing_attribute_values
+      build_missing_citations
       render :edit, status: :unprocessable_entity
     end
   end
@@ -76,10 +84,22 @@ class EntitiesController < ApplicationController
     @project.entities.includes(entity_attribute_values: :entity_type_attribute).find(params[:id])
   end
 
+  # A blank citation row per value, so every attribute can be given a source
+  # without the form growing an "add source" step.
+  def build_missing_citations
+    @entity.entity_attribute_values.each do |value|
+      value.entity_attribute_value_sources.build if value.entity_attribute_value_sources.empty?
+    end
+  end
+
   def entity_params
     params.require(:entity).permit(
       :entity_type_id,
-      entity_attribute_values_attributes: [ :id, :entity_type_attribute_id, :value ]
+      entity_sources_attributes: [ :id, :source_id, :confidence ],
+      entity_attribute_values_attributes: [
+        :id, :entity_type_attribute_id, :value,
+        { entity_attribute_value_sources_attributes: [ :id, :source_id, :confidence ] }
+      ]
     )
   end
 end

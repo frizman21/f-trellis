@@ -3,6 +3,27 @@ class SourcesController < ApplicationController
     @sources = Source.order(created_at: :desc).page(params[:page]).per(25)
   end
 
+  # Matches on what a person would recognise a page by — its URL and its
+  # description — and caps the result count, since this answers a keystroke.
+  LOOKUP_LIMIT = 15
+
+  def search
+    query = params[:q].to_s.strip
+
+    sources = if query.blank?
+                Source.none
+              else
+                pattern = "%#{query}%"
+                Source.where("url ILIKE :q OR description ILIKE :q", q: pattern)
+                      .order(:url)
+                      .limit(LOOKUP_LIMIT)
+              end
+
+    render json: sources.map { |source|
+      { id: source.id, url: source.url, description: source.description.to_s.truncate(120) }
+    }
+  end
+
   def show
     @source = Source.find(params[:id])
     @links_from_count = @source.links_to.count

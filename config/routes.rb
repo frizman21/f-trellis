@@ -21,6 +21,11 @@ Rails.application.routes.draw do
   end
 
   resources :sources, only: [:index, :show, :new, :create] do
+    collection do
+      # Backs the source search field on the ontology's CRUD forms. A select of
+      # every source is not an option: a crawled deployment has thousands.
+      get :search
+    end
     member do
       post :fetch
       post :crawl

@@ -18,6 +18,7 @@ class RelationshipsController < ApplicationController
   def edit
     @relationship = find_relationship
     @relationship.build_missing_attribute_values
+    build_missing_citations
   end
 
   def update
@@ -28,6 +29,7 @@ class RelationshipsController < ApplicationController
                   notice: "Relationship updated."
     else
       @relationship.build_missing_attribute_values
+      build_missing_citations
       render :edit, status: :unprocessable_entity
     end
   end
@@ -51,10 +53,20 @@ class RelationshipsController < ApplicationController
     @project.relationships.find(params[:id])
   end
 
+  def build_missing_citations
+    @relationship.relationship_type_values.each do |value|
+      value.relationship_type_value_sources.build if value.relationship_type_value_sources.empty?
+    end
+  end
+
   def relationship_params
     params.require(:relationship).permit(
       :from_entity_id, :to_entity_id, :relationship_type_id,
-      relationship_type_values_attributes: [ :id, :relationship_type_attribute_id, :value ]
+      relationship_sources_attributes: [ :id, :source_id, :confidence ],
+      relationship_type_values_attributes: [
+        :id, :relationship_type_attribute_id, :value,
+        { relationship_type_value_sources_attributes: [ :id, :source_id, :confidence ] }
+      ]
     )
   end
 end

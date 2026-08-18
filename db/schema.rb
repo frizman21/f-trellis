@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_18_213356) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_18_213947) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -70,6 +70,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213356) do
     t.index ["project_id"], name: "index_entities_on_project_id"
   end
 
+  create_table "entity_attribute_value_sources", force: :cascade do |t|
+    t.integer "confidence", default: 100, null: false
+    t.datetime "created_at", null: false
+    t.bigint "entity_attribute_value_id", null: false
+    t.bigint "source_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["entity_attribute_value_id", "source_id"], name: "index_entity_attribute_value_sources_on_owner_and_source", unique: true
+    t.index ["entity_attribute_value_id"], name: "idx_on_entity_attribute_value_id_36db6dab02"
+    t.index ["source_id"], name: "index_entity_attribute_value_sources_on_source_id"
+  end
+
   create_table "entity_attribute_values", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "datetime_value"
@@ -84,6 +95,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213356) do
     t.index ["entity_id"], name: "index_entity_attribute_values_on_entity_id"
     t.index ["entity_type_attribute_id"], name: "index_entity_attribute_values_on_entity_type_attribute_id"
     t.index ["project_id"], name: "index_entity_attribute_values_on_project_id"
+  end
+
+  create_table "entity_sources", force: :cascade do |t|
+    t.integer "confidence", default: 100, null: false
+    t.datetime "created_at", null: false
+    t.bigint "entity_id", null: false
+    t.bigint "source_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["entity_id", "source_id"], name: "index_entity_sources_on_owner_and_source", unique: true
+    t.index ["entity_id"], name: "index_entity_sources_on_entity_id"
+    t.index ["source_id"], name: "index_entity_sources_on_source_id"
   end
 
   create_table "entity_type_attributes", force: :cascade do |t|
@@ -196,6 +218,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213356) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "relationship_sources", force: :cascade do |t|
+    t.integer "confidence", default: 100, null: false
+    t.datetime "created_at", null: false
+    t.bigint "relationship_id", null: false
+    t.bigint "source_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["relationship_id", "source_id"], name: "index_relationship_sources_on_owner_and_source", unique: true
+    t.index ["relationship_id"], name: "index_relationship_sources_on_relationship_id"
+    t.index ["source_id"], name: "index_relationship_sources_on_source_id"
+  end
+
   create_table "relationship_type_attributes", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -206,6 +239,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213356) do
     t.index ["project_id"], name: "index_relationship_type_attributes_on_project_id"
     t.index ["relationship_type_id", "name"], name: "index_relationship_type_attributes_on_type_and_name", unique: true
     t.index ["relationship_type_id"], name: "index_relationship_type_attributes_on_relationship_type_id"
+  end
+
+  create_table "relationship_type_value_sources", force: :cascade do |t|
+    t.integer "confidence", default: 100, null: false
+    t.datetime "created_at", null: false
+    t.bigint "relationship_type_value_id", null: false
+    t.bigint "source_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["relationship_type_value_id", "source_id"], name: "index_relationship_type_value_sources_on_owner_and_source", unique: true
+    t.index ["relationship_type_value_id"], name: "idx_on_relationship_type_value_id_3df863f22b"
+    t.index ["source_id"], name: "index_relationship_type_value_sources_on_source_id"
   end
 
   create_table "relationship_type_values", force: :cascade do |t|
@@ -459,9 +503,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213356) do
   add_foreign_key "chats", "models"
   add_foreign_key "entities", "entity_types"
   add_foreign_key "entities", "projects"
+  add_foreign_key "entity_attribute_value_sources", "entity_attribute_values"
+  add_foreign_key "entity_attribute_value_sources", "sources"
   add_foreign_key "entity_attribute_values", "entities"
   add_foreign_key "entity_attribute_values", "entity_type_attributes"
   add_foreign_key "entity_attribute_values", "projects"
+  add_foreign_key "entity_sources", "entities"
+  add_foreign_key "entity_sources", "sources"
   add_foreign_key "entity_type_attributes", "entity_types"
   add_foreign_key "entity_type_attributes", "projects"
   add_foreign_key "entity_types", "projects"
@@ -471,8 +519,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213356) do
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "models"
   add_foreign_key "messages", "tool_calls"
+  add_foreign_key "relationship_sources", "relationships"
+  add_foreign_key "relationship_sources", "sources"
   add_foreign_key "relationship_type_attributes", "projects"
   add_foreign_key "relationship_type_attributes", "relationship_types"
+  add_foreign_key "relationship_type_value_sources", "relationship_type_values"
+  add_foreign_key "relationship_type_value_sources", "sources"
   add_foreign_key "relationship_type_values", "projects"
   add_foreign_key "relationship_type_values", "relationship_type_attributes"
   add_foreign_key "relationship_type_values", "relationships"

@@ -23,6 +23,12 @@
                             { prompt: "Choose a type" }, class: "form-select", required: true %>
   </div>
 
+  <div class="mb-3">
+    <%= f.fields_for :entity_sources do |sf| %>
+      <%= render "shared/source_field", f: sf, label: "Source (optional)" %>
+    <% end %>
+  </div>
+
   <%= f.submit "Create entity", class: "btn btn-primary" %>
   <%= link_to "Cancel", project_entities_path(@project), class: "btn btn-outline-secondary" %>
 <% end %>

@@ -283,4 +283,101 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
       assert_not_includes offered, relationship_types(:gemini_docks).id
     end
   end
+
+  # --- citing a source -------------------------------------------------------
+
+  test "create records a citation for the entity when a source is chosen" do
+    assert_difference -> { EntitySource.count }, 1 do
+      post project_entities_path(@project), params: {
+        entity: { entity_type_id: entity_types(:rocket_engine).id,
+                  entity_sources_attributes: { "0" => { source_id: sources(:one).id, confidence: "80" } } }
+      }
+    end
+
+    citation = Entity.order(:id).last.entity_sources.sole
+
+    assert_equal sources(:one), citation.source
+    assert_equal 80, citation.confidence
+  end
+
+  # Citing is optional, so a blank search box is not an error.
+  test "create records no citation when no source is chosen" do
+    assert_difference -> { Entity.count }, 1 do
+      assert_no_difference -> { EntitySource.count } do
+        post project_entities_path(@project), params: {
+          entity: { entity_type_id: entity_types(:rocket_engine).id,
+                    entity_sources_attributes: { "0" => { source_id: "", confidence: "100" } } }
+        }
+      end
+    end
+  end
+
+  test "create rejects a confidence outside 1..100 and records nothing" do
+    assert_no_difference [ -> { Entity.count }, -> { EntitySource.count } ] do
+      post project_entities_path(@project), params: {
+        entity: { entity_type_id: entity_types(:rocket_engine).id,
+                  entity_sources_attributes: { "0" => { source_id: sources(:one).id, confidence: "101" } } }
+      }
+    end
+
+    assert_response :unprocessable_entity
+  end
+
+  # The citation belongs to the value, not to the entity: different facts about
+  # one thing can come from different pages.
+  test "update cites a source against a specific attribute value" do
+    entity = entities(:f1)
+    chambers = entity_type_attributes(:engine_chambers)
+
+    assert_difference -> { EntityAttributeValueSource.count }, 1 do
+      assert_no_difference -> { EntitySource.count } do
+        patch project_entity_path(@project, entity), params: {
+          entity: { entity_attribute_values_attributes: {
+            "0" => { entity_type_attribute_id: chambers.id, value: "5",
+                     entity_attribute_value_sources_attributes: {
+                       "0" => { source_id: sources(:one).id, confidence: "60" }
+                     } }
+          } }
+        }
+      end
+    end
+
+    value = entity.reload.entity_attribute_values.find_by(entity_type_attribute: chambers)
+
+    assert_equal sources(:one), value.entity_attribute_value_sources.sole.source
+    assert_equal 60, value.entity_attribute_value_sources.sole.confidence
+  end
+
+  test "a blank source with a confidence filled in records nothing" do
+    entity = entities(:f1)
+
+    assert_no_difference -> { EntityAttributeValueSource.count } do
+      patch project_entity_path(@project, entity), params: {
+        entity: { entity_attribute_values_attributes: {
+          "0" => { entity_type_attribute_id: entity_type_attributes(:engine_chambers).id, value: "5",
+                   entity_attribute_value_sources_attributes: {
+                     "0" => { source_id: "", confidence: "60" }
+                   } }
+        } }
+      }
+    end
+  end
+
+  test "show displays what each fact is cited from, with its confidence" do
+    EntityAttributeValueSource.create!(entity_attribute_value: entity_attribute_values(:f1_name),
+                                       source: sources(:one), confidence: 42)
+
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "th", text: "Cited from"
+    assert_match(/42%/, response.body)
+  end
+
+  test "the entity form offers a source search field" do
+    get new_project_entity_path(@project)
+
+    assert_select "[data-controller=?]", "source-search"
+    assert_select "input[name=?]", "entity[entity_sources_attributes][0][source_id]"
+  end
 end

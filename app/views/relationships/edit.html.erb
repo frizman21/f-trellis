@@ -45,6 +45,10 @@
         <% else %>
           <%= vf.text_field :value, value: vf.object.value, class: "form-control" %>
         <% end %>
+
+        <%= vf.fields_for :relationship_type_value_sources do |sf| %>
+          <%= render "shared/source_field", f: sf, label: "Source for #{attribute.name} (optional)" %>
+        <% end %>
       </div>
     <% end %>
   <% else %>

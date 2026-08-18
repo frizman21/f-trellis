@@ -8,6 +8,11 @@ class EntityAttributeValue < ApplicationRecord
 
   belongs_to :entity_type_attribute
 
+  has_many :entity_attribute_value_sources, dependent: :destroy
+  has_many :sources, through: :entity_attribute_value_sources
+
+  accepts_nested_attributes_for :entity_attribute_value_sources, reject_if: ->(attrs) { attrs["source_id"].blank? }
+
   validates :entity_type_attribute_id, uniqueness: { scope: :entity_id }
 
   # What TypedValue needs to know which column is live.

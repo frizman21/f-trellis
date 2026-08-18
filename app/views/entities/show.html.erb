@@ -21,6 +21,7 @@
       <tr>
         <th>Attribute</th>
         <th>Value</th>
+        <th>Cited from</th>
       </tr>
     </thead>
     <tbody>
@@ -34,6 +35,10 @@
             <span class="text-muted small">(<%= attribute.value_type %>)</span>
           </td>
           <td><%= value&.display_value %></td>
+          <td>
+            <%= render "shared/citations",
+                       citations: value ? value.entity_attribute_value_sources.includes(:source) : [] %>
+          </td>
         </tr>
       <% end %>
     </tbody>
@@ -84,7 +89,7 @@
 <% end %>
 
 <% if @candidates.any? && @project.relationship_types.any? %>
-  <%= form_with model: [ @project, Relationship.new ], local: true, class: "row g-2 align-items-end" do |f| %>
+  <%= form_with model: [ @project, @new_relationship ], local: true, class: "row g-2 align-items-end" do |f| %>
     <%= f.hidden_field :from_entity_id, value: @entity.id %>
     <div class="col-auto">
       <%= f.label :relationship_type_id, "Relationship", class: "form-label" %>
@@ -95,6 +100,11 @@
       <%= f.label :to_entity_id, "Relate to", class: "form-label" %>
       <%= f.collection_select :to_entity_id, @candidates, :id, :label,
                               { prompt: "Choose an entity" }, class: "form-select", required: true %>
+    </div>
+    <div class="col-12">
+      <%= f.fields_for :relationship_sources do |sf| %>
+        <%= render "shared/source_field", f: sf, label: "Source for this relationship (optional)" %>
+      <% end %>
     </div>
     <div class="col-auto">
       <%= f.submit "Add relationship", class: "btn btn-outline-primary" %>

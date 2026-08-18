@@ -156,4 +156,64 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
       }
     end
   end
+
+  # --- citing a source -------------------------------------------------------
+
+  test "create records a citation for the edge when a source is chosen" do
+    assert_difference -> { RelationshipSource.count }, 1 do
+      post project_relationships_path(@project), params: {
+        relationship: { relationship_type_id: relationship_types(:powers).id,
+                        from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id,
+                        relationship_sources_attributes: {
+                          "0" => { source_id: sources(:one).id, confidence: "75" }
+                        } }
+      }
+    end
+
+    citation = Relationship.order(:id).last.relationship_sources.sole
+
+    assert_equal sources(:one), citation.source
+    assert_equal 75, citation.confidence
+  end
+
+  test "create records no citation when no source is chosen" do
+    assert_difference -> { Relationship.count }, 1 do
+      assert_no_difference -> { RelationshipSource.count } do
+        post project_relationships_path(@project), params: {
+          relationship: { relationship_type_id: relationship_types(:powers).id,
+                          from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id,
+                          relationship_sources_attributes: { "0" => { source_id: "", confidence: "100" } } }
+        }
+      end
+    end
+  end
+
+  test "update cites a source against a specific attribute value of the edge" do
+    relationship = relationships(:f1_powers_saturn_v)
+    stage = relationship_type_attributes(:powers_stage)
+
+    assert_difference -> { RelationshipTypeValueSource.count }, 1 do
+      patch project_relationship_path(@project, relationship), params: {
+        relationship: {
+          relationship_type_id: relationship.relationship_type_id,
+          relationship_type_values_attributes: {
+            "0" => { relationship_type_attribute_id: stage.id, value: "First",
+                     relationship_type_value_sources_attributes: {
+                       "0" => { source_id: sources(:one).id, confidence: "55" }
+                     } }
+          }
+        }
+      }
+    end
+
+    value = relationship.reload.relationship_type_values.find_by(relationship_type_attribute: stage)
+
+    assert_equal 55, value.relationship_type_value_sources.sole.confidence
+  end
+
+  test "the relationship edit form offers a source search field" do
+    get edit_project_relationship_path(@project, relationships(:f1_powers_saturn_v))
+
+    assert_select "[data-controller=?]", "source-search"
+  end
 end
