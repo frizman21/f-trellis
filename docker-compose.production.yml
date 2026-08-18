@@ -2,12 +2,14 @@
 #
 # Prerequisites:
 #   1. Copy `.env.production.example` to `.env.production` and fill in the secrets.
-#   2. `docker compose -f docker-compose.production.yml --env-file .env.production build`
-#   3. `docker compose -f docker-compose.production.yml --env-file .env.production up -d`
+#   2. A Postgres server reachable on the host at 5432 (see "Database" below).
+#   3. `docker compose -f docker-compose.production.yml --env-file .env.production build`
+#   4. `docker compose -f docker-compose.production.yml --env-file .env.production up -d`
 #
 # Topology:
 #   nginx (host port APP_HTTP_PORT) -> app (Thruster, container port 80) -> Puma
 #   worker  (Solid Queue) runs alongside, sharing the same image as app.
+#   Postgres is NOT part of this stack — it runs on the host.
 #
 # TLS:
 #   The bundled nginx terminates plain HTTP. For TLS, either (a) put a TLS
@@ -15,11 +17,24 @@
 #   (b) extend `docker/nginx/default.conf` with a 443 server block and mount
 #   certs into the nginx container.
 #
+# Database:
+#   The bundled `postgres` service is commented out below; the app connects to
+#   a Postgres running on the host via `host.docker.internal`. That server must
+#   have role f_dod_user with a password matching APP_DATABASE_PASSWORD, owning
+#   f_dod_production and the _cache / _queue / _cable databases. Because
+#   Postgres is external, `db/postgres-init/` no longer runs — those three
+#   extra databases have to be created by hand.
+#
+#   On Docker Desktop for Mac, host.docker.internal is proxied to the host's
+#   loopback, so a server listening on the default listen_addresses='localhost'
+#   is reachable and the connection arrives as 127.0.0.1. On Linux the host
+#   gateway is a real interface, so a deployment there additionally needs
+#   listen_addresses to cover it plus a matching pg_hba.conf line.
+#
 # Database persistence:
-#   Postgres data lives in the `postgres_data` named volume — it survives
-#   `docker compose down` (without `-v`), container rebuilds, and host reboots.
-#   Back it up before destructive ops. See README "Production deployment"
-#   for backup/restore commands.
+#   Postgres data lives on the host, outside Docker's lifecycle entirely, so
+#   `docker compose down -v` no longer touches it. Back it up with the host's
+#   own pg_dump. See README "Production deployment".
 #
 # Database migrations on every start:
 #   The `app` service runs `bin/rails db:prepare` before starting the web
@@ -36,10 +51,13 @@ x-app-env: &app-env
   RAILS_MASTER_KEY: ${RAILS_MASTER_KEY:?RAILS_MASTER_KEY must be set in .env.production}
   RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-5}
   WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
-  DATABASE_URL: postgres://app:${APP_DATABASE_PASSWORD}@postgres:5432/app_production
-  CACHE_DATABASE_URL: postgres://app:${APP_DATABASE_PASSWORD}@postgres:5432/app_production_cache
-  QUEUE_DATABASE_URL: postgres://app:${APP_DATABASE_PASSWORD}@postgres:5432/app_production_queue
-  CABLE_DATABASE_URL: postgres://app:${APP_DATABASE_PASSWORD}@postgres:5432/app_production_cable
+  # host.docker.internal, not localhost: Postgres runs on the host, outside
+  # compose, so `localhost` inside a container is the container itself. The
+  # `extra_hosts: host-gateway` entry on app/worker makes this name resolve.
+  DATABASE_URL: postgres://f_dod_user:${APP_DATABASE_PASSWORD}@host.docker.internal:5432/f_dod_production
+  CACHE_DATABASE_URL: postgres://f_dod_user:${APP_DATABASE_PASSWORD}@host.docker.internal:5432/f_dod_production_cache
+  QUEUE_DATABASE_URL: postgres://f_dod_user:${APP_DATABASE_PASSWORD}@host.docker.internal:5432/f_dod_production_queue
+  CABLE_DATABASE_URL: postgres://f_dod_user:${APP_DATABASE_PASSWORD}@host.docker.internal:5432/f_dod_production_cable
 
 x-logging: &default-logging
   driver: json-file
@@ -48,23 +66,23 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
-  postgres:
-    image: postgres:17.4
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: ${APP_DATABASE_PASSWORD:?APP_DATABASE_PASSWORD must be set in .env.production}
-      POSTGRES_DB: app_production
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./db/postgres-init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d app_production"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    logging: *default-logging
+  # postgres:
+  #   image: postgres:17.4
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: f_dod_user
+  #     POSTGRES_PASSWORD: ${APP_DATABASE_PASSWORD:?APP_DATABASE_PASSWORD must be set in .env.production}
+  #     POSTGRES_DB: f_dod_production
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./db/postgres-init:/docker-entrypoint-initdb.d:ro
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U app -d app_production"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 20s
+  #   logging: *default-logging
 
   app:
     build:
@@ -78,9 +96,8 @@ services:
       sh -c "./bin/rails db:prepare && exec ./bin/thrust ./bin/rails server"
     environment:
       <<: *app-env
-    depends_on:
-      postgres:
-        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "80"
     volumes:
@@ -99,9 +116,9 @@ services:
     command: ["./bin/jobs"]
     environment:
       <<: *app-env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
-      postgres:
-        condition: service_healthy
       app:
         condition: service_healthy
     volumes:
@@ -119,7 +136,10 @@ services:
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/up >/dev/null || exit 1"]
+      # 127.0.0.1, not localhost: nginx listens on IPv4 only, and the image's
+      # busybox wget resolves localhost to ::1 first and fails there instead of
+      # falling through to the IPv4 address the way curl does.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/up >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -127,5 +147,4 @@ services:
     logging: *default-logging
 
 volumes:
-  postgres_data:
   app_storage:
