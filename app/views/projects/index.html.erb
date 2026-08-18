@@ -11,7 +11,7 @@
     <thead>
       <tr>
         <th>Name</th>
-        <th>Ontology</th>
+        <th>Structure</th>
         <th>Data</th>
         <th></th>
       </tr>
@@ -23,8 +23,8 @@
           <%# The two sides of a project: what it can describe, and what it has
               recorded. The counts are the useful thing to know before choosing. %>
           <td>
-            <%= link_to ontology_project_path(project), class: "btn btn-sm btn-outline-primary" do %>
-              Ontology <span class="badge text-bg-secondary"><%= project.entity_types.size %></span>
+            <%= link_to structure_project_path(project), class: "btn btn-sm btn-outline-primary" do %>
+              Structure <span class="badge text-bg-secondary"><%= project.entity_types.size %></span>
             <% end %>
           </td>
           <td>

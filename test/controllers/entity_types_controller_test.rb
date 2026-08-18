@@ -69,7 +69,7 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
       delete project_entity_type_path(@project, type)
     end
 
-    assert_redirected_to ontology_project_path(@project)
+    assert_redirected_to structure_project_path(@project)
   end
 
   # A type with instances is not something to cascade away on a button press.

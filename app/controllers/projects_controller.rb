@@ -5,9 +5,12 @@ class ProjectsController < ApplicationController
     @projects = Project.includes(:entity_types, :entities).order(:name)
   end
 
-  # A project's ontology is its entity types and the relationship types between
+  # A project's structure is its entity types and the relationship types between
   # them — one idea, so one page. Reading either alone was never enough.
-  def ontology
+  #
+  # "Structure" rather than "ontology" is what the product calls this screen; the
+  # code keeps the modelling vocabulary.
+  def structure
     @project = Project.find(params[:id])
     @entity_types = @project.entity_types.includes(:entity_type_attributes, :entities)
     @relationship_types = @project.relationship_types

@@ -1,4 +1,4 @@
-# The relationship half of a project's ontology.
+# The relationship half of a project's structure.
 class RelationshipTypesController < ApplicationController
   before_action :set_project
 
@@ -40,7 +40,7 @@ class RelationshipTypesController < ApplicationController
     @relationship_type = find_relationship_type
 
     if @relationship_type.destroy
-      redirect_to ontology_project_path(@project),
+      redirect_to structure_project_path(@project),
                   notice: "Relationship type \"#{@relationship_type.name}\" deleted."
     else
       # restrict_with_error: edges of this kind still exist, and deleting the

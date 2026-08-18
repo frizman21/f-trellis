@@ -1,5 +1,5 @@
 <% content_for :title, "Edit Attribute" %>
-<%= render "projects/back", project: @project, side: :ontology %>
+<%= render "projects/back", project: @project, side: :structure %>
 <h1>Edit <%= @attribute.name %></h1>
 <p class="text-muted">On <%= link_to @entity_type.name, project_entity_type_path(@project, @entity_type) %></p>
 

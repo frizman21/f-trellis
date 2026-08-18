@@ -13,7 +13,7 @@ Rails.application.routes.draw do
     # The two sides of a project, addressed by what they are rather than by the
     # first resource each happens to list.
     member do
-      get :ontology
+      get :structure
       get :data
     end
 

@@ -131,7 +131,7 @@
 
 <% if @candidates.any? && @relationship_types.none? %>
   <p class="text-muted">
-    No <%= link_to "relationship type", ontology_project_path(@project) %>
+    No <%= link_to "relationship type", structure_project_path(@project) %>
     starts at a <%= @entity.entity_type.name %>, so this entity cannot be connected yet.
   </p>
 <% end %>

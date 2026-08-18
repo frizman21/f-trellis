@@ -1,10 +1,8 @@
 <%# The way back from a record page to the side it belongs to.
-    A record page is neither index, so the Ontology/Data tabs would render with
-    neither active — a control with no state, which is worse than no control.
-    `side` is :ontology or :data. %>
+    `side` is :structure or :data. %>
 <p class="mb-3">
-  <% if side == :ontology %>
-    <%= link_to "← Ontology", ontology_project_path(project), class: "text-decoration-none" %>
+  <% if side == :structure %>
+    <%= link_to "← Structure", structure_project_path(project), class: "text-decoration-none" %>
   <% else %>
     <%= link_to "← Data", data_project_path(project), class: "text-decoration-none" %>
   <% end %>

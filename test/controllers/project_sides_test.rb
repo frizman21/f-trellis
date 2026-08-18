@@ -7,7 +7,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
   # --- the ontology side -----------------------------------------------------
 
   test "ontology lists every entity type and every relationship type at once" do
-    get ontology_project_path(@project)
+    get structure_project_path(@project)
 
     assert_response :success
     assert_select "h1", text: "Entity Types"
@@ -17,7 +17,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
   end
 
   test "ontology shows only this project's types" do
-    get ontology_project_path(@project)
+    get structure_project_path(@project)
 
     assert_select "a", text: "Capsule", count: 0
     assert_select "a", text: "Docks With", count: 0
@@ -25,7 +25,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
   # From and To are two facts about a type, so they are two columns.
   test "the relationship type table has From and To columns carrying the end names" do
-    get ontology_project_path(@project)
+    get structure_project_path(@project)
 
     assert_select "th", text: "From"
     assert_select "th", text: "To"
@@ -39,7 +39,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
   end
 
   test "ontology says so when a project has no types rather than showing empty tables" do
-    get ontology_project_path(projects(:gemini))
+    get structure_project_path(projects(:gemini))
     assert_response :success
 
     Relationship.where(project: projects(:gemini)).destroy_all
@@ -47,7 +47,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     projects(:gemini).entities.destroy_all
     projects(:gemini).entity_types.destroy_all
 
-    get ontology_project_path(projects(:gemini))
+    get structure_project_path(projects(:gemini))
 
     assert_match(/No entity types yet/, response.body)
     assert_match(/No relationship types yet/, response.body)
@@ -77,14 +77,26 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
   # --- the tabs --------------------------------------------------------------
 
-  test "both sides offer both tabs, with the current one active" do
-    get ontology_project_path(@project)
-    assert_select "a.nav-link.active[href=?]", ontology_project_path(@project)
-    assert_select "a.nav-link[href=?]", data_project_path(@project)
+  # The tab strip is gone from the side pages too, so the project listing — one
+  # click away in the banner — is the only route between the two sides. That one
+  # remaining path is asserted rather than assumed.
+  test "neither side renders a tab strip, and both still render their content" do
+    get structure_project_path(@project)
+    assert_response :success
+    assert_select "ul.nav-tabs", count: 0
+    assert_select "h1", text: "Entity Types"
 
     get data_project_path(@project)
-    assert_select "a.nav-link.active[href=?]", data_project_path(@project)
-    assert_select "a.nav-link[href=?]", ontology_project_path(@project)
+    assert_response :success
+    assert_select "ul.nav-tabs", count: 0
+    assert_select "h1", text: "Entities"
+  end
+
+  test "the banner is the only way between the two sides" do
+    get data_project_path(@project)
+
+    assert_select "nav.navbar a[href=?]", projects_path, text: @project.name
+    assert_select "a[href=?]", structure_project_path(@project), count: 0
   end
 
   # The old index addresses moved; the per-record ones did not.
@@ -113,7 +125,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
   # --- the banner ------------------------------------------------------------
 
   test "the banner names the project you are in and links back to the listing" do
-    get ontology_project_path(@project)
+    get structure_project_path(@project)
 
     assert_select "nav.navbar" do
       assert_select "a.navbar-brand", text: "Trellis"
@@ -137,7 +149,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
   # The project moved to the banner, so saying it again in the page is noise.
   test "the in-page breadcrumb is gone" do
-    get ontology_project_path(@project)
+    get structure_project_path(@project)
 
     assert_select "nav[aria-label=?]", "breadcrumb", count: 0
   end
@@ -145,7 +157,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
   # --- the attribute popover -------------------------------------------------
 
   test "an entity type on the ontology page carries its attributes as a popover" do
-    get ontology_project_path(@project)
+    get structure_project_path(@project)
 
     assert_select "a[data-controller=?][data-bs-title=?]", "type-popover", "Rocket Engine" do |links|
       content = links.first["data-bs-content"]
@@ -157,7 +169,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
   end
 
   test "a relationship type carries its attributes as a popover" do
-    get ontology_project_path(@project)
+    get structure_project_path(@project)
 
     assert_select "a[data-controller=?][data-bs-title=?]", "type-popover", "Powers" do |links|
       assert_match(/engine_count \(int\)/, links.first["data-bs-content"])
@@ -166,7 +178,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
   # An empty box on hover reads as broken, so it says what it means.
   test "a type with no attributes says so rather than popping up nothing" do
-    get ontology_project_path(@project)
+    get structure_project_path(@project)
 
     assert_select "a[data-controller=?][data-bs-title=?]", "type-popover", "Bare Type" do |links|
       assert_equal "No attributes defined.", links.first["data-bs-content"]
@@ -203,7 +215,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
       assert_select "ul.nav-tabs", { count: 0 }, "#{path} should not carry the side tabs"
       # minimum rather than exactly one: a form also offers Cancel to the
       # same place, which is correct, not a duplicate.
-      assert_select "a[href=?]", ontology_project_path(@project), { minimum: 1 },
+      assert_select "a[href=?]", structure_project_path(@project), { minimum: 1 },
                     "#{path} should link back to the ontology"
     end
   end
@@ -234,11 +246,24 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the two side pages keep their tabs" do
-    [ ontology_project_path(@project), data_project_path(@project) ].each do |path|
-      get path
+  # A rename that misses one site is the whole failure mode, so the old word is
+  # asserted absent rather than the new one asserted present.
+  test "the product calls this side Structure, not Ontology" do
+    get projects_path
+    assert_select "a[href=?]", structure_project_path(@project), text: /Structure/
+    assert_no_match(/Ontology/, response.body)
 
-      assert_select "ul.nav-tabs a.nav-link", 2
-    end
+    get structure_project_path(@project)
+    assert_no_match(/Ontology/, response.body)
+
+    get edit_project_entity_type_path(@project, entity_types(:rocket_engine))
+    assert_no_match(/Ontology/, response.body)
+    assert_select "a[href=?]", structure_project_path(@project), text: /Structure/
+  end
+
+  test "the old ontology path no longer resolves" do
+    get "/projects/#{@project.id}/ontology"
+
+    assert_response :not_found
   end
 end
