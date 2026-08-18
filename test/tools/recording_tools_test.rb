@@ -11,7 +11,11 @@ class RecordingToolsTest < ActiveSupport::TestCase
     "PersonOrganization.count", "PersonOrganizationDetail.count",
     "PartOrganization.count", "PartOrganizationDetail.count",
     "PersonPerson.count", "PersonPersonDetail.count",
-    "OrganizationOrganization.count", "OrganizationOrganizationDetail.count"
+    "OrganizationOrganization.count", "OrganizationOrganizationDetail.count",
+    "Science.count", "ScienceDetail.count", "Technology.count", "TechnologyDetail.count",
+    "ScienceTechnology.count", "ScienceTechnologyDetail.count",
+    "PartTechnology.count", "PartTechnologyDetail.count",
+    "PersonScience.count", "PersonScienceDetail.count"
   ].freeze
 
   setup do
@@ -30,6 +34,17 @@ class RecordingToolsTest < ActiveSupport::TestCase
     @manufacturer = PartOrganizationType.find_or_create_by!(name: "Manufacturer")
     @partnership = OrganizationOrganizationType.find_or_create_by!(name: "Partnership")
     @founder = PersonPersonType.find_or_create_by!(name: "Co-Founder")
+
+    @sciences = RecordingUpsertScienceTool.new(@recorder)
+    @technologies = RecordingUpsertTechnologyTool.new(@recorder)
+    @science_technology = RecordingLinkScienceTechnologyTool.new(@recorder)
+    @part_technology = RecordingLinkPartTechnologyTool.new(@recorder)
+    @person_science = RecordingLinkPersonScienceTool.new(@recorder)
+    @discipline = ScienceType.find_or_create_by!(name: "Discipline")
+    @device = TechnologyType.find_or_create_by!(name: "Device")
+    @application = ScienceTechnologyType.find_or_create_by!(name: "Application")
+    @implementation = PartTechnologyType.find_or_create_by!(name: "Implementation")
+    @researcher = PersonScienceType.find_or_create_by!(name: "Researcher")
   end
 
   def two_people
@@ -301,5 +316,79 @@ class RecordingToolsTest < ActiveSupport::TestCase
 
     assert_match(/PartOrganizationType 'Nonsense' is not configured/, result[:error])
     assert_nil @recorder.proposals.detect { |p| p["type"] == "part_organization" }
+  end
+
+  # --- Sciences and technologies -------------------------------------------
+
+  test "a science and a technology are captured with their types, and nothing is written" do
+    assert_no_difference ENTITY_TABLES do
+      @sciences.execute(sciences: [ { name: "Ferromagnetism", summary: "Retained magnetisation.",
+                                      science_types: [ "Discipline" ] } ])
+      @technologies.execute(technologies: [ { name: "Core Rope Memory", technology_types: [ "Device" ] } ])
+    end
+
+    science = @recorder.proposals.detect { |p| p["type"] == "science" }
+    technology = @recorder.proposals.detect { |p| p["type"] == "technology" }
+
+    assert_equal "ferromagnetism", science["name"]
+    assert_equal "retained magnetisation.", science["summary"]
+    assert_equal [ "discipline" ], science["science_types"]
+    assert_equal "core rope memory", technology["name"]
+    assert_equal [ "device" ], technology["technology_types"]
+  end
+
+  test "the three new links are captured against the names, not the synthetic ids" do
+    science_id = @sciences.execute(sciences: [ { name: "Ferromagnetism" } ])[:results].first[:science_id]
+    technology_id = @technologies.execute(
+      technologies: [ { name: "Core Rope Memory" } ]
+    )[:results].first[:technology_id]
+    part_id = @parts.execute(parts: [ { name: "AGC Memory Module",
+                                        part_types: [ "Physical Part" ] } ])[:results].first[:part_id]
+    person_id = @people.execute(people: [ { first_name: "Hannes",
+                                            last_name: "Alfven" } ])[:results].first[:person_id]
+
+    assert_no_difference ENTITY_TABLES do
+      @science_technology.execute(science_id: science_id, technology_id: technology_id, type: "Application")
+      @part_technology.execute(part_id: part_id, technology_id: technology_id, type: "Implementation")
+      @person_science.execute(person_id: person_id, science_id: science_id, type: "Researcher")
+    end
+
+    assert_includes @recorder.proposals,
+                    { "type" => "science_technology", "science" => "ferromagnetism",
+                      "technology" => "core rope memory", "relationship_type" => "application",
+                      "attributes" => {} }
+    assert_includes @recorder.proposals,
+                    { "type" => "part_technology", "part" => "agc memory module",
+                      "technology" => "core rope memory", "relationship_type" => "implementation",
+                      "attributes" => {} }
+    assert_includes @recorder.proposals,
+                    { "type" => "person_science", "person" => "hannes alfven",
+                      "science" => "ferromagnetism", "relationship_type" => "researcher",
+                      "attributes" => {} }
+  end
+
+  test "the stand-in refuses an id it never issued and a type that is not configured" do
+    science_id = @sciences.execute(sciences: [ { name: "Ferromagnetism" } ])[:results].first[:science_id]
+    technology_id = @technologies.execute(
+      technologies: [ { name: "Core Rope Memory" } ]
+    )[:results].first[:technology_id]
+
+    assert_equal "no technology #4242",
+                 @science_technology.execute(science_id: science_id, technology_id: 4242,
+                                             type: "Application")[:error]
+    assert_equal "ScienceTechnologyType 'Sorcery' is not configured",
+                 @science_technology.execute(science_id: science_id, technology_id: technology_id,
+                                             type: "Sorcery")[:error]
+  end
+
+  # An unconfigured entity type is reported rather than dropped, exactly as the
+  # writing tool reports it — the entry is still recorded.
+  test "an unconfigured science type is reported by the stand-in too" do
+    result = @sciences.execute(sciences: [
+      { name: "Alchemy", science_types: [ "Discipline", "Sorcery" ] }
+    ])[:results].first
+
+    assert_equal [ "science type 'Sorcery' is not configured" ], result[:type_errors]
+    assert_equal [ "discipline" ], @recorder.proposals.detect { |p| p["type"] == "science" }["science_types"]
   end
 end

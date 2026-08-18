@@ -105,6 +105,11 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
   test "registers the recording stand-ins and creates no entities" do
     assert_no_difference [ "Person.count", "Organization.count", "PersonDetail.count",
                            "OrganizationDetail.count", "Part.count", "PartDetail.count",
+                           "Science.count", "ScienceDetail.count",
+                           "Technology.count", "TechnologyDetail.count",
+                           "ScienceTechnology.count", "ScienceTechnologyDetail.count",
+                           "PartTechnology.count", "PartTechnologyDetail.count",
+                           "PersonScience.count", "PersonScienceDetail.count",
                            "PartDetailParameter.count", "PersonOrganization.count",
                            "OrganizationOrganization.count", "PersonOrganizationDetail.count",
                            "OrganizationOrganizationDetail.count",
@@ -115,9 +120,12 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
     end
 
     assert_equal [ RecordingUpsertPersonTool, RecordingUpsertOrganizationTool, RecordingUpsertPartTool,
+                   RecordingUpsertScienceTool, RecordingUpsertTechnologyTool,
                    RecordingLinkPersonOrganizationTool, RecordingLinkPartOrganizationTool,
                    RecordingLinkPersonPersonTool,
                    RecordingLinkOrganizationOrganizationTool,
+                   RecordingLinkPartTechnologyTool, RecordingLinkScienceTechnologyTool,
+                   RecordingLinkPersonScienceTool,
                    RecordingCreatePersonOrganizationTypeTool, RecordingCreatePersonPersonTypeTool ],
                  Recorder.tools.map(&:class)
   end
@@ -128,6 +136,11 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
     [ [ RecordingUpsertPersonTool, UpsertPersonTool ],
       [ RecordingUpsertOrganizationTool, UpsertOrganizationTool ],
       [ RecordingUpsertPartTool, UpsertPartTool ],
+      [ RecordingUpsertScienceTool, UpsertScienceTool ],
+      [ RecordingUpsertTechnologyTool, UpsertTechnologyTool ],
+      [ RecordingLinkPartTechnologyTool, LinkPartTechnologyTool ],
+      [ RecordingLinkScienceTechnologyTool, LinkScienceTechnologyTool ],
+      [ RecordingLinkPersonScienceTool, LinkPersonScienceTool ],
       [ RecordingLinkPersonOrganizationTool, LinkPersonOrganizationTool ],
       [ RecordingLinkPersonPersonTool, LinkPersonPersonTool ],
       [ RecordingLinkOrganizationOrganizationTool, LinkOrganizationOrganizationTool ],

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_18_120024) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -404,6 +404,49 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_130000) do
     t.index ["part_b_id"], name: "index_part_parts_on_part_b_id"
   end
 
+  create_table "part_technologies", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "part_id", null: false
+    t.bigint "technology_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_part_technologies_on_current_detail_id"
+    t.index ["part_id", "technology_id"], name: "index_part_technologies_on_part_id_and_technology_id", unique: true
+    t.index ["part_id"], name: "index_part_technologies_on_part_id"
+    t.index ["technology_id"], name: "index_part_technologies_on_technology_id"
+  end
+
+  create_table "part_technology_detail_part_technology_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "part_technology_detail_id", null: false
+    t.bigint "part_technology_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_technology_detail_id", "part_technology_type_id"], name: "index_ptdptt_on_pair", unique: true
+    t.index ["part_technology_detail_id"], name: "index_ptdptt_on_detail_id"
+    t.index ["part_technology_type_id"], name: "index_ptdptt_on_type_id"
+  end
+
+  create_table "part_technology_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "part_technology_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_technology_id"], name: "index_part_technology_details_on_part_technology_id"
+    t.index ["source_processing_report_id"], name: "index_ptd_on_source_processing_report_id"
+  end
+
+  create_table "part_technology_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_part_technology_types_on_name", unique: true
+  end
+
   create_table "part_type_parameters", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "description"
@@ -549,6 +592,49 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_130000) do
     t.index ["name"], name: "index_person_person_types_on_name", unique: true
   end
 
+  create_table "person_science_detail_person_science_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "person_science_detail_id", null: false
+    t.bigint "person_science_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["person_science_detail_id", "person_science_type_id"], name: "index_psdpst_on_pair", unique: true
+    t.index ["person_science_detail_id"], name: "index_psdpst_on_detail_id"
+    t.index ["person_science_type_id"], name: "index_psdpst_on_type_id"
+  end
+
+  create_table "person_science_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "person_science_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["person_science_id"], name: "index_person_science_details_on_person_science_id"
+    t.index ["source_processing_report_id"], name: "index_psd_on_source_processing_report_id"
+  end
+
+  create_table "person_science_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_person_science_types_on_name", unique: true
+  end
+
+  create_table "person_sciences", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "person_id", null: false
+    t.bigint "science_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_person_sciences_on_current_detail_id"
+    t.index ["person_id", "science_id"], name: "index_person_sciences_on_person_id_and_science_id", unique: true
+    t.index ["person_id"], name: "index_person_sciences_on_person_id"
+    t.index ["science_id"], name: "index_person_sciences_on_science_id"
+  end
+
   create_table "person_types", force: :cascade do |t|
     t.text "additional_attribute_keys", default: [], null: false, array: true
     t.datetime "created_at", null: false
@@ -568,6 +654,89 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_130000) do
     t.string "url", null: false
     t.index ["frequency"], name: "index_research_starting_points_on_frequency"
     t.index ["is_enabled"], name: "index_research_starting_points_on_is_enabled"
+  end
+
+  create_table "science_detail_science_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "science_detail_id", null: false
+    t.bigint "science_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["science_detail_id", "science_type_id"], name: "index_sdst_on_detail_and_type", unique: true
+    t.index ["science_detail_id"], name: "index_science_detail_science_types_on_science_detail_id"
+    t.index ["science_type_id"], name: "index_science_detail_science_types_on_science_type_id"
+  end
+
+  create_table "science_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "science_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.text "summary"
+    t.datetime "updated_at", null: false
+    t.index ["science_id"], name: "index_science_details_on_science_id"
+    t.index ["source_processing_report_id"], name: "index_science_details_on_source_processing_report_id"
+  end
+
+  create_table "science_technologies", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "science_id", null: false
+    t.bigint "technology_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_science_technologies_on_current_detail_id"
+    t.index ["science_id", "technology_id"], name: "index_science_technologies_on_science_id_and_technology_id", unique: true
+    t.index ["science_id"], name: "index_science_technologies_on_science_id"
+    t.index ["technology_id"], name: "index_science_technologies_on_technology_id"
+  end
+
+  create_table "science_technology_detail_science_technology_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "science_technology_detail_id", null: false
+    t.bigint "science_technology_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["science_technology_detail_id", "science_technology_type_id"], name: "index_stdstt_on_pair", unique: true
+    t.index ["science_technology_detail_id"], name: "index_stdstt_on_detail_id"
+    t.index ["science_technology_type_id"], name: "index_stdstt_on_type_id"
+  end
+
+  create_table "science_technology_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "science_technology_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["science_technology_id"], name: "index_std_on_science_technology_id"
+    t.index ["source_processing_report_id"], name: "index_std_on_source_processing_report_id"
+  end
+
+  create_table "science_technology_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_science_technology_types_on_name", unique: true
+  end
+
+  create_table "science_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_science_types_on_name", unique: true
+  end
+
+  create_table "sciences", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_sciences_on_current_detail_id"
   end
 
   create_table "skill_evaluation_models", force: :cascade do |t|
@@ -731,6 +900,46 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_130000) do
     t.index ["status"], name: "index_sources_on_status"
   end
 
+  create_table "technologies", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_technologies_on_current_detail_id"
+  end
+
+  create_table "technology_detail_technology_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "technology_detail_id", null: false
+    t.bigint "technology_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["technology_detail_id", "technology_type_id"], name: "index_tdtt_on_detail_and_type", unique: true
+    t.index ["technology_detail_id"], name: "index_tdtt_on_detail_id"
+    t.index ["technology_type_id"], name: "index_tdtt_on_type_id"
+  end
+
+  create_table "technology_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.text "summary"
+    t.bigint "technology_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["source_processing_report_id"], name: "index_technology_details_on_source_processing_report_id"
+    t.index ["technology_id"], name: "index_technology_details_on_technology_id"
+  end
+
+  create_table "technology_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_technology_types_on_name", unique: true
+  end
+
   create_table "tool_calls", force: :cascade do |t|
     t.jsonb "arguments", default: {}
     t.datetime "created_at", null: false
@@ -813,6 +1022,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_130000) do
   add_foreign_key "part_parts", "part_part_details", column: "current_detail_id"
   add_foreign_key "part_parts", "parts", column: "part_a_id"
   add_foreign_key "part_parts", "parts", column: "part_b_id"
+  add_foreign_key "part_technologies", "part_technology_details", column: "current_detail_id"
+  add_foreign_key "part_technologies", "parts"
+  add_foreign_key "part_technologies", "technologies"
+  add_foreign_key "part_technology_detail_part_technology_types", "part_technology_details"
+  add_foreign_key "part_technology_detail_part_technology_types", "part_technology_types"
+  add_foreign_key "part_technology_details", "part_technologies"
+  add_foreign_key "part_technology_details", "source_processing_reports"
   add_foreign_key "part_type_parameters", "part_types"
   add_foreign_key "parts", "part_details", column: "current_detail_id"
   add_foreign_key "people", "person_details", column: "current_detail_id"
@@ -834,6 +1050,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_130000) do
   add_foreign_key "person_person_detail_person_person_types", "person_person_types"
   add_foreign_key "person_person_details", "person_people"
   add_foreign_key "person_person_details", "source_processing_reports"
+  add_foreign_key "person_science_detail_person_science_types", "person_science_details"
+  add_foreign_key "person_science_detail_person_science_types", "person_science_types"
+  add_foreign_key "person_science_details", "person_sciences"
+  add_foreign_key "person_science_details", "source_processing_reports"
+  add_foreign_key "person_sciences", "people"
+  add_foreign_key "person_sciences", "person_science_details", column: "current_detail_id"
+  add_foreign_key "person_sciences", "sciences"
+  add_foreign_key "science_detail_science_types", "science_details"
+  add_foreign_key "science_detail_science_types", "science_types"
+  add_foreign_key "science_details", "sciences"
+  add_foreign_key "science_details", "source_processing_reports"
+  add_foreign_key "science_technologies", "science_technology_details", column: "current_detail_id"
+  add_foreign_key "science_technologies", "sciences"
+  add_foreign_key "science_technologies", "technologies"
+  add_foreign_key "science_technology_detail_science_technology_types", "science_technology_details"
+  add_foreign_key "science_technology_detail_science_technology_types", "science_technology_types"
+  add_foreign_key "science_technology_details", "science_technologies"
+  add_foreign_key "science_technology_details", "source_processing_reports"
+  add_foreign_key "sciences", "science_details", column: "current_detail_id"
   add_foreign_key "skill_evaluation_models", "models"
   add_foreign_key "skill_evaluation_models", "skill_evaluations", on_delete: :cascade
   add_foreign_key "skill_evaluation_results", "chats"
@@ -857,6 +1092,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_130000) do
   add_foreign_key "source_processing_reports", "sources"
   add_foreign_key "sources", "domains"
   add_foreign_key "sources", "sources", column: "parent_source_id", on_delete: :nullify
+  add_foreign_key "technologies", "technology_details", column: "current_detail_id"
+  add_foreign_key "technology_detail_technology_types", "technology_details"
+  add_foreign_key "technology_detail_technology_types", "technology_types"
+  add_foreign_key "technology_details", "source_processing_reports"
+  add_foreign_key "technology_details", "technologies"
   add_foreign_key "tool_calls", "messages"
   add_foreign_key "triage_configurations", "models"
 end

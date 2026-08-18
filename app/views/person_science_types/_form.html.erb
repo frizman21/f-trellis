@@ -1,0 +1,29 @@
+<%= form_with model: person_science_type, local: true do |f| %>
+  <% if person_science_type.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% person_science_type.errors.full_messages.each do |m| %><li><%= m %></li><% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :name, class: "form-label" %>
+    <%= f.text_field :name, class: "form-control", required: true %>
+  </div>
+  <div class="mb-3">
+    <%= f.label :description, class: "form-label" %>
+    <%= f.text_area :description, class: "form-control", rows: 3 %>
+  </div>
+  <div class="mb-3">
+    <%= f.label :additional_attribute_keys, "Additional attribute keys", class: "form-label" %>
+    <%= f.text_field :additional_attribute_keys,
+                     value: Array(f.object.additional_attribute_keys).join(", "),
+                     class: "form-control",
+                     placeholder: "since, institution" %>
+    <div class="form-text">Comma-separated.</div>
+  </div>
+
+  <%= f.submit submit_label, class: "btn btn-primary" %>
+  <%= link_to "Cancel", person_science_types_path, class: "btn btn-outline-secondary" %>
+<% end %>

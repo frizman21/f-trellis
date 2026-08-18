@@ -1,0 +1,90 @@
+<% current = @technology.current_detail %>
+<% content_for :title, (current ? current.name : "Unnamed technology ##{@technology.id}") %>
+
+<h1><%= current ? current.name : "Unnamed technology ##{@technology.id}" %></h1>
+
+<% if current %>
+  <% if current.summary.present? %>
+    <p class="lead"><%= current.summary %></p>
+  <% end %>
+
+  <dl>
+    <dt>As of</dt><dd><%= current.as_of&.to_date %></dd>
+    <dt>Confidence</dt><dd><%= current.confidence_tenths.to_i / 10.0 %>%</dd>
+    <% if current.technology_types.any? %>
+      <dt>Types</dt><dd><%= current.technology_types.map(&:name).join(", ") %></dd>
+    <% end %>
+  </dl>
+
+  <% if current.additional_attributes.any? %>
+    <h2>Attributes</h2>
+    <table class="table table-sm">
+      <tbody>
+        <% current.additional_attributes.each do |key, value| %>
+          <tr><th><%= key.humanize %></th><td><%= value %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+<% end %>
+
+<% prior = @technology.technology_details.where.not(id: current&.id).order(as_of: :desc) %>
+<% if prior.any? %>
+  <h2>Prior details</h2>
+  <table class="table">
+    <thead>
+      <tr><th>Name</th><th>Summary</th><th>As of</th><th>Confidence</th><th>Attributes</th></tr>
+    </thead>
+    <tbody>
+      <% prior.each do |d| %>
+        <tr>
+          <td><%= d.name %></td>
+          <td><%= d.summary %></td>
+          <td><%= d.as_of&.to_date %></td>
+          <td><%= d.confidence_tenths.to_i / 10.0 %>%</td>
+          <td>
+            <% if d.additional_attributes.any? %>
+              <%= d.additional_attributes.map { |k, v| "#{k.humanize}: #{v}" }.join("; ") %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<% sciences = @technology.science_technologies.includes(:science, current_detail: :science_technology_types) %>
+<%= render "shared/relationship_table",
+      title: "Sciences",
+      column_header: "Science",
+      empty_message: "No sciences recorded for this technology.",
+      rows: sciences.map { |st|
+        science_detail = st.science.current_detail
+        rel_detail = st.current_detail
+        {
+          name: science_detail ? science_detail.name : "Science ##{st.science_id}",
+          record: st.science,
+          types: rel_detail&.science_technology_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: science_technology_path(st)
+        }
+      } %>
+
+<% parts = @technology.part_technologies.includes(:part, current_detail: :part_technology_types) %>
+<%= render "shared/relationship_table",
+      title: "Parts",
+      column_header: "Part",
+      empty_message: "No parts recorded for this technology.",
+      rows: parts.map { |pt|
+        part_detail = pt.part.current_detail
+        rel_detail = pt.current_detail
+        {
+          name: part_detail ? part_detail.name : "Part ##{pt.part_id}",
+          record: pt.part,
+          types: rel_detail&.part_technology_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: part_technology_path(pt)
+        }
+      } %>
+
+<p><%= link_to "Back to technologies", technologies_path %></p>

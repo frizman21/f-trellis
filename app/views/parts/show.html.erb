@@ -133,4 +133,21 @@
   </table>
 <% end %>
 
+<% technologies = @part.part_technologies.includes(:technology, current_detail: :part_technology_types) %>
+<%= render "shared/relationship_table",
+      title: "Technologies",
+      column_header: "Technology",
+      empty_message: "No technologies recorded for this part.",
+      rows: technologies.map { |pt|
+        tech_detail = pt.technology.current_detail
+        rel_detail = pt.current_detail
+        {
+          name: tech_detail ? tech_detail.name : "Technology ##{pt.technology_id}",
+          record: pt.technology,
+          types: rel_detail&.part_technology_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: part_technology_path(pt)
+        }
+      } %>
+
 <p><%= link_to "Back to parts", parts_path %></p>

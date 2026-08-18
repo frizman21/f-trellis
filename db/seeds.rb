@@ -114,6 +114,105 @@ if pull_part_specifications.skill_revisions.order(:sequence).last&.content != pu
   SkillRevision.create!(skill: pull_part_specifications, content: pull_part_specifications_content)
 end
 
+# The skill that reads a paper — an abstract, a conference paper, a whitepaper —
+# and pulls the science and the technology out of it, along with the edges
+# between them and the people behind them. A first draft: the wording here is
+# expected to be revised against real papers rather than to be right first time.
+#
+# Like "Pull Part Specifications" it does not restate the taxonomies. The
+# upsert tools carry the live science and technology types in their own
+# descriptions, and a second copy here would drift the moment a type is added.
+read_abstract_content = <<~MARKDOWN.strip
+  This page is a research paper, an abstract, or a technical whitepaper. Read it
+  for the *knowledge* it reports, not for the document itself. The paper is not
+  the finding, and the title is not the name of anything.
+
+  Work in this order. Each step gives the next one the ids it needs.
+
+  ## 1. Name the science
+
+  A **Science** is a body of knowledge: a field, a principle, a law, an effect, a
+  phenomenon. Record it with the upsert science tool.
+
+  - Name it as a subject, not as a document — "Magnetohydrodynamics", not "On the
+    flow of conducting fluids in a magnetic field".
+  - Prefer the established name of the field or effect over the authors' phrasing
+    for it. If the paper coins a term for something that already has a name, use
+    the established one and put the coined term in `additional_attributes`.
+  - Give a one-sentence `summary` in the source's own terms.
+  - A paper usually sits in one or two sciences. Recording five is a sign you are
+    listing the keywords rather than reading the work.
+  - Genuinely new science — an effect the paper is the first to report — is still
+    a Science. Record it with lower confidence, not by leaving it out.
+
+  ## 2. Name the technology
+
+  A **Technology** is an engineered capability: a method, a process, a material,
+  a class of device, a subsystem. Record it with the upsert technology tool.
+
+  - Name it generically. "Solid-state lithium battery" is a technology;
+    "PowerCell 9000" is a product, and a product is a Part.
+  - Give a one-sentence `summary` of what it does.
+  - A paper about pure science may name no technology at all. That is a valid
+    reading — do not invent one to fill the slot.
+  - The distinction that matters: a Science is knowledge about how the world
+    behaves; a Technology is a way of making the world do something. "Superconductivity"
+    is a science. "Superconducting magnet winding" is a technology.
+
+  ## 3. Name the people and the organizations
+
+  Record the authors with the upsert person tool and their affiliations with the
+  upsert organization tool, then link each author to their affiliation with the
+  link person organization tool. Author lists are the most reliable facts on the
+  page — record them at high confidence.
+
+  ## 4. Build the relationships
+
+  This is the point of the exercise. A science and a technology recorded with no
+  edge between them says almost nothing.
+
+  - **Science ↔ Technology** — link every technology to the science it rests on
+    with the link science technology tool. Use "Application" where the technology
+    applies the science, "Derived From" where it grew out of work in the field,
+    and "Enabling Principle" where the technology could not exist without it.
+  - **Person ↔ Science** — link every author to the science they wrote in with
+    the link person science tool, as "Author". Add "Researcher" where the paper
+    shows the field is their standing work rather than a one-off, and
+    "Contributor" where the paper credits them with a specific named
+    contribution.
+  - **Part ↔ Technology** — only where the paper names a concrete artefact: a
+    specific device, instrument, or product it built or tested. Record that
+    artefact with the upsert part tool, then link it as "Implementation". A paper
+    that describes a method with no built instance has no Part in it, and
+    inventing one to hang the technology off is worse than leaving the edge out.
+
+  ## Confidence
+
+  Set confidence from what the source actually did with the claim, per link and
+  per entity:
+
+  - **900–1000** — stated outright, in the abstract, the results or the author
+    list.
+  - **700–850** — clearly implied by the paper but never stated in those terms.
+  - **400–650** — your inference from domain knowledge the paper assumes. The
+    science-to-technology edge is often this: a paper on a battery chemistry
+    rarely says "this applies electrochemistry".
+  - Below 400, leave it out. A low-confidence edge is still an assertion, and a
+    graph full of guesses is harder to use than a sparse one.
+
+  Do not record the paper itself as an entity of any kind. Its identity lives in
+  the Source, and every detail you write is already attributed to it.
+MARKDOWN
+
+read_abstract = Skill.find_or_create_by!(name: "Read Abstract for Science and Technology") do |s|
+  s.purpose = "Read a paper abstract or whitepaper and pull out the science, the technology, " \
+              "and the relationships between them and the people behind them."
+end
+
+if read_abstract.skill_revisions.order(:sequence).last&.content != read_abstract_content
+  SkillRevision.create!(skill: read_abstract, content: read_abstract_content)
+end
+
 # Applicability statements — what triage reads to decide which skills are worth
 # calling on a page. Backfilled here rather than in the migration because they
 # are editorial content, not schema. Only written when currently blank, so a
@@ -143,6 +242,12 @@ skill_applicability = {
     "Best on pages where organizations are the subject rather than mentioned " \
     "in passing. Not pages about a single company, and not prose articles, " \
     "where a general extraction pulls mostly noise.",
+  "Read Abstract for Science and Technology" =>
+    "Research papers, conference papers, preprints, abstracts and technical " \
+    "whitepapers — pages reporting a scientific or engineering finding, with " \
+    "an author list, an abstract, or a results section. Not news coverage of " \
+    "research, not product pages, not press releases, and not journal or " \
+    "conference index pages, which list papers without reporting any of them.",
   "Pull Part Specifications" =>
     "Manufacturer product pages and spec sheets for a physical product — a " \
     "drone, a battery, a motor, a camera payload, a component. Look for a " \
@@ -373,6 +478,72 @@ part_part_types = {
   memo[name] = PartPartType.find_or_create_by!(name: name) do |ppt|
     ppt.description = attrs[:description]
     ppt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+science_types = {
+  "Discipline" => { description: "A named field of study — physics, metallurgy, immunology.",
+                    keys: [ "parent_field" ] },
+  "Principle"  => { description: "A law, effect or theorem a field rests on.",
+                    keys: [ "named_after" ] },
+  "Phenomenon" => { description: "An observed behaviour a field studies and a technology exploits.",
+                    keys: [ "first_observed" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = ScienceType.find_or_create_by!(name: name) do |st|
+    st.description = attrs[:description]
+    st.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+technology_types = {
+  "Method"      => { description: "A way of doing something — a process, a technique, an algorithm.",
+                     keys: [ "maturity" ] },
+  "Material"    => { description: "An engineered material with a capability the bulk substance lacks.",
+                     keys: [ "maturity" ] },
+  "Device"      => { description: "A class of engineered artefact, not a specific product.",
+                     keys: [ "maturity" ] },
+  "Subsystem"   => { description: "An engineered capability that only exists inside something larger.",
+                     keys: [ "maturity", "host_system" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = TechnologyType.find_or_create_by!(name: name) do |tt|
+    tt.description = attrs[:description]
+    tt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+part_technology_types = {
+  "Implementation" => { description: "The part is a built instance of the technology.", keys: [ "since" ] },
+  "Dependency"     => { description: "The part cannot work without the technology.",    keys: [ "subsystem" ] },
+  "Enabler"        => { description: "The part is what made the technology practical.",  keys: [ "since" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = PartTechnologyType.find_or_create_by!(name: name) do |ptt|
+    ptt.description = attrs[:description]
+    ptt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+science_technology_types = {
+  "Application"        => { description: "The technology applies the science directly.", keys: [ "since" ] },
+  "Derived From"       => { description: "The technology grew out of work in the science.", keys: [ "since" ] },
+  "Enabling Principle" => { description: "The science is the principle the technology could not work without.",
+                            keys: [] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = ScienceTechnologyType.find_or_create_by!(name: name) do |stt|
+    stt.description = attrs[:description]
+    stt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+person_science_types = {
+  "Researcher"  => { description: "The person works in the field.",                keys: [ "institution", "since" ] },
+  "Author"      => { description: "The person authored the source's findings in this field.",
+                     keys: [ "institution" ] },
+  "Contributor" => { description: "The person made a named contribution to the field.",
+                     keys: [ "contribution" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = PersonScienceType.find_or_create_by!(name: name) do |pst|
+    pst.description = attrs[:description]
+    pst.additional_attribute_keys = attrs[:keys]
   end
 end
 

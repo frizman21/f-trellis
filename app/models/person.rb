@@ -3,6 +3,9 @@ class Person < ApplicationRecord
   has_many :person_organizations, dependent: :destroy
   has_many :organizations, through: :person_organizations
 
+  has_many :person_sciences, dependent: :destroy
+  has_many :sciences, through: :person_sciences
+
   has_many :person_people_as_a,
            class_name: "PersonPerson",
            foreign_key: :person_a_id,

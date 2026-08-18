@@ -91,4 +91,21 @@
         }
       } %>
 
+<% sciences = @person.person_sciences.includes(:science, current_detail: :person_science_types) %>
+<%= render "shared/relationship_table",
+      title: "Sciences",
+      column_header: "Science",
+      empty_message: "No sciences recorded for this person.",
+      rows: sciences.map { |ps|
+        science_detail = ps.science.current_detail
+        rel_detail = ps.current_detail
+        {
+          name: science_detail ? science_detail.name : "Science ##{ps.science_id}",
+          record: ps.science,
+          types: rel_detail&.person_science_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: person_science_path(ps)
+        }
+      } %>
+
 <p><%= link_to "Back to people", people_path %></p>

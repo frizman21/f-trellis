@@ -118,8 +118,10 @@ class ProcessReportJobTest < ActiveJob::TestCase
     assert_includes names, "link_part_organization"
     assert_equal %w[create_person_organization_type create_person_person_type
                     link_organization_organization link_part_organization
-                    link_person_organization link_person_person
-                    upsert_organization upsert_part upsert_person], names.sort
+                    link_part_technology link_person_organization link_person_person
+                    link_person_science link_science_technology
+                    upsert_organization upsert_part upsert_person
+                    upsert_science upsert_technology], names.sort
   end
 
   test "fails the report when the page has no extractable text" do

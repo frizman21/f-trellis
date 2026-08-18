@@ -21,10 +21,15 @@ class ProcessReportJob < ApplicationJob
       UpsertPersonTool.new(report),
       UpsertOrganizationTool.new(report),
       UpsertPartTool.new(report),
+      UpsertScienceTool.new(report),
+      UpsertTechnologyTool.new(report),
       LinkPersonOrganizationTool.new(report),
       LinkPartOrganizationTool.new(report),
       LinkPersonPersonTool.new(report),
       LinkOrganizationOrganizationTool.new(report),
+      LinkPartTechnologyTool.new(report),
+      LinkScienceTechnologyTool.new(report),
+      LinkPersonScienceTool.new(report),
       CreatePersonOrganizationTypeTool.new(report),
       CreatePersonPersonTypeTool.new(report)
     )
