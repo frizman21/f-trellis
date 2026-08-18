@@ -1,0 +1,20 @@
+<%# The two sides of a project, and the way back to the listing. Rendered on
+    every ontology and data page so moving between them never needs the
+    browser's back button. `side` is :ontology or :data. %>
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb mb-1">
+    <li class="breadcrumb-item"><%= link_to "Projects", projects_path %></li>
+    <li class="breadcrumb-item active" aria-current="page"><%= project.name %></li>
+  </ol>
+</nav>
+
+<ul class="nav nav-tabs mb-4">
+  <li class="nav-item">
+    <%= link_to "Ontology", project_entity_types_path(project),
+                class: "nav-link #{'active' if side == :ontology}" %>
+  </li>
+  <li class="nav-item">
+    <%= link_to "Data", project_entities_path(project),
+                class: "nav-link #{'active' if side == :data}" %>
+  </li>
+</ul>

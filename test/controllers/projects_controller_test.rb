@@ -11,7 +11,9 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "index shows the empty state when there are no projects" do
-    Project.delete_all
+    # destroy_all, not delete_all: a project now owns an ontology and its data,
+    # and deleting the row out from under them violates the foreign keys.
+    Project.destroy_all
 
     get projects_path
 
@@ -94,5 +96,35 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_equal "Apollo Program", projects(:apollo).reload.name
+  end
+
+  # --- the two sides ---------------------------------------------------------
+
+  test "the listing links each project to both of its sides" do
+    get projects_path
+
+    assert_select "a[href=?]", project_entity_types_path(projects(:apollo))
+    assert_select "a[href=?]", project_entities_path(projects(:apollo))
+    assert_select "a[href=?]", project_entity_types_path(projects(:gemini))
+    assert_select "a[href=?]", project_entities_path(projects(:gemini))
+  end
+
+  test "the listing counts what each project holds on each side" do
+    get projects_path
+
+    assert_select "a[href=?]", project_entity_types_path(projects(:apollo)),
+                  text: /Ontology\s+#{projects(:apollo).entity_types.count}/
+    assert_select "a[href=?]", project_entities_path(projects(:gemini)),
+                  text: /Data\s+#{projects(:gemini).entities.count}/
+  end
+
+  # With everything scoped, an ontology screen with no project has nothing to
+  # show, so the top-level routes are gone rather than left resolving.
+  test "the top-level ontology routes no longer resolve" do
+    get "/entities"
+    assert_response :not_found
+
+    get "/entity_types"
+    assert_response :not_found
   end
 end

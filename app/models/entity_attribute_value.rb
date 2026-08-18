@@ -4,7 +4,11 @@
 # attribute's declared value_type, and #value / #value= are the only things that
 # know that — nothing outside this model picks a column by hand.
 class EntityAttributeValue < ApplicationRecord
+  include ScopedToProject
+
   belongs_to :entity
+  scoped_to_project_through :entity
+
   belongs_to :entity_type_attribute
 
   validates :entity_type_attribute_id, uniqueness: { scope: :entity_id }

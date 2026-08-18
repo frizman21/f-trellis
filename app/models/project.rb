@@ -4,5 +4,18 @@
 # versioned, confidence-scored detail record. See
 # docs/application-data-structures.md.
 class Project < ApplicationRecord
+  # The two sides of a project: the ontology it describes things with, and the
+  # data recorded against it. Both are destroyed with it — neither means
+  # anything without the project it was defined in.
+  #
+  # Declared child-first, because Rails runs dependent callbacks in declaration
+  # order and EntityType restricts on its entities. Types first would hit that
+  # restriction and abandon the destroy, leaving the project standing.
+  has_many :relationships, dependent: :destroy
+  has_many :entity_attribute_values, dependent: :destroy
+  has_many :entities, dependent: :destroy
+  has_many :entity_type_attributes, dependent: :destroy
+  has_many :entity_types, dependent: :destroy
+
   validates :name, presence: true
 end

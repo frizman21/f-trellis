@@ -1,13 +1,21 @@
 f1:
+  project: apollo
   entity_type: rocket_engine
 
 # A rocket engine with nothing recorded at all, for the blank-row and
 # label-fallback cases.
 unnamed_engine:
+  project: apollo
   entity_type: rocket_engine
 
 saturn_v:
+  project: apollo
   entity_type: launch_vehicle
 
 bare:
+  project: apollo
   entity_type: bare
+
+gemini_capsule:
+  project: gemini
+  entity_type: gemini_capsule

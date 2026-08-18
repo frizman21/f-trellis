@@ -1,11 +1,12 @@
 <% content_for :title, "New Entity" %>
+<%= render "projects/header", project: @project, side: :data %>
 <h1>New Entity</h1>
 
 <%# Step one of two: an entity is its type, and the type decides which
     attribute fields the next page can offer. %>
 <p class="text-muted">Choose a type. You will fill in its attributes next.</p>
 
-<%= form_with model: @entity, local: true do |f| %>
+<%= form_with model: [ @project, @entity ], local: true do |f| %>
   <% if @entity.errors.any? %>
     <div class="alert alert-danger">
       <ul class="mb-0">
@@ -18,10 +19,10 @@
 
   <div class="mb-3">
     <%= f.label :entity_type_id, "Entity type", class: "form-label" %>
-    <%= f.collection_select :entity_type_id, EntityType.all, :id, :name,
+    <%= f.collection_select :entity_type_id, @project.entity_types, :id, :name,
                             { prompt: "Choose a type" }, class: "form-select", required: true %>
   </div>
 
   <%= f.submit "Create entity", class: "btn btn-primary" %>
-  <%= link_to "Cancel", entities_path, class: "btn btn-outline-secondary" %>
+  <%= link_to "Cancel", project_entities_path(@project), class: "btn btn-outline-secondary" %>
 <% end %>

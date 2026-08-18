@@ -1,10 +1,13 @@
 require "test_helper"
 
 class EntityTypeAttributesControllerTest < ActionDispatch::IntegrationTest
-  setup { @type = entity_types(:launch_vehicle) }
+  setup do
+    @project = projects(:apollo)
+    @type = entity_types(:launch_vehicle)
+  end
 
   test "new renders the form with the four value types on offer" do
-    get new_entity_type_entity_type_attribute_path(@type)
+    get new_project_entity_type_entity_type_attribute_path(@project, @type)
 
     assert_response :success
     EntityTypeAttribute::VALUE_TYPES.each do |value_type|
@@ -14,16 +17,16 @@ class EntityTypeAttributesControllerTest < ActionDispatch::IntegrationTest
 
   test "create adds an attribute to the type" do
     assert_difference -> { @type.entity_type_attributes.count }, 1 do
-      post entity_type_entity_type_attributes_path(@type),
+      post project_entity_type_entity_type_attributes_path(@project, @type),
            params: { entity_type_attribute: { name: "mass_kg", value_type: "float" } }
     end
 
-    assert_redirected_to entity_type_path(@type)
+    assert_redirected_to project_entity_type_path(@project, @type)
   end
 
   test "create rejects a value type outside the four allowed" do
     assert_no_difference -> { EntityTypeAttribute.count } do
-      post entity_type_entity_type_attributes_path(@type),
+      post project_entity_type_entity_type_attributes_path(@project, @type),
            params: { entity_type_attribute: { name: "flies", value_type: "boolean" } }
     end
 
@@ -32,7 +35,7 @@ class EntityTypeAttributesControllerTest < ActionDispatch::IntegrationTest
 
   test "create rejects a name already used on the same type" do
     assert_no_difference -> { EntityTypeAttribute.count } do
-      post entity_type_entity_type_attributes_path(@type),
+      post project_entity_type_entity_type_attributes_path(@project, @type),
            params: { entity_type_attribute: { name: "stages", value_type: "int" } }
     end
 
@@ -42,10 +45,10 @@ class EntityTypeAttributesControllerTest < ActionDispatch::IntegrationTest
   test "update renames an attribute" do
     attribute = entity_type_attributes(:vehicle_stages)
 
-    patch entity_type_entity_type_attribute_path(@type, attribute),
+    patch project_entity_type_entity_type_attribute_path(@project, @type, attribute),
           params: { entity_type_attribute: { name: "stage_count", value_type: "int" } }
 
-    assert_redirected_to entity_type_path(@type)
+    assert_redirected_to project_entity_type_path(@project, @type)
     assert_equal "stage_count", attribute.reload.name
   end
 
@@ -53,9 +56,9 @@ class EntityTypeAttributesControllerTest < ActionDispatch::IntegrationTest
     attribute = entity_type_attributes(:vehicle_stages)
 
     assert_difference [ -> { EntityTypeAttribute.count }, -> { EntityAttributeValue.count } ], -1 do
-      delete entity_type_entity_type_attribute_path(@type, attribute)
+      delete project_entity_type_entity_type_attribute_path(@project, @type, attribute)
     end
 
-    assert_redirected_to entity_type_path(@type)
+    assert_redirected_to project_entity_type_path(@project, @type)
   end
 end

@@ -1,4 +1,5 @@
 <% content_for :title, "Edit #{@entity_type.name}" %>
+<%= render "projects/header", project: @project, side: :ontology %>
 <h1>Edit <%= @entity_type.name %></h1>
 
-<%= render "form", entity_type: @entity_type, submit_label: "Update entity type" %>
+<%= render "form", project: @project, entity_type: @entity_type, submit_label: "Update entity type" %>

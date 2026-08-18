@@ -5,7 +5,9 @@ class Entity < ApplicationRecord
   # The attribute whose value labels an entity, when its type declares one.
   LABEL_ATTRIBUTE = "name".freeze
 
+  belongs_to :project
   belongs_to :entity_type
+
   has_many :entity_attribute_values, dependent: :destroy
   has_many :outgoing_relationships, class_name: "Relationship",
            foreign_key: :from_entity_id, dependent: :destroy, inverse_of: :from_entity
@@ -18,6 +20,16 @@ class Entity < ApplicationRecord
   accepts_nested_attributes_for :entity_attribute_values,
                                 reject_if: ->(attrs) { attrs["id"].blank? && attrs["value"].blank? }
 
+  # Data in one project cannot be typed by another project's ontology. Without
+  # this, a guessed entity_type_id would quietly pull a type across the boundary
+  # the whole change exists to draw.
+  validate do
+    next if entity_type.nil? || project_id.nil?
+    next if entity_type.project_id == project_id
+
+    errors.add(:entity_type, "must belong to the same project as the entity")
+  end
+
   # What to call this entity. The value of its `name` attribute when it has one,
   # and "<type> #<id>" otherwise — a bare id tells a reader nothing, and the type
   # is the one thing every entity has.
@@ -29,7 +41,8 @@ class Entity < ApplicationRecord
     named.presence || "#{entity_type.name} ##{id}"
   end
 
-  # Every relationship this entity is an end of, in either direction.
+  # Every relationship this entity is an end of, in either direction. Both ends
+  # are always in this entity's project, so no further scoping is needed here.
   def relationships
     Relationship.where(from_entity_id: id).or(Relationship.where(to_entity_id: id))
   end

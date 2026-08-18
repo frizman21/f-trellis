@@ -1,6 +1,8 @@
 class ProjectsController < ApplicationController
   def index
-    @projects = Project.order(:name)
+    # The listing shows how much each project holds on each of its two sides,
+    # so the counts are loaded with it rather than one query per row.
+    @projects = Project.includes(:entity_types, :entities).order(:name)
   end
 
   def new

@@ -1,5 +1,5 @@
 # Attributes are always reached through the type that owns them — an attribute
-# has no meaning apart from it.
+# has no meaning apart from it — and that type through its project.
 class EntityTypeAttributesController < ApplicationController
   before_action :set_entity_type
 
@@ -11,37 +11,45 @@ class EntityTypeAttributesController < ApplicationController
     @attribute = @entity_type.entity_type_attributes.new(attribute_params)
 
     if @attribute.save
-      redirect_to entity_type_path(@entity_type), notice: "Attribute \"#{@attribute.name}\" added."
+      redirect_to project_entity_type_path(@project, @entity_type),
+                  notice: "Attribute \"#{@attribute.name}\" added."
     else
       render :new, status: :unprocessable_entity
     end
   end
 
   def edit
-    @attribute = @entity_type.entity_type_attributes.find(params[:id])
+    @attribute = find_attribute
   end
 
   def update
-    @attribute = @entity_type.entity_type_attributes.find(params[:id])
+    @attribute = find_attribute
 
     if @attribute.update(attribute_params)
-      redirect_to entity_type_path(@entity_type), notice: "Attribute \"#{@attribute.name}\" updated."
+      redirect_to project_entity_type_path(@project, @entity_type),
+                  notice: "Attribute \"#{@attribute.name}\" updated."
     else
       render :edit, status: :unprocessable_entity
     end
   end
 
   def destroy
-    @attribute = @entity_type.entity_type_attributes.find(params[:id])
+    @attribute = find_attribute
     @attribute.destroy
 
-    redirect_to entity_type_path(@entity_type), notice: "Attribute \"#{@attribute.name}\" deleted."
+    redirect_to project_entity_type_path(@project, @entity_type),
+                notice: "Attribute \"#{@attribute.name}\" deleted."
   end
 
   private
 
   def set_entity_type
-    @entity_type = EntityType.find(params[:entity_type_id])
+    @project = Project.find(params[:project_id])
+    @entity_type = @project.entity_types.find(params[:entity_type_id])
+  end
+
+  def find_attribute
+    @entity_type.entity_type_attributes.find(params[:id])
   end
 
   def attribute_params

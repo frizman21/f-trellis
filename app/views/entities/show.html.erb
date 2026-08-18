@@ -1,16 +1,17 @@
 <% content_for :title, @entity.label %>
+<%= render "projects/header", project: @project, side: :data %>
 
 <div class="d-flex justify-content-between align-items-center mb-1">
   <h1 class="mb-0"><%= @entity.label %></h1>
   <div>
-    <%= link_to "Edit", edit_entity_path(@entity), class: "btn btn-sm btn-outline-primary" %>
-    <%= button_to "Delete", entity_path(@entity), method: :delete,
+    <%= link_to "Edit", edit_project_entity_path(@project, @entity), class: "btn btn-sm btn-outline-primary" %>
+    <%= button_to "Delete", project_entity_path(@project, @entity), method: :delete,
                   class: "btn btn-sm btn-outline-danger",
                   form: { class: "d-inline", data: { turbo_confirm: "Delete this entity?" } } %>
   </div>
 </div>
 <p class="text-muted">
-  <%= link_to @entity.entity_type.name, entity_type_path(@entity.entity_type) %>
+  <%= link_to @entity.entity_type.name, project_entity_type_path(@project, @entity.entity_type) %>
 </p>
 
 <h2 class="h5 mt-4">Attributes</h2>
@@ -39,7 +40,7 @@
   </table>
 <% else %>
   <p class="text-muted">
-    <%= link_to @entity.entity_type.name, entity_type_path(@entity.entity_type) %>
+    <%= link_to @entity.entity_type.name, project_entity_type_path(@project, @entity.entity_type) %>
     defines no attributes yet.
   </p>
 <% end %>
@@ -63,10 +64,10 @@
             <%= relationship.from_entity_id == @entity.id ? "→ to" : "← from" %>
           </td>
           <%# Links to the far end, never back to the page it is on. %>
-          <td><%= link_to other.label, entity_path(other) %></td>
+          <td><%= link_to other.label, project_entity_path(@project, other) %></td>
           <td class="text-muted"><%= other.entity_type.name %></td>
           <td>
-            <%= button_to "Remove", relationship_path(relationship, entity_id: @entity.id),
+            <%= button_to "Remove", project_relationship_path(@project, relationship, entity_id: @entity.id),
                           method: :delete, class: "btn btn-sm btn-outline-danger",
                           form: { class: "m-0" } %>
           </td>
@@ -79,7 +80,7 @@
 <% end %>
 
 <% if @candidates.any? %>
-  <%= form_with model: Relationship.new, local: true, class: "row g-2 align-items-end" do |f| %>
+  <%= form_with model: [ @project, Relationship.new ], local: true, class: "row g-2 align-items-end" do |f| %>
     <%= f.hidden_field :from_entity_id, value: @entity.id %>
     <div class="col-auto">
       <%= f.label :to_entity_id, "Relate to", class: "form-label" %>

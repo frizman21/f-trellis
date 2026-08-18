@@ -7,10 +7,12 @@
 </div>
 
 <% if @projects.any? %>
-  <table class="table">
+  <table class="table align-middle">
     <thead>
       <tr>
         <th>Name</th>
+        <th>Ontology</th>
+        <th>Data</th>
         <th></th>
       </tr>
     </thead>
@@ -18,7 +20,19 @@
       <% @projects.each do |project| %>
         <tr>
           <td><%= project.name %></td>
-          <td><%= link_to "Edit", edit_project_path(project), class: "btn btn-sm btn-outline-primary" %></td>
+          <%# The two sides of a project: what it can describe, and what it has
+              recorded. The counts are the useful thing to know before choosing. %>
+          <td>
+            <%= link_to project_entity_types_path(project), class: "btn btn-sm btn-outline-primary" do %>
+              Ontology <span class="badge text-bg-secondary"><%= project.entity_types.size %></span>
+            <% end %>
+          </td>
+          <td>
+            <%= link_to project_entities_path(project), class: "btn btn-sm btn-outline-primary" do %>
+              Data <span class="badge text-bg-secondary"><%= project.entities.size %></span>
+            <% end %>
+          </td>
+          <td><%= link_to "Edit", edit_project_path(project), class: "btn btn-sm btn-outline-secondary" %></td>
         </tr>
       <% end %>
     </tbody>

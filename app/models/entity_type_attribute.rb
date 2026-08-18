@@ -13,7 +13,11 @@ class EntityTypeAttribute < ApplicationRecord
     "datetime" => :datetime_value
   }.freeze
 
+  include ScopedToProject
+
   belongs_to :entity_type
+  scoped_to_project_through :entity_type
+
   has_many :entity_attribute_values, dependent: :destroy
 
   validates :name, presence: true,
