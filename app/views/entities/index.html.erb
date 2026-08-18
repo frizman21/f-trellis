@@ -9,22 +9,35 @@
 </div>
 
 <% if @entities.any? %>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Entity</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @entities.each do |entity| %>
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
         <tr>
-          <td><%= link_to entity.label, project_entity_path(@project, entity) %></td>
-          <td><%= link_to "Edit", edit_project_entity_path(@project, entity), class: "btn btn-sm btn-outline-primary" %></td>
+          <th>Entity</th>
+          <%# A column per attribute the type asks to show. %>
+          <% @columns.each do |attribute| %>
+            <th><%= attribute.name %></th>
+          <% end %>
+          <th></th>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <% @entities.each do |entity| %>
+          <% values = entity.values_by_attribute_id %>
+          <tr>
+            <td><%= link_to entity.label, project_entity_path(@project, entity) %></td>
+            <% @columns.each do |attribute| %>
+              <%# Truncated in the cell, not in the data: a string attribute has
+                  no length limit, and one long value would otherwise decide the
+                  width of every column. %>
+              <td><%= values[attribute.id]&.display_value.to_s.truncate(60) %></td>
+            <% end %>
+            <td><%= link_to "Edit", edit_project_entity_path(@project, entity), class: "btn btn-sm btn-outline-primary" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
   <%= paginate @entities %>
 <% else %>
   <p>No <%= @entity_type.name %> entities yet.</p>

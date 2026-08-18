@@ -20,6 +20,8 @@ class RelationshipType < ApplicationRecord
 
   def declared_attributes = relationship_type_attributes.active
 
+  def index_columns = relationship_type_attributes.displayed_on_index
+
   # The shape this type permits, for anywhere that states it in one line.
   def shape = "#{from_entity_type.name} → #{to_entity_type.name}"
 

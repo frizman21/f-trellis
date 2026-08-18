@@ -29,6 +29,8 @@ class EntityType < ApplicationRecord
   # of an entity type and a relationship type alike.
   def declared_attributes = entity_type_attributes.active
 
+  def index_columns = entity_type_attributes.displayed_on_index
+
   validate :slug_is_usable
 
   default_scope { order(:name) }

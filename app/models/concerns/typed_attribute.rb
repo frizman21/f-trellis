@@ -23,6 +23,11 @@ module TypedAttribute
 
     # What the forms and the type popover read: what this type tracks now.
     scope :active, -> { where(is_disabled: false) }
+
+    # The columns a type's list shows. Composed with `active` rather than read
+    # alone: an attribute no longer tracked is not a column, whatever the flag
+    # says, and the two flags answer different questions.
+    scope :displayed_on_index, -> { active.where(is_displayed_on_index: true) }
   end
 
   # Whether anything has ever been recorded against this attribute. Deleting one

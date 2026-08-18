@@ -77,4 +77,28 @@ class AttributeDisablingTest < ActiveSupport::TestCase
     attribute.update!(is_disabled: false)
     assert_predicate attribute.reload, :enabled?
   end
+
+  # --- which attributes are columns ------------------------------------------
+
+  test "is_displayed_on_index defaults to true" do
+    cases.each { |c| assert c[:unused].is_displayed_on_index?, "#{c[:unused].class} should default to shown" }
+  end
+
+  # The composition is the part that can silently go wrong: an attribute no
+  # longer tracked is not a column, whatever the display flag says.
+  test "displayed_on_index excludes undisplayed and disabled attributes alike" do
+    cases.each do |c|
+      attribute = c[:used]
+      scope = attribute.class.where(id: attribute.id)
+
+      assert_includes scope.displayed_on_index, attribute
+
+      attribute.update!(is_displayed_on_index: false)
+      assert_not_includes scope.displayed_on_index, attribute
+
+      attribute.update!(is_displayed_on_index: true, is_disabled: true)
+      assert_not_includes scope.displayed_on_index, attribute,
+                          "a disabled attribute is not a column even when flagged"
+    end
+  end
 end

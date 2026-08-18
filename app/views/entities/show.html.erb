@@ -62,7 +62,9 @@
         <th>Relationship</th>
         <th>Direction</th>
         <th>Entity</th>
-        <th>Entity type</th>
+        <% @relationship_columns.each do |attribute| %>
+          <th><%= attribute.name %></th>
+        <% end %>
         <th></th>
       </tr>
     </thead>
@@ -75,9 +77,20 @@
           <td class="text-muted">
             <%= relationship.from_entity_id == @entity.id ? "→ to" : "← from" %>
           </td>
-          <%# Links to the far end, never back to the page it is on. %>
-          <td><%= link_to other.label, project_entity_path(@project, other) %></td>
-          <td class="text-muted"><%= other.entity_type.name %></td>
+          <%# One fact about the far end, not two: "Saturn V, which is a Launch
+              Vehicle". Links to the far end, never back to the page it is on;
+              the type links to its own list. %>
+          <td>
+            <%= link_to other.label, project_entity_path(@project, other) %>
+            <span class="text-muted">:</span>
+            <%= link_to other.entity_type.name,
+                        project_typed_entities_path(@project, other.entity_type.slug),
+                        class: "text-muted" %>
+          </td>
+          <% values = relationship.values_by_attribute_id %>
+          <% @relationship_columns.each do |attribute| %>
+            <td><%= values[attribute.id]&.display_value.to_s.truncate(40) %></td>
+          <% end %>
           <td class="text-nowrap">
             <%= link_to "Edit", edit_project_relationship_path(@project, relationship),
                         class: "btn btn-sm btn-outline-primary" %>

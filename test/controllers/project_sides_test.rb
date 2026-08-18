@@ -61,7 +61,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select ".card", @project.entity_types.count
-    assert_select ".card", text: /Rocket Engine/
+    assert_select ".card", text: /Rocket Engines/
     assert_select ".card", text: /2 entities/
     assert_select ".card", text: /Capsule/, count: 0
   end
@@ -77,7 +77,8 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
   # against each other rather than separately.
   test "a card opens that type's entities and no other type's" do
     get project_path(@project)
-    href = css_select(".card a").detect { |a| a.text.strip == "Rocket Engine" }["href"]
+    # Cards name the type in the plural.
+    href = css_select(".card a").detect { |a| a.text.strip == "Rocket Engines" }["href"]
 
     get href
 
@@ -381,5 +382,82 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "nav.sidebar a[href$=?]", "/", count: 0
+  end
+
+  test "cards name their type in the plural" do
+    get project_path(@project)
+
+    assert_select ".card a", text: "Rocket Engines"
+    assert_select ".card a", text: "Launch Vehicles"
+    assert_select ".card a", { text: "Rocket Engine", count: 0 }
+  end
+
+  # --- columns on a type's list ----------------------------------------------
+
+  test "a type's list shows a column per displayed attribute, in the type's order" do
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+
+    assert_response :success
+    headers = css_select("table th").map { |th| th.text.strip }
+
+    assert_equal [ "Entity", "chambers", "first_flight", "name", "thrust_kn", "" ], headers
+  end
+
+  # Read as a list rather than cell by cell, so a column shift is caught.
+  test "a row shows each value in its own column, blank where nothing is recorded" do
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+
+    row = css_select("tbody tr").detect { |r| r.text.include?("Rocketdyne F-1") }
+    cells = row.css("td").map { |td| td.text.strip }
+
+    assert_equal "Rocketdyne F-1", cells[0]
+    assert_equal "", cells[1]
+    assert_equal "", cells[2]
+    assert_equal "Rocketdyne F-1", cells[3]
+    assert_equal "6770.0", cells[4]
+  end
+
+  test "an undisplayed attribute is not a column" do
+    entity_type_attributes(:engine_thrust).update!(is_displayed_on_index: false)
+
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+
+    headers = css_select("table th").map { |th| th.text.strip }
+    assert_not_includes headers, "thrust_kn"
+  end
+
+  test "a disabled attribute is not a column even when flagged for display" do
+    entity_type_attributes(:engine_thrust).update!(is_disabled: true, is_displayed_on_index: true)
+
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+
+    headers = css_select("table th").map { |th| th.text.strip }
+    assert_not_includes headers, "thrust_kn"
+  end
+
+  test "a type with no displayed attributes still lists its entities" do
+    entity_types(:rocket_engine).entity_type_attributes.update_all(is_displayed_on_index: false)
+
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+
+    assert_response :success
+    assert_equal [ "Entity", "" ], css_select("table th").map { |th| th.text.strip }
+    assert_select "a", text: "Rocketdyne F-1"
+  end
+
+  test "the attribute form carries the display checkbox" do
+    get new_project_entity_type_entity_type_attribute_path(@project, entity_types(:rocket_engine))
+
+    assert_select "input[type=checkbox][name=?]", "entity_type_attribute[is_displayed_on_index]"
+  end
+
+  test "saving the checkbox off clears the flag" do
+    attribute = entity_type_attributes(:engine_thrust)
+
+    patch project_entity_type_entity_type_attribute_path(@project, entity_types(:rocket_engine), attribute),
+          params: { entity_type_attribute: { name: "thrust_kn", value_type: "float",
+                                             is_displayed_on_index: "0" } }
+
+    assert_not attribute.reload.is_displayed_on_index?
   end
 end

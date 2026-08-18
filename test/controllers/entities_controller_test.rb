@@ -354,7 +354,12 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_select "h2", text: "Relationships"
     headers = css_select("table").last.css("th").map { |th| th.text.strip }
 
-    assert_equal [ "Relationship", "Direction", "Entity", "Entity type", "" ], headers
+    # The far end's name and type are one fact, so one column; plus a column per
+    # relationship attribute the type asks to show.
+    # The far end's name and type are one fact, so one column; then a column per
+    # relationship attribute the type asks to show, in name order.
+    assert_equal [ "Relationship", "Direction", "Entity",
+                   "certified_on", "engine_count", "stage", "thrust_share", "" ], headers
   end
 
   test "a row reads type, direction, other entity, other entity's type" do
@@ -364,10 +369,10 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal "Powers", cells[0]
     assert_equal "→ to", cells[1]
-    # The launch_vehicle fixture type declares no `name` attribute, so this is
-    # the type-and-id fallback — which is the label, and what the cell must show.
-    assert_equal entities(:saturn_v).label, cells[2]
-    assert_equal "Launch Vehicle", cells[3]
+    # The launch_vehicle fixture type declares no `name` attribute, so the label
+    # is the type-and-id fallback. Name and type share the cell.
+    assert_match(/#{Regexp.escape(entities(:saturn_v).label)}/, cells[2])
+    assert_match(/Launch Vehicle/, cells[2])
   end
 
   # A column reorder is exactly the edit that can silently swap two cells, so
@@ -438,5 +443,40 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
       assert_no_match(/chambers/, links.first["data-bs-content"])
       assert_match(/thrust_kn/, links.first["data-bs-content"])
     end
+  end
+
+  # --- the far end's cell ----------------------------------------------------
+
+  test "the far end's cell links the entity and its type, from both ends" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "a[href=?]", project_entity_path(@project, entities(:saturn_v))
+    assert_select "a[href=?]", project_typed_entities_path(@project, entity_types(:launch_vehicle).slug)
+
+    get project_entity_path(@project, entities(:saturn_v))
+
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
+    assert_select "a[href=?]", project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+  end
+
+  # --- columns the type asks for ---------------------------------------------
+
+  test "the relationships table shows a column for a displayed relationship attribute" do
+    get project_entity_path(@project, entities(:f1))
+
+    headers = css_select("table").last.css("th").map { |th| th.text.strip }
+    assert_includes headers, "engine_count"
+
+    cells = css_select("table").last.css("tbody tr").first.css("td").map { |td| td.text.strip }
+    assert_equal "5", cells[headers.index("engine_count")]
+  end
+
+  test "an undisplayed relationship attribute is not a column" do
+    relationship_type_attributes(:powers_engine_count).update!(is_displayed_on_index: false)
+
+    get project_entity_path(@project, entities(:f1))
+
+    headers = css_select("table").last.css("th").map { |th| th.text.strip }
+    assert_not_includes headers, "engine_count"
   end
 end

@@ -6,6 +6,9 @@ class EntitiesController < ApplicationController
   # through its type's card.
   def index
     @entity_type = find_entity_type_by_slug
+    # The columns this type asks for, and the values for them preloaded, so the
+    # table costs two queries rather than one per cell.
+    @columns = @entity_type.index_columns.to_a
     @entities = @project.entities
                         .where(entity_type_id: @entity_type.id)
                         .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
@@ -17,8 +20,16 @@ class EntitiesController < ApplicationController
     @entity = find_entity
     @rows = @entity.attribute_rows
     @relationships = @entity.relationships
-                            .includes(from_entity: :entity_type, to_entity: :entity_type)
+                            .includes(:relationship_type, :relationship_type_values,
+                                      from_entity: :entity_type, to_entity: :entity_type)
                             .order(:id)
+    # The union of columns the kinds of edge on this page ask for. An entity can
+    # hold edges of several kinds, so the table shows what any of them declares
+    # and leaves the cell blank where a kind has no such attribute.
+    @relationship_columns = RelationshipTypeAttribute
+                            .displayed_on_index
+                            .where(relationship_type_id: @relationships.map(&:relationship_type_id).uniq)
+                            .order(:name).to_a
   end
 
   # Creating is two steps: pick the type here, fill in its attributes on the

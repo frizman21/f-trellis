@@ -50,6 +50,10 @@ class Entity < ApplicationRecord
     Relationship.where(from_entity_id: id).or(Relationship.where(to_entity_id: id))
   end
 
+  # This entity's values keyed by attribute id, for a table that reads many
+  # attributes across many rows.
+  def values_by_attribute_id = entity_attribute_values.index_by(&:entity_type_attribute_id)
+
   # The recorded value of a named attribute, or nil if the type has no such
   # attribute or nothing has been recorded for it.
   def value_for(attribute_name)

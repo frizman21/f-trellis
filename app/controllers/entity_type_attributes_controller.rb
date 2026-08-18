@@ -71,6 +71,6 @@ class EntityTypeAttributesController < ApplicationController
   end
 
   def attribute_params
-    params.require(:entity_type_attribute).permit(:name, :value_type)
+    params.require(:entity_type_attribute).permit(:name, :value_type, :is_displayed_on_index)
   end
 end

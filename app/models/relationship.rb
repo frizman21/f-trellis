@@ -28,6 +28,8 @@ class Relationship < ApplicationRecord
     from_entity_id == entity.id ? to_entity : from_entity
   end
 
+  def values_by_attribute_id = relationship_type_values.index_by(&:relationship_type_attribute_id)
+
   # The type's attributes paired with this relationship's values, including
   # attributes with nothing recorded — the same shape the entity side shows, so
   # a blank is a row rather than a missing one.
