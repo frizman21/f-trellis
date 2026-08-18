@@ -240,16 +240,6 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_select "td", text: "Powers"
   end
 
-  test "the relationship picker offers only this project's relationship types" do
-    get project_entity_path(@project, entities(:f1))
-
-    assert_select "select[name=?] option", "relationship[relationship_type_id]" do |options|
-      offered = options.map { |o| o["value"] }.compact_blank.map(&:to_i)
-
-      assert_equal @project.relationship_types.pluck(:id).sort, offered.sort
-      assert_not_includes offered, relationship_types(:gemini_docks).id
-    end
-  end
 
   # --- citing a source -------------------------------------------------------
 
@@ -350,36 +340,59 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   # --- the relationship picker respects the declared ends --------------------
 
-  test "the picker offers only types that can start at this entity's type" do
-    get project_entity_path(@project, entities(:f1))
 
-    assert_select "select[name=?] option", "relationship[relationship_type_id]" do |options|
-      offered = options.map { |o| o["value"] }.compact_blank.map(&:to_i)
-      expected = @project.relationship_types
-                         .where(from_entity_type_id: entities(:f1).entity_type_id).pluck(:id)
-
-      assert_equal expected.sort, offered.sort
-    end
-  end
-
-  test "an entity no type can start at is told so rather than shown a dead picker" do
-    get project_entity_path(@project, entities(:saturn_v))
-
-    assert_response :success
-    assert_select "select[name=?]", "relationship[relationship_type_id]", count: 0
-    assert_match(/starts at a Launch Vehicle/, response.body)
-  end
 
   # What the narrowing controller reads to hide entities that cannot be the far
   # end of the chosen kind.
-  test "the picker carries the entity type ids the narrowing needs" do
+
+  # --- the relationships table -----------------------------------------------
+
+  test "the relationships table leads with the kind of relationship" do
     get project_entity_path(@project, entities(:f1))
 
-    assert_select "select[name=?][data-relationship-form-target=?]",
-                  "relationship[relationship_type_id]", "type"
-    assert_select "select[name=?] option[data-entity-type-id=?]",
-                  "relationship[to_entity_id]", entities(:saturn_v).entity_type_id.to_s
-    assert_select "select[name=?] option[data-to-entity-type-id]",
-                  "relationship[relationship_type_id]"
+    assert_response :success
+    assert_select "h2", text: "Relationships"
+    headers = css_select("table").last.css("th").map { |th| th.text.strip }
+
+    assert_equal [ "Relationship", "Direction", "Entity", "Entity type", "" ], headers
+  end
+
+  test "a row reads type, direction, other entity, other entity's type" do
+    get project_entity_path(@project, entities(:f1))
+
+    cells = css_select("table").last.css("tbody tr").first.css("td").map { |td| td.text.strip }
+
+    assert_equal "Powers", cells[0]
+    assert_equal "→ to", cells[1]
+    # The launch_vehicle fixture type declares no `name` attribute, so this is
+    # the type-and-id fallback — which is the label, and what the cell must show.
+    assert_equal entities(:saturn_v).label, cells[2]
+    assert_equal "Launch Vehicle", cells[3]
+  end
+
+  # A column reorder is exactly the edit that can silently swap two cells, so
+  # the far-end link is re-asserted from both directions.
+  test "the other entity is still the far end, from either side" do
+    get project_entity_path(@project, entities(:f1))
+    assert_select "a[href=?]", project_entity_path(@project, entities(:saturn_v))
+
+    get project_entity_path(@project, entities(:saturn_v))
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
+    assert_select "table a[href=?]", project_entity_path(@project, entities(:saturn_v)), count: 0
+  end
+
+  test "the page offers no relationship form" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "select[name=?]", "relationship[relationship_type_id]", count: 0
+    assert_select "select[name=?]", "relationship[to_entity_id]", count: 0
+    assert_select "input[value=?]", "Add relationship", count: 0
+  end
+
+  test "an existing relationship can still be edited and removed" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "a[href=?]", edit_project_relationship_path(@project, relationships(:f1_powers_saturn_v))
+    assert_select "form[action*=?]", project_relationship_path(@project, relationships(:f1_powers_saturn_v))
   end
 end

@@ -328,4 +328,58 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
     assert_response :not_found
   end
+
+  # --- the project's types in the sidebar ------------------------------------
+
+  test "inside a project the sidebar lists that project's entity types" do
+    get project_path(@project)
+
+    assert_select "nav.sidebar" do
+      @project.entity_types.each do |type|
+        assert_select "a[href=?]", project_typed_entities_path(@project, type.slug), text: type.name
+      end
+      assert_select "a", text: "Capsule", count: 0
+    end
+  end
+
+  # Following the sidebar's own href checks the link and the route against each
+  # other rather than separately.
+  test "a sidebar link lands on that type's list" do
+    get project_path(@project)
+    href = css_select("nav.sidebar a").detect { |a| a.text.strip == "Rocket Engine" }["href"]
+
+    get href
+
+    assert_response :success
+    assert_select "h1", "Rocket Engine"
+  end
+
+  test "the section is absent outside a project" do
+    get projects_path
+    assert_select "nav.sidebar a[href*=?]", "rocket-engines", count: 0
+
+    get sources_path
+    assert_select "nav.sidebar a[href*=?]", "rocket-engines", count: 0
+  end
+
+  # An empty heading is worse than no heading.
+  test "a project with no entity types renders no section for it" do
+    Relationship.where(project: projects(:gemini)).destroy_all
+    projects(:gemini).relationship_types.destroy_all
+    projects(:gemini).entities.destroy_all
+    projects(:gemini).entity_types.destroy_all
+
+    get project_path(projects(:gemini))
+
+    assert_select "nav.sidebar h6", text: projects(:gemini).name, count: 0
+  end
+
+  # The unsaved record on a "new type" page is already in the association's
+  # target and has no address; the sidebar must not try to link it.
+  test "the new type form does not put a blank link in the sidebar" do
+    get new_project_entity_type_path(@project)
+
+    assert_response :success
+    assert_select "nav.sidebar a[href$=?]", "/", count: 0
+  end
 end

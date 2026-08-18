@@ -57,7 +57,31 @@
         <% if sidebar? %>
         <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar" style="min-height: calc(100vh - 56px);">
           <div class="position-sticky pt-3">
-            <h6 class="sidebar-heading px-3 mt-3 mb-1 text-muted text-uppercase small">Research</h6>
+            <%# The kinds of thing in the project you are in. The sidebar is the one
+                piece of chrome always on screen, so moving between kinds is a single
+                click from anywhere inside the project. Absent outside a project, and
+                absent for a project that has no types yet — an empty heading is worse
+                than no heading. %>
+            <%# A fresh query rather than current_project.entity_types: on a "new type"
+                page the unsaved record is already in the association's target, and it
+                has no name and so no address to link to. %>
+            <% project_types = current_project ? EntityType.where(project_id: current_project.id) : [] %>
+            <% if project_types.any? %>
+              <h6 class="sidebar-heading px-3 mt-3 mb-1 text-muted text-uppercase small">
+                <%= current_project.name %>
+              </h6>
+              <ul class="nav flex-column">
+                <% project_types.each do |entity_type| %>
+                  <li class="nav-item">
+                    <%= link_to entity_type.name,
+                                project_typed_entities_path(current_project, entity_type.slug),
+                                class: "nav-link" %>
+                  </li>
+                <% end %>
+              </ul>
+            <% end %>
+
+            <h6 class="sidebar-heading px-3 <%= project_types.any? ? "mt-4" : "mt-3" %> mb-1 text-muted text-uppercase small">Research</h6>
             <ul class="nav flex-column">
               <li class="nav-item">
                 <%= link_to "Starting Points", research_starting_points_path, class: "nav-link" %>

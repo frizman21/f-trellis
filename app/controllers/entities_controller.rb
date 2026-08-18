@@ -19,18 +19,6 @@ class EntitiesController < ApplicationController
     @relationships = @entity.relationships
                             .includes(from_entity: :entity_type, to_entity: :entity_type)
                             .order(:id)
-    # For the "add a relationship" picker: this project's other entities. An edge
-    # to itself is rejected by the model, so it is not offered either.
-    @candidates = @project.entities
-                          .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
-                          .where.not(id: @entity.id)
-    # Only kinds of edge that can start at an entity of this type. Offering the
-    # rest would be offering a rejection.
-    @relationship_types = @project.relationship_types
-                                  .includes(:to_entity_type)
-                                  .where(from_entity_type_id: @entity.entity_type_id)
-    @new_relationship = @project.relationships.new
-    @new_relationship.relationship_sources.build
   end
 
   # Creating is two steps: pick the type here, fill in its attributes on the
