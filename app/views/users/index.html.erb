@@ -1,0 +1,30 @@
+<% content_for :title, "Users" %>
+
+<h1 class="mb-3">Users</h1>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Email</th>
+      <th>Access</th>
+      <th>Created</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @users.each do |user| %>
+      <tr>
+        <td><%= user.email %></td>
+        <td>
+          <%# The read-only flag is enforced on every non-GET request, so it is
+              the one thing about an account worth stating here. %>
+          <% if user.read_only? %>
+            <span class="badge text-bg-secondary">read-only</span>
+          <% else %>
+            <span class="text-muted">full</span>
+          <% end %>
+        </td>
+        <td class="text-muted"><%= user.created_at.to_date.to_fs(:long) %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

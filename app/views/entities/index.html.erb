@@ -5,16 +5,24 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="mb-0"><%= @entity_type.name %></h1>
-  <%= link_to "New entity", new_project_entity_path(@project), class: "btn btn-primary" %>
+  <%# Named for the kind, and carrying it, so the next page can ask for its
+      attributes rather than for its type. %>
+  <%= link_to "New #{@entity_type.name}",
+              new_project_entity_path(@project, type: @entity_type.slug),
+              class: "btn btn-primary" %>
 </div>
 
-<%# Search and sort live in the query string, so a filtered, ordered list is a
-    link you can keep and send. %>
-<%= form_with url: url_for(sort: params[:sort], dir: params[:dir]), method: :get,
-              local: true, class: "row g-2 align-items-end mb-3" do %>
+<%# One form holds the whole view — search, sort and page size — so there is a
+    single place that knows what is currently being shown, and every one of them
+    stays in the query string where a link can carry it. %>
+<%= form_with url: url_for(only_path: true), method: :get,
+              local: true, class: "row g-2 align-items-center mb-3" do %>
+  <%= hidden_field_tag :sort, params[:sort] %>
+  <%= hidden_field_tag :dir, params[:dir] %>
   <div class="col-auto">
-    <%= label_tag :q, "Search", class: "form-label" %>
-    <%= text_field_tag :q, @query, class: "form-control", placeholder: "Match any text value…" %>
+    <%= text_field_tag :q, @query, class: "form-control",
+                       placeholder: "Search #{@entity_type.name.pluralize}…",
+                       "aria-label": "Search" %>
   </div>
   <div class="col-auto">
     <%= submit_tag "Search", class: "btn btn-outline-primary", name: nil %>
@@ -22,6 +30,13 @@
       <%= link_to "Clear", url_for(sort: params[:sort], dir: params[:dir]),
                   class: "btn btn-outline-secondary" %>
     <% end %>
+  </div>
+  <div class="col-auto ms-auto d-flex align-items-center gap-2">
+    <%= label_tag :per, "Per page", class: "col-form-label text-muted small mb-0" %>
+    <%= select_tag :per,
+                   options_for_select(EntitiesController::PAGE_SIZES, @per_page),
+                   class: "form-select form-select-sm", style: "width: auto;",
+                   onchange: "this.form.requestSubmit()" %>
   </div>
 <% end %>
 
@@ -60,6 +75,9 @@
       </tbody>
     </table>
   </div>
+  <%# What you are looking at, so the page size means something before you
+      change it. %>
+  <p class="text-muted small"><%= page_entries_info @entities %></p>
   <%= paginate @entities %>
 <% elsif @query.present? %>
   <p>No <%= @entity_type.name %> entities match <%= tag.strong @query %>.</p>

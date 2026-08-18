@@ -181,10 +181,13 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
     assert_equal [ "RS-25" ], labels
   end
 
+  # The sort rides in the form as a hidden field rather than in its action, so
+  # searching from a sorted list keeps the sort.
   test "the search form keeps the current sort" do
     get @path, params: { sort: "chambers", dir: "desc" }
 
-    assert_select "form[action*=?]", "sort=chambers"
+    assert_select "form input[type=hidden][name=?][value=?]", "sort", "chambers"
+    assert_select "form input[type=hidden][name=?][value=?]", "dir", "desc"
   end
 
   # --- name as a column ------------------------------------------------------
@@ -214,5 +217,90 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
 
     assert_select "th a.fw-bold", text: /Name ↑/
     assert_select "th a[href*=?]", "dir=desc"
+  end
+
+  # --- page size -------------------------------------------------------------
+
+  def make_engines(count)
+    count.times { |i| build_engine(name: format("Engine %03d", i), chambers: i) }
+  end
+
+  test "the default page size is 25" do
+    make_engines(30)
+
+    get @path
+
+    assert_equal 25, labels.size
+  end
+
+  test "a chosen size is honoured" do
+    make_engines(30)
+
+    get @path, params: { per: 10 }
+
+    assert_equal 10, labels.size
+  end
+
+  # The two ways it arrives wrong. An arbitrary size is a denial of service on
+  # your own database, and per=100000 is a valid integer.
+  test "a size outside the offered list falls back to the default" do
+    make_engines(30)
+
+    get @path, params: { per: 100_000 }
+    assert_equal 25, labels.size
+
+    get @path, params: { per: "lots" }
+    assert_equal 25, labels.size
+  end
+
+  test "the size select shows the current size" do
+    get @path, params: { per: 50 }
+
+    assert_select "select[name=?] option[selected][value=?]", "per", "50"
+  end
+
+  test "page two shows the next rows" do
+    make_engines(30)
+
+    get @path, params: { per: 10, sort: "name", dir: "asc" }
+    first_page = labels
+
+    get @path, params: { per: 10, sort: "name", dir: "asc", page: 2 }
+
+    assert_equal 10, labels.size
+    assert_empty(first_page & labels)
+  end
+
+  # Read from the rendered link, so the parameters are checked where they are
+  # actually used rather than where they were set.
+  test "page links carry the search, the sort and the size" do
+    make_engines(30)
+
+    get @path, params: { q: "Engine", per: 10, sort: "chambers", dir: "desc" }
+    href = css_select("nav.pagination a, .pagination a").first["href"]
+
+    assert_includes href, "q=Engine"
+    assert_includes href, "per=10"
+    assert_includes href, "sort=chambers"
+    assert_includes href, "dir=desc"
+  end
+
+  test "sorting and paging compose" do
+    make_engines(30)
+
+    get @path, params: { per: 5, sort: "chambers", dir: "desc" }
+    top = labels
+
+    get @path, params: { per: 5, sort: "chambers", dir: "desc", page: 2 }
+
+    assert_empty(top & labels)
+  end
+
+  test "the list states what it is showing" do
+    make_engines(30)
+
+    get @path, params: { per: 10 }
+
+    assert_match(/1.*10.*3[0-9]/m, css_select("p.text-muted.small").map(&:text).join)
   end
 end

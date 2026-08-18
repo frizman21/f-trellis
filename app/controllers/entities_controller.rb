@@ -13,6 +13,7 @@ class EntitiesController < ApplicationController
     @sort_attribute = sort_attribute
     @sorted_by_name = params[:sort] == "name"
     @direction = direction
+    @per_page = per_page
 
     scope = @project.entities
                     .where(entity_type_id: @entity_type.id)
@@ -21,7 +22,7 @@ class EntitiesController < ApplicationController
     scope = search(scope)
     scope = sort(scope)
 
-    @entities = scope.page(params[:page]).per(25)
+    @entities = scope.page(params[:page]).per(@per_page)
   end
 
   def show
@@ -121,6 +122,17 @@ class EntitiesController < ApplicationController
   end
 
   DIRECTIONS = %w[asc desc].freeze
+
+  # Chosen from a list rather than taken as a number: an arbitrary ?per= is a
+  # denial of service on your own database, and per=100000 is a valid integer.
+  # Anything else falls back rather than erroring, so a stale URL still works.
+  PAGE_SIZES = [ 10, 25, 50, 100, 250 ].freeze
+  DEFAULT_PAGE_SIZE = 25
+
+  def per_page
+    requested = params[:per].to_i
+    PAGE_SIZES.include?(requested) ? requested : DEFAULT_PAGE_SIZE
+  end
 
   # An IN against matching value rows rather than a join: an entity matching on
   # two attributes should appear once, and a join would need a DISTINCT that then
