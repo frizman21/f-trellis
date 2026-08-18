@@ -102,73 +102,20 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
 
   # The invariant that matters, now tested *with* tools registered: the model is
   # handed recording stand-ins, and an evaluation still writes nothing.
-  test "registers the recording stand-ins and creates no entities" do
-    assert_no_difference [ "Person.count", "Organization.count", "PersonDetail.count",
-                           "OrganizationDetail.count", "Part.count", "PartDetail.count",
-                           "Science.count", "ScienceDetail.count",
-                           "Technology.count", "TechnologyDetail.count",
-                           "ScienceTechnology.count", "ScienceTechnologyDetail.count",
-                           "PartTechnology.count", "PartTechnologyDetail.count",
-                           "PersonScience.count", "PersonScienceDetail.count",
-                           "Contract.count", "ContractDetail.count",
-                           "ContractOrganization.count", "ContractOrganizationDetail.count",
-                           "ContractPerson.count", "ContractPersonDetail.count",
-                           "ContractTechnology.count", "ContractTechnologyDetail.count",
-                           "ContractPart.count", "ContractPartDetail.count",
-                           "OrganizationTechnology.count", "OrganizationTechnologyDetail.count",
-                           "PartDetailParameter.count", "PersonOrganization.count",
-                           "OrganizationOrganization.count", "PersonOrganizationDetail.count",
-                           "OrganizationOrganizationDetail.count",
-                           "PersonPerson.count", "PersonPersonDetail.count",
-                           "PersonOrganizationType.count", "PersonPersonType.count",
-                           "PartOrganization.count", "PartOrganizationDetail.count" ] do
-      with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
-    end
+  # The entity-writing tools and their recording stand-ins are gone (#4), so an
+  # evaluation registers no tools at all. Asserted directly, because "creates no
+  # entities" used to be the invariant this job existed to protect and it is now
+  # held by there being nothing to call rather than by a stand-in.
+  test "registers no tools" do
+    with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
 
-    assert_equal [ RecordingUpsertPersonTool, RecordingUpsertOrganizationTool, RecordingUpsertPartTool,
-                   RecordingUpsertScienceTool, RecordingUpsertTechnologyTool,
-                   RecordingUpsertContractTool,
-                   RecordingLinkPersonOrganizationTool, RecordingLinkPartOrganizationTool,
-                   RecordingLinkPersonPersonTool,
-                   RecordingLinkOrganizationOrganizationTool,
-                   RecordingLinkPartTechnologyTool, RecordingLinkScienceTechnologyTool,
-                   RecordingLinkPersonScienceTool,
-                   RecordingLinkContractOrganizationTool, RecordingLinkContractPersonTool,
-                   RecordingLinkContractTechnologyTool, RecordingLinkContractPartTool,
-                   RecordingLinkOrganizationTechnologyTool,
-                   RecordingCreatePersonOrganizationTypeTool, RecordingCreatePersonPersonTypeTool ],
-                 Recorder.tools.map(&:class)
+    assert_nil Recorder.tools
   end
 
-  # The stand-ins announce themselves under the writing tools' names, so a model
-  # that has learned to call `upsert_organization` still can.
-  test "the stand-ins present the writing tools' names, descriptions and schemas" do
-    [ [ RecordingUpsertPersonTool, UpsertPersonTool ],
-      [ RecordingUpsertOrganizationTool, UpsertOrganizationTool ],
-      [ RecordingUpsertPartTool, UpsertPartTool ],
-      [ RecordingUpsertScienceTool, UpsertScienceTool ],
-      [ RecordingUpsertTechnologyTool, UpsertTechnologyTool ],
-      [ RecordingUpsertContractTool, UpsertContractTool ],
-      [ RecordingLinkContractOrganizationTool, LinkContractOrganizationTool ],
-      [ RecordingLinkContractPersonTool, LinkContractPersonTool ],
-      [ RecordingLinkContractTechnologyTool, LinkContractTechnologyTool ],
-      [ RecordingLinkContractPartTool, LinkContractPartTool ],
-      [ RecordingLinkOrganizationTechnologyTool, LinkOrganizationTechnologyTool ],
-      [ RecordingLinkPartTechnologyTool, LinkPartTechnologyTool ],
-      [ RecordingLinkScienceTechnologyTool, LinkScienceTechnologyTool ],
-      [ RecordingLinkPersonScienceTool, LinkPersonScienceTool ],
-      [ RecordingLinkPersonOrganizationTool, LinkPersonOrganizationTool ],
-      [ RecordingLinkPersonPersonTool, LinkPersonPersonTool ],
-      [ RecordingLinkOrganizationOrganizationTool, LinkOrganizationOrganizationTool ],
-      [ RecordingCreatePersonOrganizationTypeTool, CreatePersonOrganizationTypeTool ],
-      [ RecordingCreatePersonPersonTypeTool, CreatePersonPersonTypeTool ] ].each do |recording, writing|
-      stand_in = recording.new(ProposalRecorder.new)
-      real = writing.new(nil)
+  test "records an empty proposal set" do
+    with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
 
-      assert_equal real.name, stand_in.name
-      assert_equal real.description, stand_in.description
-      assert_equal real.params_schema, stand_in.params_schema
-    end
+    assert_empty @result.reload.proposals
   end
 
   test "links the chat the run went through" do
@@ -232,70 +179,24 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
     assert_nil Recorder.asked
   end
 
-  # --- What the run would contribute --------------------------------------
+  # --- What the run contributes --------------------------------------------
+  #
+  # A run used to be measured by what it *would* have written into the knowledge
+  # base, exercised here by driving the recording tools with fake tool calls.
+  # Those tools and that knowledge base are gone (#4), so the only proposal
+  # behaviour left to assert from this job is that a run records an empty set —
+  # and that scoring an empty set still yields 0 rather than nil, which is the
+  # boundary the evaluation screens read. The order-independence of proposal
+  # digests, which two of the removed tests covered here, is covered at its own
+  # level in test/services/proposal_set_test.rb.
 
-  UPSERT_ORGS = [ "upsert_organization",
-                  { organizations: [ { name: "Acme Corp", acronym: "ACME" }, { name: "Beta Inc" } ] } ].freeze
-
-  test "a run stores what it proposed and scores it" do
-    with_fake_chat(tool_calls: [ UPSERT_ORGS ]) { RunSkillEvaluationJob.perform_now(@result) }
-
-    @result.reload
-    assert_equal "complete", @result.status
-    assert_equal 2, @result.score
-    assert_equal 2, @result.proposals.size
-    assert_includes @result.proposals.map { |p| p["name"] }, "acme corp"
-    assert @result.proposal_digest.present?
-  end
-
-  # The model gets back what the writing tool would have returned, so the ids it
-  # then passes to a link tool resolve.
-  test "the ids handed back by an upsert tool are usable by a link tool" do
-    PersonOrganizationType.find_or_create_by!(name: "Employment")
-
-    calls = [
-      [ "upsert_person", { people: [ { first_name: "Jane", last_name: "Doe" } ] } ],
-      [ "upsert_organization", { organizations: [ { name: "Acme Corp" } ] } ],
-      [ "link_person_organization", { person_id: 1, organization_id: 1, type: "Employment" } ]
-    ]
-
-    assert_no_difference [ "Person.count", "Organization.count", "PersonOrganization.count" ] do
-      with_fake_chat(tool_calls: calls) { RunSkillEvaluationJob.perform_now(@result) }
-    end
-
-    assert_nil Recorder.tool_results.last[:error]
-    link = @result.reload.proposals.detect { |p| p["type"] == "person_organization" }
-    assert_equal "jane doe", link["person"]
-    assert_equal 3, @result.score
-  end
-
-  test "the same organization proposed twice scores once" do
-    duplicate = [ "upsert_organization", { organizations: [ { name: "Acme Corp" }, { name: "acme corp" } ] } ]
-
-    with_fake_chat(tool_calls: [ duplicate ]) { RunSkillEvaluationJob.perform_now(@result) }
-
-    assert_equal 1, @result.reload.score
-  end
-
-  test "a run that proposed nothing scores zero, not nil" do
+  test "a run proposes nothing and scores zero, not nil" do
     with_fake_chat { RunSkillEvaluationJob.perform_now(@result) }
 
-    assert_equal 0, @result.reload.score
+    @result.reload
+
+    assert_equal "complete", @result.status
+    assert_equal 0, @result.score
     assert_empty @result.proposals
-  end
-
-  test "two runs proposing the same set in a different order share a digest" do
-    other_model = Model.create!(provider: "openai", model_id: "gpt-other", name: "Other",
-                                last_seen_at: @model.last_seen_at)
-    other = SkillEvaluationResult.create!(skill_evaluation: @evaluation, source: @source,
-                                          model: other_model, skill_revision: @revision,
-                                          status: "pending")
-
-    with_fake_chat(tool_calls: [ UPSERT_ORGS ]) { RunSkillEvaluationJob.perform_now(@result) }
-    reversed = [ "upsert_organization",
-                 { organizations: [ { name: "Beta Inc" }, { name: "Acme Corp", acronym: "ACME" } ] } ]
-    with_fake_chat(tool_calls: [ reversed ]) { RunSkillEvaluationJob.perform_now(other) }
-
-    assert @result.reload.same_proposals_as?(other.reload)
   end
 end

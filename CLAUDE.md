@@ -24,13 +24,14 @@ which the unit tests do not exercise — and when to escalate instead of forcing
 resolution.
 
 ## Data Model
-See `docs/data-model-spec.md` for the repeating shape used by tier 1 entities
-and their relationships (entity + versioned, confidence-scored detail record).
-Follow this pattern when adding new tier 1 entities.
+See `docs/application-data-structures.md` for the data structures the
+application is built from (Source, SourceDatum, SourceProcessingReport, Skill,
+SkillRevision, Project).
 
-See `docs/application-data-structures.md` for operational data structures
-(Source, SourceDatum, SourceProcessingReport, Skill, SkillRevision) that
-support the application but are **not** tier 1 knowledge entities.
+The "tier 1 knowledge entity" pattern and every entity that followed it
+(Person, Organization, Facility, Part, Science, Technology, Contract and the
+relationships among them) were removed in change request #4, along with
+`docs/data-model-spec.md`. Do not reintroduce that shape.
 
 ## Development Environment
 This project runs in Docker containers. All Rails and database commands must be executed within the containerized environment.

@@ -1,12 +1,10 @@
-# Runs one skill revision against one page through one model, keeps the reply,
-# and records what the run would have contributed to the knowledge base.
+# Runs one skill revision against one page through one model and keeps the reply.
 #
-# The model is handed the recording stand-ins, not the writing tools. That is the
-# whole trick: an evaluation is a rehearsal, and a rehearsal that writes people
-# and organizations into the graph would poison the thing it measures — but
-# measuring *contribution* means seeing what a model proposes, which means giving
-# it tools at all. The stand-ins present an identical contract and write nothing,
-# so the invariant holds: an evaluation still creates no entities.
+# It used to hand the model recording stand-ins for the entity-writing tools, so
+# an evaluation could measure what a run *would* have contributed to the
+# knowledge base without writing to it. That knowledge base is gone (#4), so
+# there is nothing to propose and no tools to stand in for: an evaluation is now
+# the revision, the page, the model, and the text that comes back.
 class RunSkillEvaluationJob < ApplicationJob
   queue_as :default
 
@@ -23,14 +21,15 @@ class RunSkillEvaluationJob < ApplicationJob
     source_text = result.source.latest_text
     raise NotRunnable, "source has no fetched data" if source_text.blank?
 
-    recorder = ProposalRecorder.new
     chat = Chat.create!(model: result.model)
     result.update!(chat: chat)
     chat.with_instructions(instructions)
-    chat.with_tools(*recording_tools(recorder))
     reply = chat.ask(source_text)
 
-    result.record_proposals(recorder.proposals)
+    # Recorded empty rather than skipped: SkillEvaluationResult and the
+    # comparison screens still speak in proposals, and an empty set is the
+    # truthful answer now that no tool can propose anything.
+    result.record_proposals([])
     result.update!(status: "complete", response: reply&.content.to_s,
                    error: nil, completed_at: Time.current)
   rescue StandardError => e
@@ -42,34 +41,5 @@ class RunSkillEvaluationJob < ApplicationJob
     # circulation now — the rest of this run is one job per page, all of them
     # about to make the same doomed call.
     result&.model&.deprecate_for!(e)
-  end
-
-  private
-
-  # One recorder behind all of them, so a link tool can resolve the synthetic id
-  # an upsert tool handed the model a moment earlier.
-  def recording_tools(recorder)
-    [
-      RecordingUpsertPersonTool.new(recorder),
-      RecordingUpsertOrganizationTool.new(recorder),
-      RecordingUpsertPartTool.new(recorder),
-      RecordingUpsertScienceTool.new(recorder),
-      RecordingUpsertTechnologyTool.new(recorder),
-      RecordingUpsertContractTool.new(recorder),
-      RecordingLinkPersonOrganizationTool.new(recorder),
-      RecordingLinkPartOrganizationTool.new(recorder),
-      RecordingLinkPersonPersonTool.new(recorder),
-      RecordingLinkOrganizationOrganizationTool.new(recorder),
-      RecordingLinkPartTechnologyTool.new(recorder),
-      RecordingLinkScienceTechnologyTool.new(recorder),
-      RecordingLinkPersonScienceTool.new(recorder),
-      RecordingLinkContractOrganizationTool.new(recorder),
-      RecordingLinkContractPersonTool.new(recorder),
-      RecordingLinkContractTechnologyTool.new(recorder),
-      RecordingLinkContractPartTool.new(recorder),
-      RecordingLinkOrganizationTechnologyTool.new(recorder),
-      RecordingCreatePersonOrganizationTypeTool.new(recorder),
-      RecordingCreatePersonPersonTypeTool.new(recorder)
-    ]
   end
 end

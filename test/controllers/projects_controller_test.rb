@@ -46,7 +46,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "suppressing the sidebar does not leak to other pages" do
-    get people_path
+    get domains_path
 
     assert_response :success
     assert_select "nav.sidebar"

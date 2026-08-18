@@ -1,8 +1,12 @@
 # Application Data Structures
 
-This document describes the operational data structures that support the
-application but are **not** tier 1 knowledge entities. See
-`docs/data-model-spec.md` for the tier 1 pattern.
+This document describes the data structures the application is built from.
+
+It used to be the counterpart to `docs/data-model-spec.md`, which defined a
+"tier 1 knowledge entity" pattern — a stable identity plus versioned,
+confidence-scored, source-attributed detail records — repeated across seven
+entities and thirteen relationships. That concept and every entity following it
+were removed (change request #4), and this is now the whole data model.
 
 The families here today:
 
@@ -307,7 +311,7 @@ They sit outside the knowledge and research navigation the sidebar offers.
 
 ---
 
-## 5. Relationship map
+## 6. Relationship map
 
 ```
 Source ─┬─< SourceDatum
@@ -318,6 +322,7 @@ Source ─┬─< SourceDatum
         └─< SkillEvaluationResult >─ SkillEvaluation
 
 SourceExclusion              (standalone — consulted when links become Sources)
+Project                      (standalone — owns nothing yet)
 
 SkillEvaluation ─┬─ Skill
                  ├─ LearningSet

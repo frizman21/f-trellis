@@ -10,35 +10,30 @@ class ReadOnlyUserTest < ActionDispatch::IntegrationTest
     @reader = User.create!(email: "reader@example.com", password: "password", read_only: true)
     sign_in @reader
 
-    @organization = Organization.create!
-    @report = SourceProcessingReport.create!(
-      source: sources(:one), skill_revision: skill_revisions(:promoted_1), status: "complete"
-    )
-    @detail = OrganizationDetail.create!(
-      organization: @organization, source_processing_report: @report,
-      name: "National Aeronautics and Space Administration", acronym: "NASA",
-      as_of: Time.zone.parse("1958-07-29"), confidence_tenths: 1000
-    )
-    @organization.update!(current_detail: @detail)
+    # Domains stand in for "a resource with an index, a show page, and an edit
+    # form a write could be attempted through". This used to be Organization,
+    # which no longer exists (#4); what is under test is the verb guard, not
+    # the resource, so any full CRUD resource serves.
+    @domain = domains(:example_com)
   end
 
   # --- reading is unaffected ----------------------------------------------
 
   test "a read-only user can GET an index" do
-    get organizations_path
+    get domains_path
 
     assert_response :success
   end
 
   test "a read-only user can GET a show page" do
-    get organization_path(@organization)
+    get domain_path(@domain)
 
     assert_response :success
-    assert_match "NASA", response.body
+    assert_match "example.com", response.body
   end
 
   test "a read-only user can GET a form, even one it could never submit" do
-    get edit_organization_path(@organization)
+    get edit_domain_path(@domain)
 
     assert_response :success
   end
@@ -58,10 +53,10 @@ class ReadOnlyUserTest < ActionDispatch::IntegrationTest
   # --- writing is refused --------------------------------------------------
 
   test "PATCH is refused and changes nothing" do
-    patch organization_path(@organization), params: { organization: { acronym: "CHANGED" } }
+    patch domain_path(@domain), params: { domain: { min_crawl_delay_seconds: 99 } }
 
     assert_response :forbidden
-    assert_equal "NASA", @detail.reload.acronym
+    assert_equal 1, @domain.reload.min_crawl_delay_seconds
   end
 
   test "POST is refused and creates nothing" do
@@ -113,7 +108,7 @@ class ReadOnlyUserTest < ActionDispatch::IntegrationTest
     delete destroy_user_session_path
 
     assert_response :redirect
-    get organizations_path
+    get domains_path
     assert_redirected_to new_user_session_path
   end
 
@@ -123,7 +118,7 @@ class ReadOnlyUserTest < ActionDispatch::IntegrationTest
     post user_session_path, params: { user: { email: @reader.email, password: "password" } }
 
     assert_response :redirect
-    get organizations_path
+    get domains_path
     assert_response :success
   end
 
@@ -133,9 +128,9 @@ class ReadOnlyUserTest < ActionDispatch::IntegrationTest
     sign_out @reader
     sign_in users(:admin)
 
-    patch organization_path(@organization), params: { organization: { acronym: "CHANGED" } }
+    patch domain_path(@domain), params: { domain: { min_crawl_delay_seconds: 99 } }
 
     assert_response :redirect
-    assert_equal "CHANGED", @detail.reload.acronym
+    assert_equal 99, @domain.reload.min_crawl_delay_seconds
   end
 end

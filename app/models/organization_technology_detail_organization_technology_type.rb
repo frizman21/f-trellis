@@ -1,4 +1,0 @@
-class OrganizationTechnologyDetailOrganizationTechnologyType < ApplicationRecord
-  belongs_to :organization_technology_detail
-  belongs_to :organization_technology_type
-end
