@@ -9,11 +9,13 @@ class CrawlJob < ApplicationJob
   DEFAULT_MAX_PAGES = 500
   MAX_MAX_PAGES = 5_000
 
-  # What "the crawler's default" in the domain form has always promised, and
-  # never delivered. One second is slow enough to be unremarkable in a server
-  # log and fast enough that a 500-page crawl still finishes in under ten
-  # minutes.
-  DEFAULT_CRAWL_DELAY_SECONDS = 1
+  # What "the crawler's default" in the domain form means. Ten seconds against a
+  # site that never asked us to visit is unambiguously polite — invisible in the
+  # target's server load — and the only cost is wall-clock time on a background
+  # job nobody is watching. A full 500-page crawl of an untuned domain therefore
+  # takes over an hour; an operator who wants it faster sets the domain's minimum
+  # crawl delay, which the source page links to alongside the projected time.
+  DEFAULT_CRAWL_DELAY_SECONDS = 10
 
   # An operator's explicit setting wins, then the site's own Crawl-delay, then
   # the default. Stated in one place so the precedence is not rediscovered.
