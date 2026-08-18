@@ -8,6 +8,14 @@ Rails.application.routes.draw do
 
   resources :projects, only: [:index, :new, :create, :edit, :update]
 
+  # The ontology. Attributes are nested because an attribute has no meaning
+  # apart from the type that owns it.
+  resources :entities
+  resources :entity_types do
+    resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+  end
+  resources :relationships, only: [:create, :destroy]
+
   resources :sources, only: [:index, :show, :new, :create] do
     member do
       post :fetch

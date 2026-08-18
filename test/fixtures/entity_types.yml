@@ -1,0 +1,11 @@
+rocket_engine:
+  name: Rocket Engine
+  description: A propulsion device.
+
+launch_vehicle:
+  name: Launch Vehicle
+  description: A rocket that carries something to orbit.
+
+# A type with no attributes, so the empty states are reachable from a fixture.
+bare:
+  name: Bare Type

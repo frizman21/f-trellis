@@ -26,7 +26,12 @@ resolution.
 ## Data Model
 See `docs/application-data-structures.md` for the data structures the
 application is built from (Source, SourceDatum, SourceProcessingReport, Skill,
-SkillRevision, Project).
+SkillRevision, Project) and for the ontology that carries knowledge content
+(EntityType, EntityTypeAttribute, Entity, EntityAttributeValue, Relationship).
+
+A new kind of thing is a row in `entity_types`, not a new model and a
+migration. Note that `EntityTypeAttribute` names its enumeration column
+`value_type`: `type` is reserved by Rails for single-table inheritance.
 
 The "tier 1 knowledge entity" pattern and every entity that followed it
 (Person, Organization, Facility, Part, Science, Technology, Contract and the

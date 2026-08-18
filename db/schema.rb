@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_18_204822) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_18_205559) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -59,6 +59,45 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_204822) do
     t.text "robots_txt"
     t.datetime "updated_at", null: false
     t.index ["host"], name: "index_domains_on_host", unique: true
+  end
+
+  create_table "entities", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "entity_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["entity_type_id"], name: "index_entities_on_entity_type_id"
+  end
+
+  create_table "entity_attribute_values", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "datetime_value"
+    t.bigint "entity_id", null: false
+    t.bigint "entity_type_attribute_id", null: false
+    t.float "float_value"
+    t.integer "int_value"
+    t.string "string_value"
+    t.datetime "updated_at", null: false
+    t.index ["entity_id", "entity_type_attribute_id"], name: "index_entity_attribute_values_on_entity_and_attribute", unique: true
+    t.index ["entity_id"], name: "index_entity_attribute_values_on_entity_id"
+    t.index ["entity_type_attribute_id"], name: "index_entity_attribute_values_on_entity_type_attribute_id"
+  end
+
+  create_table "entity_type_attributes", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "entity_type_id", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.string "value_type", null: false
+    t.index ["entity_type_id", "name"], name: "index_entity_type_attributes_on_type_and_name", unique: true
+    t.index ["entity_type_id"], name: "index_entity_type_attributes_on_entity_type_id"
+  end
+
+  create_table "entity_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower((name)::text)", name: "index_entity_types_on_lower_name", unique: true
   end
 
   create_table "fetch_records", force: :cascade do |t|
@@ -147,6 +186,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_204822) do
     t.datetime "created_at", null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "relationships", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "from_entity_id", null: false
+    t.bigint "to_entity_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["from_entity_id"], name: "index_relationships_on_from_entity_id"
+    t.index ["to_entity_id"], name: "index_relationships_on_to_entity_id"
   end
 
   create_table "research_starting_points", force: :cascade do |t|
@@ -359,12 +407,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_204822) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "chats", "models"
+  add_foreign_key "entities", "entity_types"
+  add_foreign_key "entity_attribute_values", "entities"
+  add_foreign_key "entity_attribute_values", "entity_type_attributes"
+  add_foreign_key "entity_type_attributes", "entity_types"
   add_foreign_key "fetch_records", "domains"
   add_foreign_key "learning_set_sources", "learning_sets", on_delete: :cascade
   add_foreign_key "learning_set_sources", "sources"
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "models"
   add_foreign_key "messages", "tool_calls"
+  add_foreign_key "relationships", "entities", column: "from_entity_id"
+  add_foreign_key "relationships", "entities", column: "to_entity_id"
   add_foreign_key "skill_evaluation_models", "models"
   add_foreign_key "skill_evaluation_models", "skill_evaluations", on_delete: :cascade
   add_foreign_key "skill_evaluation_results", "chats"

@@ -1,0 +1,48 @@
+<% content_for :title, "Edit #{@entity.label}" %>
+<h1>Edit <%= @entity.label %></h1>
+<p class="text-muted">
+  <%= link_to @entity.entity_type.name, entity_type_path(@entity.entity_type) %>
+</p>
+
+<%= form_with model: @entity, local: true do |f| %>
+  <% if @entity.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% @entity.errors.full_messages.each do |m| %>
+          <li><%= m %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <% if @entity.entity_attribute_values.any? %>
+    <%= f.fields_for :entity_attribute_values do |vf| %>
+      <% attribute = vf.object.entity_type_attribute %>
+      <div class="mb-3">
+        <%= vf.label :value, attribute.name, class: "form-label" %>
+        <span class="text-muted small">(<%= attribute.value_type %>)</span>
+        <%= vf.hidden_field :entity_type_attribute_id, value: attribute.id %>
+        <%# The input type follows the declared value type, so the browser
+            rejects the obvious mistakes before the model has to. %>
+        <% case attribute.value_type %>
+        <% when "int" %>
+          <%= vf.number_field :value, value: vf.object.value, step: 1, class: "form-control" %>
+        <% when "float" %>
+          <%= vf.number_field :value, value: vf.object.value, step: "any", class: "form-control" %>
+        <% when "datetime" %>
+          <%= vf.datetime_field :value, value: vf.object.value, class: "form-control" %>
+        <% else %>
+          <%= vf.text_field :value, value: vf.object.value, class: "form-control" %>
+        <% end %>
+      </div>
+    <% end %>
+  <% else %>
+    <p class="text-muted">
+      <%= link_to @entity.entity_type.name, entity_type_path(@entity.entity_type) %>
+      defines no attributes yet, so there is nothing to fill in.
+    </p>
+  <% end %>
+
+  <%= f.submit "Save entity", class: "btn btn-primary" %>
+  <%= link_to "Cancel", entity_path(@entity), class: "btn btn-outline-secondary" %>
+<% end %>

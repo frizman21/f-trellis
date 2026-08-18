@@ -311,7 +311,75 @@ They sit outside the knowledge and research navigation the sidebar offers.
 
 ---
 
-## 6. Relationship map
+## 6. The ontology
+
+The knowledge model, rebuilt generically after the tier 1 entity concept was
+removed (#4). Adding a new kind of thing is a row in `entity_types`, not a
+migration and a new set of tables — which is the specific failure of what it
+replaces.
+
+### `EntityType`
+
+| Column        | Type     | Notes                                   |
+|---------------|----------|-----------------------------------------|
+| `name`        | `string`, NOT NULL | Unique, case-insensitively.   |
+| `description` | `text`   | What this kind of thing is.             |
+
+### `EntityTypeAttribute`
+
+One typed attribute things of a type may carry.
+
+| Column           | Type     | Notes                                              |
+|------------------|----------|----------------------------------------------------|
+| `entity_type_id` | FK, NOT NULL | The type that declares it.                     |
+| `name`           | `string`, NOT NULL | Unique within the type.              |
+| `value_type`     | `string`, NOT NULL | One of `int`, `float`, `string`, `datetime`. |
+
+The column is **`value_type`, not `type`**. Rails reserves `type` for
+single-table inheritance: a column named `type` here would make ActiveRecord try
+to instantiate a class named `"int"` on every load.
+
+### `Entity`
+
+| Column           | Type     | Notes                          |
+|------------------|----------|--------------------------------|
+| `entity_type_id` | FK, NOT NULL | What kind of thing it is.  |
+
+An entity carries **no name**. It is identity plus type; anything nameable is an
+attribute value. `Entity#label` is the single place that decides what an entity
+is called: the value of an attribute named `name` when its type declares one and
+a value is recorded, and `"<type name> #<id>"` otherwise.
+
+### `EntityAttributeValue`
+
+| Column                     | Type       | Notes                                  |
+|----------------------------|------------|----------------------------------------|
+| `entity_id`                | FK, NOT NULL |                                      |
+| `entity_type_attribute_id` | FK, NOT NULL | Unique together with `entity_id`.    |
+| `int_value`                | `integer`  | Exactly one of these four is live,     |
+| `float_value`              | `float`    | chosen by the attribute's              |
+| `string_value`             | `string`   | `value_type`. `#value` and `#value=`   |
+| `datetime_value`           | `datetime` | are the only things that know which.   |
+
+Writing through `#value=` clears the other three columns, so changing an
+attribute's declared type cannot leave a stale value behind in a column nothing
+reads. A value that cannot be cast to its declared type is a validation error;
+a blank one records nothing.
+
+### `Relationship`
+
+| Column           | Type       | Notes                        |
+|------------------|------------|------------------------------|
+| `from_entity_id` | FK, NOT NULL | An `Entity`.               |
+| `to_entity_id`   | FK, NOT NULL | An `Entity`. Must differ.  |
+
+An untyped edge. It carries no kind or direction semantics yet — that is coming.
+`Relationship#other_end(entity)` answers "the far one from here", which is what
+keeps an entity's relationship table from linking back to the page it is on.
+
+---
+
+## 7. Relationship map
 
 ```
 Source ─┬─< SourceDatum
@@ -323,6 +391,12 @@ Source ─┬─< SourceDatum
 
 SourceExclusion              (standalone — consulted when links become Sources)
 Project                      (standalone — owns nothing yet)
+
+EntityType ─┬─< EntityTypeAttribute ─┬─< EntityAttributeValue >─ Entity
+            └─< Entity ──────────────┘
+
+Relationship ─┬─ Entity (from_entity)
+              └─ Entity (to_entity)
 
 SkillEvaluation ─┬─ Skill
                  ├─ LearningSet

@@ -1,0 +1,24 @@
+<%= form_with model: entity_type, local: true do |f| %>
+  <% if entity_type.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% entity_type.errors.full_messages.each do |m| %>
+          <li><%= m %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :name, class: "form-label" %>
+    <%= f.text_field :name, class: "form-control", required: true %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :description, class: "form-label" %>
+    <%= f.text_area :description, class: "form-control", rows: 3 %>
+  </div>
+
+  <%= f.submit submit_label, class: "btn btn-primary" %>
+  <%= link_to "Cancel", entity_types_path, class: "btn btn-outline-secondary" %>
+<% end %>
