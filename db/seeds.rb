@@ -118,6 +118,10 @@ end
   end
 end
 
+# The F-DoD landscape: the tier 1 model removed in #4, rebuilt as ontology.
+# Its own file — several hundred lines of data would swamp this one.
+load Rails.root.join("db/seeds/f_dod.rb").to_s
+
 skills = [
   { name: "Summarize",  purpose: "Condense a long document into a short brief." },
   { name: "Translate",  purpose: "Translate text from one language to another." }
