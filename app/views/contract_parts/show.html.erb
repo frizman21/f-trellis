@@ -1,0 +1,100 @@
+<% contract_detail = @contract.current_detail %>
+<% part_detail = @part.current_detail %>
+<% contract_label = contract_detail ? contract_detail.label : "Contract ##{@contract.id}" %>
+<% part_label = part_detail ? part_detail.name : "Part ##{@part.id}" %>
+<% content_for :title, "#{contract_label} ↔ #{part_label}" %>
+
+<h1><%= contract_label %>&nbsp;↔&nbsp;<%= part_label %></h1>
+
+<h2>Parties</h2>
+<table class="table">
+  <thead><tr><th>Side</th><th>Name</th><th>Type(s)</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Contract</td>
+      <td><%= link_to contract_label, @contract %></td>
+      <td><%= contract_detail&.contract_types&.map(&:name)&.join(", ") %></td>
+    </tr>
+    <tr>
+      <td>Part</td>
+      <td><%= link_to part_label, @part %></td>
+      <td><%= part_detail&.part_types&.map(&:name)&.join(", ") %></td>
+    </tr>
+  </tbody>
+</table>
+
+<% if @current %>
+  <h2>Current relationship detail</h2>
+  <dl>
+    <dt>As of</dt><dd><%= @current.as_of&.to_date %></dd>
+    <dt>Confidence</dt><dd><%= @current.confidence_tenths.to_i / 10.0 %>%</dd>
+    <% if @current.contract_part_types.any? %>
+      <dt>Types</dt><dd><%= @current.contract_part_types.map(&:name).join(", ") %></dd>
+    <% end %>
+    <% if @current.source_processing_report %>
+      <dt>Source</dt>
+      <dd><%= link_to @current.source_processing_report.source.url, @current.source_processing_report.source %></dd>
+    <% end %>
+  </dl>
+
+  <% if @current.additional_attributes.any? %>
+    <h3>Additional attributes</h3>
+    <table class="table table-sm">
+      <tbody>
+        <% @current.additional_attributes.each do |key, value| %>
+          <tr><th><%= key.humanize %></th><td><%= value %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+<% else %>
+  <p class="text-muted">No current detail set on this relationship.</p>
+<% end %>
+
+<% if @details.any? %>
+  <h2>Contributing details</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th></th>
+        <th>As of</th>
+        <th>Confidence</th>
+        <th>Types</th>
+        <th>Source</th>
+        <th>Additional attributes</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @details.each do |d| %>
+        <tr>
+          <td>
+            <% if d.id == @current&.id %>
+              <span class="badge bg-primary">current</span>
+            <% end %>
+          </td>
+          <td><%= d.as_of&.to_date %></td>
+          <td><%= d.confidence_tenths.to_i / 10.0 %>%</td>
+          <td><%= d.contract_part_types.map(&:name).join(", ") %></td>
+          <td>
+            <% src = d.source_processing_report&.source %>
+            <% if src %>
+              <%= link_to src.url, src %>
+            <% end %>
+          </td>
+          <td>
+            <% if d.additional_attributes.any? %>
+              <%= d.additional_attributes.map { |k, v| "#{k.humanize}: #{v}" }.join("; ") %>
+            <% end %>
+          </td>
+          <td><%= link_to "View", contract_part_detail_path(d) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<p>
+  <%= link_to "Back to contract", @contract %> ·
+  <%= link_to "Back to part", @part %>
+</p>

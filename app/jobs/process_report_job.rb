@@ -23,6 +23,7 @@ class ProcessReportJob < ApplicationJob
       UpsertPartTool.new(report),
       UpsertScienceTool.new(report),
       UpsertTechnologyTool.new(report),
+      UpsertContractTool.new(report),
       LinkPersonOrganizationTool.new(report),
       LinkPartOrganizationTool.new(report),
       LinkPersonPersonTool.new(report),
@@ -30,6 +31,11 @@ class ProcessReportJob < ApplicationJob
       LinkPartTechnologyTool.new(report),
       LinkScienceTechnologyTool.new(report),
       LinkPersonScienceTool.new(report),
+      LinkContractOrganizationTool.new(report),
+      LinkContractPersonTool.new(report),
+      LinkContractTechnologyTool.new(report),
+      LinkContractPartTool.new(report),
+      LinkOrganizationTechnologyTool.new(report),
       CreatePersonOrganizationTypeTool.new(report),
       CreatePersonPersonTypeTool.new(report)
     )

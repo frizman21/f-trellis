@@ -166,7 +166,35 @@ read_abstract_content = <<~MARKDOWN.strip
   link person organization tool. Author lists are the most reliable facts on the
   page — record them at high confidence.
 
-  ## 4. Build the relationships
+  ## 4. Record the contract, if the source names one
+
+  Award pages, contract announcements and funded-project summaries usually give
+  a contract or grant number. Where one is stated, record it with the upsert
+  contract tool. The contract is what actually ties a company to the technology
+  it is paid to build, so it is worth more than any other single fact on such a
+  page.
+
+  - The **identifier** is the contract number, not the project title. Use it
+    exactly as written.
+  - Give the title, the award value in dollars, and the start and end dates
+    where the source states them. Phase, program, solicitation number and
+    tracking number go in additional_attributes.
+  - **Only record a contract the source names.** A paper that says it was funded
+    by an agency, without a number, has no Contract in it. Record the agency's
+    involvement with the link organization technology tool as "Funder" instead.
+
+  Then say what the contract covers:
+
+  - **link contract organization** — the awardee company, the awarding agency,
+    any subcontractor, any partnered research institution.
+  - **link contract person** — the principal investigator and any named
+    technical contact. On an award page the PI is the most reliable person on it.
+  - **link contract technology** — what the contract is *for*. "Develop" where it
+    funds building the technology, "Apply", "Evaluate" or "Mature" otherwise.
+  - **link contract part** — only where the contract names a concrete artefact it
+    delivers or procures.
+
+  ## 5. Build the relationships
 
   This is the point of the exercise. A science and a technology recorded with no
   edge between them says almost nothing.
@@ -185,6 +213,16 @@ read_abstract_content = <<~MARKDOWN.strip
     artefact with the upsert part tool, then link it as "Implementation". A paper
     that describes a method with no built instance has no Part in it, and
     inventing one to hang the technology off is worse than leaving the edge out.
+  - **Organization ↔ Technology** — link the organization doing the work to the
+    technology with the link organization technology tool, as "Developer". Use
+    "Funder" for an agency that paid without a contract number in evidence, and
+    "Adopter" or "Licensee" where the source says a company took up or licensed
+    someone else's technology. Where you already recorded a contract covering the
+    same work, record this edge anyway: it stays true if the contract ends.
+
+  Do not connect a person or an organization to a technology just because they
+  share a science. Two projects can both rest on optics and have nothing to do
+  with each other, and an edge asserting otherwise is worse than no edge.
 
   ## Confidence
 
@@ -544,6 +582,89 @@ person_science_types = {
   memo[name] = PersonScienceType.find_or_create_by!(name: name) do |pst|
     pst.description = attrs[:description]
     pst.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+contract_types = {
+  "Research Contract"          => { description: "Funds investigation, with knowledge as the deliverable.",
+                                    keys: [ "vehicle", "competition" ] },
+  "Development Contract"       => { description: "Funds building a thing, with hardware or software as the deliverable.",
+                                    keys: [ "vehicle", "competition" ] },
+  "Grant"                      => { description: "Funds work without procuring a deliverable for the funder.",
+                                    keys: [ "program" ] },
+  "Other Transaction Agreement" => { description: "An agreement outside the standard procurement regulations.",
+                                     keys: [ "vehicle" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = ContractType.find_or_create_by!(name: name) do |ct|
+    ct.description = attrs[:description]
+    ct.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+contract_organization_types = {
+  "Awardee"              => { description: "The organization the contract is with.", keys: [ "role" ] },
+  "Awarding Agency"      => { description: "The organization paying for the work.",  keys: [ "office" ] },
+  "Subcontractor"        => { description: "Works under the awardee on this contract.", keys: [ "scope" ] },
+  "Research Institution" => { description: "A university or institute partnered on the contract.",
+                              keys: [ "department" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = ContractOrganizationType.find_or_create_by!(name: name) do |cot|
+    cot.description = attrs[:description]
+    cot.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+contract_person_types = {
+  "Principal Investigator" => { description: "Leads the technical work on the contract.", keys: [ "title" ] },
+  "Technical Contact"      => { description: "Named point of contact for the work.",      keys: [ "title" ] },
+  "Contracting Officer"    => { description: "Holds the contract on the funder's side.",  keys: [ "office" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = ContractPersonType.find_or_create_by!(name: name) do |cpt|
+    cpt.description = attrs[:description]
+    cpt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+contract_technology_types = {
+  "Develop" => { description: "The contract funds building the technology.",     keys: [ "phase" ] },
+  "Apply"   => { description: "The contract puts an existing technology to use.", keys: [ "phase" ] },
+  "Evaluate" => { description: "The contract funds assessing the technology, not building it.",
+                  keys: [ "phase" ] },
+  "Mature"  => { description: "The contract funds raising the technology's readiness level.",
+                 keys: [ "phase", "target_trl" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = ContractTechnologyType.find_or_create_by!(name: name) do |ctt|
+    ctt.description = attrs[:description]
+    ctt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+contract_part_types = {
+  "Deliverable" => { description: "The part is what the contract hands over.", keys: [ "quantity" ] },
+  "Component"   => { description: "The part goes into what the contract delivers.", keys: [ "quantity" ] },
+  "Procurement" => { description: "The contract buys the part rather than developing it.",
+                     keys: [ "quantity", "unit_price_usd" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = ContractPartType.find_or_create_by!(name: name) do |cpt|
+    cpt.description = attrs[:description]
+    cpt.additional_attribute_keys = attrs[:keys]
+  end
+end
+
+# The direct organization-to-technology edge, for what a contract cannot say.
+# "Developer" overlaps with holding a Develop contract, on purpose: a company
+# can build something with no award behind it, and adoption and licensing
+# rarely have a contract in our sources at all.
+organization_technology_types = {
+  "Developer" => { description: "The organization builds the technology.",   keys: [ "since", "maturity" ] },
+  "Funder"    => { description: "The organization pays for work on it.",     keys: [ "since" ] },
+  "Adopter"   => { description: "The organization uses the technology.",     keys: [ "since" ] },
+  "Licensee"  => { description: "The organization licensed the technology from whoever owns it.",
+                   keys: [ "since", "licensor" ] }
+}.each_with_object({}) do |(name, attrs), memo|
+  memo[name] = OrganizationTechnologyType.find_or_create_by!(name: name) do |ott|
+    ott.description = attrs[:description]
+    ott.additional_attribute_keys = attrs[:keys]
   end
 end
 

@@ -15,7 +15,13 @@ class RecordingToolsTest < ActiveSupport::TestCase
     "Science.count", "ScienceDetail.count", "Technology.count", "TechnologyDetail.count",
     "ScienceTechnology.count", "ScienceTechnologyDetail.count",
     "PartTechnology.count", "PartTechnologyDetail.count",
-    "PersonScience.count", "PersonScienceDetail.count"
+    "PersonScience.count", "PersonScienceDetail.count",
+    "Contract.count", "ContractDetail.count",
+    "ContractOrganization.count", "ContractOrganizationDetail.count",
+    "ContractPerson.count", "ContractPersonDetail.count",
+    "ContractTechnology.count", "ContractTechnologyDetail.count",
+    "ContractPart.count", "ContractPartDetail.count",
+    "OrganizationTechnology.count", "OrganizationTechnologyDetail.count"
   ].freeze
 
   setup do
@@ -45,6 +51,17 @@ class RecordingToolsTest < ActiveSupport::TestCase
     @application = ScienceTechnologyType.find_or_create_by!(name: "Application")
     @implementation = PartTechnologyType.find_or_create_by!(name: "Implementation")
     @researcher = PersonScienceType.find_or_create_by!(name: "Researcher")
+
+    @contracts = RecordingUpsertContractTool.new(@recorder)
+    @contract_org = RecordingLinkContractOrganizationTool.new(@recorder)
+    @contract_person = RecordingLinkContractPersonTool.new(@recorder)
+    @contract_tech = RecordingLinkContractTechnologyTool.new(@recorder)
+    @org_tech = RecordingLinkOrganizationTechnologyTool.new(@recorder)
+    @development = ContractType.find_or_create_by!(name: "Development Contract")
+    @awardee = ContractOrganizationType.find_or_create_by!(name: "Awardee")
+    @principal = ContractPersonType.find_or_create_by!(name: "Principal Investigator")
+    @develop = ContractTechnologyType.find_or_create_by!(name: "Develop")
+    @developer = OrganizationTechnologyType.find_or_create_by!(name: "Developer")
   end
 
   def two_people
@@ -390,5 +407,82 @@ class RecordingToolsTest < ActiveSupport::TestCase
 
     assert_equal [ "science type 'Sorcery' is not configured" ], result[:type_errors]
     assert_equal [ "discipline" ], @recorder.proposals.detect { |p| p["type"] == "science" }["science_types"]
+  end
+
+  # --- Contracts ------------------------------------------------------------
+
+  test "a contract is captured with its identifier, title and types, and nothing is written" do
+    assert_no_difference ENTITY_TABLES do
+      @contracts.execute(contracts: [
+        { identifier: "FA2541-26-C-B007", title: "Compact Propulsion", value_usd: "1699936.24",
+          contract_types: [ "Development Contract" ] }
+      ])
+    end
+
+    contract = @recorder.proposals.detect { |p| p["type"] == "contract" }
+
+    assert_equal "fa2541-26-c-b007", contract["identifier"]
+    assert_equal "compact propulsion", contract["title"]
+    assert_equal "1699936.24", contract["value_usd"]
+    assert_equal [ "development contract" ], contract["contract_types"]
+  end
+
+  test "the contract links are captured against the names, not the synthetic ids" do
+    contract_id = @contracts.execute(
+      contracts: [ { identifier: "FA2541-26-C-B007" } ]
+    )[:results].first[:contract_id]
+    org_id = @orgs.execute(organizations: [ { name: "Busek Co Inc" } ])[:results].first[:organization_id]
+    person_id = @people.execute(people: [ { first_name: "James",
+                                            last_name: "Szabo" } ])[:results].first[:person_id]
+    technology_id = @technologies.execute(
+      technologies: [ { name: "Hall Thruster" } ]
+    )[:results].first[:technology_id]
+
+    assert_no_difference ENTITY_TABLES do
+      @contract_org.execute(contract_id: contract_id, organization_id: org_id, type: "Awardee")
+      @contract_person.execute(contract_id: contract_id, person_id: person_id,
+                               type: "Principal Investigator")
+      @contract_tech.execute(contract_id: contract_id, technology_id: technology_id, type: "Develop")
+      @org_tech.execute(organization_id: org_id, technology_id: technology_id, type: "Developer")
+    end
+
+    assert_includes @recorder.proposals,
+                    { "type" => "contract_organization", "contract" => "fa2541-26-c-b007",
+                      "organization" => "busek co inc", "relationship_type" => "awardee",
+                      "attributes" => {} }
+    assert_includes @recorder.proposals,
+                    { "type" => "contract_person", "contract" => "fa2541-26-c-b007",
+                      "person" => "james szabo", "relationship_type" => "principal investigator",
+                      "attributes" => {} }
+    assert_includes @recorder.proposals,
+                    { "type" => "contract_technology", "contract" => "fa2541-26-c-b007",
+                      "technology" => "hall thruster", "relationship_type" => "develop",
+                      "attributes" => {} }
+    assert_includes @recorder.proposals,
+                    { "type" => "organization_technology", "organization" => "busek co inc",
+                      "technology" => "hall thruster", "relationship_type" => "developer",
+                      "attributes" => {} }
+  end
+
+  test "the contract stand-ins refuse an id never issued and a type not configured" do
+    contract_id = @contracts.execute(
+      contracts: [ { identifier: "FA2541-26-C-B007" } ]
+    )[:results].first[:contract_id]
+    technology_id = @technologies.execute(
+      technologies: [ { name: "Hall Thruster" } ]
+    )[:results].first[:technology_id]
+
+    assert_equal "no technology #4242",
+                 @contract_tech.execute(contract_id: contract_id, technology_id: 4242,
+                                        type: "Develop")[:error]
+    assert_equal "ContractTechnologyType 'Ponder' is not configured",
+                 @contract_tech.execute(contract_id: contract_id, technology_id: technology_id,
+                                        type: "Ponder")[:error]
+  end
+
+  test "a blank identifier is refused, exactly as the writing tool refuses it" do
+    assert_equal "identifier is required",
+                 @contracts.execute(contracts: [ { identifier: " " } ])[:results].first[:error]
+    assert_empty @recorder.proposals
   end
 end

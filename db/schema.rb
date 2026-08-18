@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_18_120024) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_18_130029) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -47,6 +47,221 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_120024) do
     t.bigint "model_id"
     t.datetime "updated_at", null: false
     t.index ["model_id"], name: "index_chats_on_model_id"
+  end
+
+  create_table "contract_detail_contract_types", force: :cascade do |t|
+    t.bigint "contract_detail_id", null: false
+    t.bigint "contract_type_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_detail_id", "contract_type_id"], name: "index_cdct_on_detail_and_type", unique: true
+    t.index ["contract_detail_id"], name: "index_cdct_on_detail_id"
+    t.index ["contract_type_id"], name: "index_cdct_on_type_id"
+  end
+
+  create_table "contract_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.bigint "contract_id", null: false
+    t.datetime "created_at", null: false
+    t.date "end_date"
+    t.string "identifier", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.date "start_date"
+    t.string "title"
+    t.datetime "updated_at", null: false
+    t.decimal "value_usd", precision: 15, scale: 2
+    t.index ["contract_id"], name: "index_contract_details_on_contract_id"
+    t.index ["source_processing_report_id"], name: "index_contract_details_on_source_processing_report_id"
+  end
+
+  create_table "contract_organization_detail_contract_organization_types", force: :cascade do |t|
+    t.bigint "contract_organization_detail_id", null: false
+    t.bigint "contract_organization_type_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_organization_detail_id", "contract_organization_type_id"], name: "index_codcot_on_pair", unique: true
+    t.index ["contract_organization_detail_id"], name: "index_codcot_on_detail_id"
+    t.index ["contract_organization_type_id"], name: "index_codcot_on_type_id"
+  end
+
+  create_table "contract_organization_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.bigint "contract_organization_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_organization_id"], name: "index_cod_on_contract_organization_id"
+    t.index ["source_processing_report_id"], name: "index_cod_on_source_processing_report_id"
+  end
+
+  create_table "contract_organization_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_contract_organization_types_on_name", unique: true
+  end
+
+  create_table "contract_organizations", force: :cascade do |t|
+    t.bigint "contract_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "organization_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_id", "organization_id"], name: "index_co_on_pair", unique: true
+    t.index ["contract_id"], name: "index_contract_organizations_on_contract_id"
+    t.index ["current_detail_id"], name: "index_contract_organizations_on_current_detail_id"
+    t.index ["organization_id"], name: "index_contract_organizations_on_organization_id"
+  end
+
+  create_table "contract_part_detail_contract_part_types", force: :cascade do |t|
+    t.bigint "contract_part_detail_id", null: false
+    t.bigint "contract_part_type_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_part_detail_id", "contract_part_type_id"], name: "index_cptdcptt_on_pair", unique: true
+    t.index ["contract_part_detail_id"], name: "index_cptdcptt_on_detail_id"
+    t.index ["contract_part_type_id"], name: "index_cptdcptt_on_type_id"
+  end
+
+  create_table "contract_part_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.bigint "contract_part_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_part_id"], name: "index_cptd_on_contract_part_id"
+    t.index ["source_processing_report_id"], name: "index_cptd_on_source_processing_report_id"
+  end
+
+  create_table "contract_part_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_contract_part_types_on_name", unique: true
+  end
+
+  create_table "contract_parts", force: :cascade do |t|
+    t.bigint "contract_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "part_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_id", "part_id"], name: "index_cpt_on_pair", unique: true
+    t.index ["contract_id"], name: "index_contract_parts_on_contract_id"
+    t.index ["current_detail_id"], name: "index_contract_parts_on_current_detail_id"
+    t.index ["part_id"], name: "index_contract_parts_on_part_id"
+  end
+
+  create_table "contract_people", force: :cascade do |t|
+    t.bigint "contract_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "person_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_id", "person_id"], name: "index_cps_on_pair", unique: true
+    t.index ["contract_id"], name: "index_contract_people_on_contract_id"
+    t.index ["current_detail_id"], name: "index_contract_people_on_current_detail_id"
+    t.index ["person_id"], name: "index_contract_people_on_person_id"
+  end
+
+  create_table "contract_person_detail_contract_person_types", force: :cascade do |t|
+    t.bigint "contract_person_detail_id", null: false
+    t.bigint "contract_person_type_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_person_detail_id", "contract_person_type_id"], name: "index_cpsdcpst_on_pair", unique: true
+    t.index ["contract_person_detail_id"], name: "index_cpsdcpst_on_detail_id"
+    t.index ["contract_person_type_id"], name: "index_cpsdcpst_on_type_id"
+  end
+
+  create_table "contract_person_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.bigint "contract_person_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_person_id"], name: "index_cpsd_on_contract_person_id"
+    t.index ["source_processing_report_id"], name: "index_cpsd_on_source_processing_report_id"
+  end
+
+  create_table "contract_person_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_contract_person_types_on_name", unique: true
+  end
+
+  create_table "contract_technologies", force: :cascade do |t|
+    t.bigint "contract_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "technology_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_id", "technology_id"], name: "index_ct_on_pair", unique: true
+    t.index ["contract_id"], name: "index_contract_technologies_on_contract_id"
+    t.index ["current_detail_id"], name: "index_contract_technologies_on_current_detail_id"
+    t.index ["technology_id"], name: "index_contract_technologies_on_technology_id"
+  end
+
+  create_table "contract_technology_detail_contract_technology_types", force: :cascade do |t|
+    t.bigint "contract_technology_detail_id", null: false
+    t.bigint "contract_technology_type_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_technology_detail_id", "contract_technology_type_id"], name: "index_ctdctt_on_pair", unique: true
+    t.index ["contract_technology_detail_id"], name: "index_ctdctt_on_detail_id"
+    t.index ["contract_technology_type_id"], name: "index_ctdctt_on_type_id"
+  end
+
+  create_table "contract_technology_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.bigint "contract_technology_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_technology_id"], name: "index_ctd_on_contract_technology_id"
+    t.index ["source_processing_report_id"], name: "index_ctd_on_source_processing_report_id"
+  end
+
+  create_table "contract_technology_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_contract_technology_types_on_name", unique: true
+  end
+
+  create_table "contract_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_contract_types_on_name", unique: true
+  end
+
+  create_table "contracts", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_contracts_on_current_detail_id"
   end
 
   create_table "domains", force: :cascade do |t|
@@ -263,6 +478,49 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_120024) do
     t.index ["organization_id", "created_at"], name: "idx_on_organization_id_created_at_ae8f96bcd5"
     t.index ["organization_id"], name: "index_organization_research_runs_on_organization_id"
     t.index ["seed_source_id"], name: "index_organization_research_runs_on_seed_source_id"
+  end
+
+  create_table "organization_technologies", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_detail_id"
+    t.bigint "organization_id", null: false
+    t.bigint "technology_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["current_detail_id"], name: "index_organization_technologies_on_current_detail_id"
+    t.index ["organization_id", "technology_id"], name: "index_ot_on_pair", unique: true
+    t.index ["organization_id"], name: "index_organization_technologies_on_organization_id"
+    t.index ["technology_id"], name: "index_organization_technologies_on_technology_id"
+  end
+
+  create_table "organization_technology_detail_organization_technology_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "organization_technology_detail_id", null: false
+    t.bigint "organization_technology_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_technology_detail_id", "organization_technology_type_id"], name: "index_otdott_on_pair", unique: true
+    t.index ["organization_technology_detail_id"], name: "index_otdott_on_detail_id"
+    t.index ["organization_technology_type_id"], name: "index_otdott_on_type_id"
+  end
+
+  create_table "organization_technology_details", force: :cascade do |t|
+    t.jsonb "additional_attributes", default: {}, null: false
+    t.datetime "as_of"
+    t.integer "confidence_tenths"
+    t.datetime "created_at", null: false
+    t.bigint "organization_technology_id", null: false
+    t.bigint "source_processing_report_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_technology_id"], name: "index_otd_on_organization_technology_id"
+    t.index ["source_processing_report_id"], name: "index_otd_on_source_processing_report_id"
+  end
+
+  create_table "organization_technology_types", force: :cascade do |t|
+    t.text "additional_attribute_keys", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_organization_technology_types_on_name", unique: true
   end
 
   create_table "organization_types", force: :cascade do |t|
@@ -977,6 +1235,39 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_120024) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "chats", "models"
+  add_foreign_key "contract_detail_contract_types", "contract_details"
+  add_foreign_key "contract_detail_contract_types", "contract_types"
+  add_foreign_key "contract_details", "contracts"
+  add_foreign_key "contract_details", "source_processing_reports"
+  add_foreign_key "contract_organization_detail_contract_organization_types", "contract_organization_details"
+  add_foreign_key "contract_organization_detail_contract_organization_types", "contract_organization_types"
+  add_foreign_key "contract_organization_details", "contract_organizations"
+  add_foreign_key "contract_organization_details", "source_processing_reports"
+  add_foreign_key "contract_organizations", "contract_organization_details", column: "current_detail_id"
+  add_foreign_key "contract_organizations", "contracts"
+  add_foreign_key "contract_organizations", "organizations"
+  add_foreign_key "contract_part_detail_contract_part_types", "contract_part_details"
+  add_foreign_key "contract_part_detail_contract_part_types", "contract_part_types"
+  add_foreign_key "contract_part_details", "contract_parts"
+  add_foreign_key "contract_part_details", "source_processing_reports"
+  add_foreign_key "contract_parts", "contract_part_details", column: "current_detail_id"
+  add_foreign_key "contract_parts", "contracts"
+  add_foreign_key "contract_parts", "parts"
+  add_foreign_key "contract_people", "contract_person_details", column: "current_detail_id"
+  add_foreign_key "contract_people", "contracts"
+  add_foreign_key "contract_people", "people"
+  add_foreign_key "contract_person_detail_contract_person_types", "contract_person_details"
+  add_foreign_key "contract_person_detail_contract_person_types", "contract_person_types"
+  add_foreign_key "contract_person_details", "contract_people"
+  add_foreign_key "contract_person_details", "source_processing_reports"
+  add_foreign_key "contract_technologies", "contract_technology_details", column: "current_detail_id"
+  add_foreign_key "contract_technologies", "contracts"
+  add_foreign_key "contract_technologies", "technologies"
+  add_foreign_key "contract_technology_detail_contract_technology_types", "contract_technology_details"
+  add_foreign_key "contract_technology_detail_contract_technology_types", "contract_technology_types"
+  add_foreign_key "contract_technology_details", "contract_technologies"
+  add_foreign_key "contract_technology_details", "source_processing_reports"
+  add_foreign_key "contracts", "contract_details", column: "current_detail_id"
   add_foreign_key "facilities", "facility_details", column: "current_detail_id"
   add_foreign_key "facility_detail_facility_types", "facility_details"
   add_foreign_key "facility_detail_facility_types", "facility_types"
@@ -1001,6 +1292,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_120024) do
   add_foreign_key "organization_organizations", "organizations", column: "organization_b_id"
   add_foreign_key "organization_research_runs", "organizations"
   add_foreign_key "organization_research_runs", "sources", column: "seed_source_id"
+  add_foreign_key "organization_technologies", "organization_technology_details", column: "current_detail_id"
+  add_foreign_key "organization_technologies", "organizations"
+  add_foreign_key "organization_technologies", "technologies"
+  add_foreign_key "organization_technology_detail_organization_technology_types", "organization_technology_details"
+  add_foreign_key "organization_technology_detail_organization_technology_types", "organization_technology_types"
+  add_foreign_key "organization_technology_details", "organization_technologies"
+  add_foreign_key "organization_technology_details", "source_processing_reports"
   add_foreign_key "organizations", "organization_details", column: "current_detail_id"
   add_foreign_key "part_detail_parameters", "part_details"
   add_foreign_key "part_detail_parameters", "part_type_parameters"

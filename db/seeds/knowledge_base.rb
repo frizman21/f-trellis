@@ -21,6 +21,12 @@ technology_types                = TechnologyType.all.index_by(&:name)
 part_technology_types           = PartTechnologyType.all.index_by(&:name)
 science_technology_types        = ScienceTechnologyType.all.index_by(&:name)
 person_science_types            = PersonScienceType.all.index_by(&:name)
+contract_types                  = ContractType.all.index_by(&:name)
+contract_organization_types     = ContractOrganizationType.all.index_by(&:name)
+contract_person_types           = ContractPersonType.all.index_by(&:name)
+contract_technology_types       = ContractTechnologyType.all.index_by(&:name)
+contract_part_types             = ContractPartType.all.index_by(&:name)
+organization_technology_types   = OrganizationTechnologyType.all.index_by(&:name)
 
 summarize_revision = Skill.find_by(name: "Summarize").skill_revisions.first
 
@@ -1008,6 +1014,137 @@ end
     d.additional_attributes = link[:attributes]
   end
   detail.person_science_types = [ person_science_types.fetch(link[:type]) ]
+  edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
+end
+
+# ---------------------------------------------------------------------------
+# Contracts: tier 1 + Contract↔Organization + Contract↔Person +
+# Contract↔Technology + Contract↔Part, plus the direct Organization↔Technology
+# edge.
+#
+# The contract is what ties a company to the technology it was paid to build,
+# so the demo data needs one for the Technology show page to have anything in
+# its Organizations and Contracts sections.
+#
+# The identifier is SYNTHETIC. Seed data should not read as a genuine
+# procurement record, so this is plainly a demo string rather than the real
+# Apollo guidance contract number.
+# ---------------------------------------------------------------------------
+
+agc_contract_detail = ContractDetail.find_by(identifier: "DEMO-AGC-0001")
+if agc_contract_detail.nil?
+  contract = Contract.create!
+  agc_contract_detail = ContractDetail.create!(
+    contract: contract,
+    identifier: "DEMO-AGC-0001",
+    title: "Apollo Guidance Computer design and fabrication (illustrative)",
+    value_usd: 12_500_000.00,
+    start_date: Date.new(1961, 8, 9),
+    end_date: Date.new(1969, 12, 31),
+    as_of: Time.zone.parse("1961-08-09"),
+    confidence_tenths: 600,
+    additional_attributes: { "vehicle" => "demo", "competition" => "sole source" },
+    source_processing_report: apollo_report
+  )
+end
+agc_contract_detail.contract_types = [ contract_types.fetch("Development Contract") ]
+agc_contract = agc_contract_detail.contract
+agc_contract.update!(current_detail: agc_contract_detail) unless
+  agc_contract.current_detail_id == agc_contract_detail.id
+
+# Who the contract is with. NASA funds it; the synthetic manufacturer already
+# seeded against the AGC holds it.
+agc_manufacturer = PartOrganizationDetail
+  .joins(:part_organization_types, part_organization: :part)
+  .where(parts: { id: agc_part&.id }, part_organization_types: { name: "Manufacturer" })
+  .first&.part_organization&.organization
+
+[
+  { organization: nasa_org,         type: "Awarding Agency", attributes: { "office" => "Manned Spacecraft Center" } },
+  { organization: agc_manufacturer, type: "Awardee",         attributes: { "role" => "prime" } }
+].each do |link|
+  next unless link[:organization]
+
+  edge = ContractOrganization.find_or_create_by!(contract: agc_contract, organization: link[:organization])
+  detail = edge.contract_organization_details.find_or_create_by!(as_of: Time.zone.parse("1961-08-09")) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = 600
+    d.additional_attributes = link[:attributes]
+  end
+  detail.contract_organization_types = [ contract_organization_types.fetch(link[:type]) ]
+  edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
+end
+
+# The person on the contract. Reuses a seeded person rather than inventing one.
+contract_pi = PersonDetail.find_by(last_name: "Turing")&.person
+if contract_pi
+  edge = ContractPerson.find_or_create_by!(contract: agc_contract, person: contract_pi)
+  detail = edge.contract_person_details.find_or_create_by!(as_of: Time.zone.parse("1961-08-09")) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = 400
+    d.additional_attributes = { "title" => "Principal Investigator (illustrative)" }
+  end
+  detail.contract_person_types = [ contract_person_types.fetch("Principal Investigator") ]
+  edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
+end
+
+# What the contract is for. This is the edge that puts a company on a
+# Technology page.
+[
+  { technology: "Core Rope Memory",               type: "Develop", attributes: { "phase" => "development" } },
+  { technology: "Real-Time Executive Scheduling", type: "Develop", attributes: { "phase" => "development" } },
+  { technology: "Integrated Circuit",             type: "Apply",   attributes: { "phase" => "production" } }
+].each do |link|
+  technology = technologies_by_name[link[:technology]]
+  next unless technology
+
+  edge = ContractTechnology.find_or_create_by!(contract: agc_contract, technology: technology)
+  detail = edge.contract_technology_details.find_or_create_by!(as_of: Time.zone.parse("1961-08-09")) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = 600
+    d.additional_attributes = link[:attributes]
+  end
+  detail.contract_technology_types = [ contract_technology_types.fetch(link[:type]) ]
+  edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
+end
+
+# What it delivers.
+[
+  { part: agc_part,                            type: "Deliverable", attributes: { "quantity" => "1" } },
+  { part: parts_by_name["AGC Memory Module"],  type: "Component",   attributes: { "quantity" => "1" } }
+].each do |link|
+  next unless link[:part]
+
+  edge = ContractPart.find_or_create_by!(contract: agc_contract, part: link[:part])
+  detail = edge.contract_part_details.find_or_create_by!(as_of: Time.zone.parse("1961-08-09")) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = 600
+    d.additional_attributes = link[:attributes]
+  end
+  detail.contract_part_types = [ contract_part_types.fetch(link[:type]) ]
+  edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
+end
+
+# The direct organization-to-technology edge, for what the contract cannot say:
+# NASA went on using core rope memory as an adopter beyond any one award.
+[
+  { organization: agc_manufacturer, technology: "Core Rope Memory", type: "Developer",
+    attributes: { "since" => "1961", "maturity" => "flight qualified" } },
+  { organization: nasa_org,         technology: "Core Rope Memory", type: "Adopter",
+    attributes: { "since" => "1966" } },
+  { organization: nasa_org,         technology: "Real-Time Executive Scheduling", type: "Funder",
+    attributes: { "since" => "1961" } }
+].each do |link|
+  technology = technologies_by_name[link[:technology]]
+  next unless link[:organization] && technology
+
+  edge = OrganizationTechnology.find_or_create_by!(organization: link[:organization], technology: technology)
+  detail = edge.organization_technology_details.find_or_create_by!(as_of: Time.zone.parse("1966-01-01")) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = 700
+    d.additional_attributes = link[:attributes]
+  end
+  detail.organization_technology_types = [ organization_technology_types.fetch(link[:type]) ]
   edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
 end
 

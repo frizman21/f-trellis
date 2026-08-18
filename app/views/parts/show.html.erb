@@ -150,4 +150,21 @@
         }
       } %>
 
+<% cps = @part.contract_parts.includes(:contract, current_detail: :contract_part_types) %>
+<%= render "shared/relationship_table",
+      title: "Contracts",
+      column_header: "Contract",
+      empty_message: "No contracts recorded for this part.",
+      rows: cps.map { |cp|
+        other_detail = cp.contract.current_detail
+        rel_detail = cp.current_detail
+        {
+          name: other_detail ? other_detail.label : "Contract ##{cp.contract_id}",
+          record: cp.contract,
+          types: rel_detail&.contract_part_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: contract_part_path(cp)
+        }
+      } %>
+
 <p><%= link_to "Back to parts", parts_path %></p>
