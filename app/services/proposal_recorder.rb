@@ -73,6 +73,36 @@ class ProposalRecorder
     [ id, created ]
   end
 
+  # Summary rides along with the name rather than being a proposal of its own:
+  # "this paper is about magnetohydrodynamics" and "here is what that is" are
+  # one contribution, and counting them separately would let a model out-rank
+  # another by writing more prose about the same field.
+  def record_science(name:, summary: nil, science_types: [], attributes: nil)
+    label = normalize(name)
+    id, created = identify(:science, label)
+
+    add("science",
+        "name" => label,
+        "summary" => normalize(summary).presence,
+        "science_types" => Array(science_types).map { |t| normalize(t) }.sort,
+        "attributes" => normalize_attributes(attributes))
+
+    [ id, created ]
+  end
+
+  def record_technology(name:, summary: nil, technology_types: [], attributes: nil)
+    label = normalize(name)
+    id, created = identify(:technology, label)
+
+    add("technology",
+        "name" => label,
+        "summary" => normalize(summary).presence,
+        "technology_types" => Array(technology_types).map { |t| normalize(t) }.sort,
+        "attributes" => normalize_attributes(attributes))
+
+    [ id, created ]
+  end
+
   def record_person_organization(person_id:, organization_id:, relationship_type:, attributes: nil)
     add("person_organization",
         "person" => label_for(:person, person_id),
@@ -91,6 +121,36 @@ class ProposalRecorder
         "attributes" => normalize_attributes(attributes))
 
     next_id(:part_organization)
+  end
+
+  def record_part_technology(part_id:, technology_id:, relationship_type:, attributes: nil)
+    add("part_technology",
+        "part" => label_for(:part, part_id),
+        "technology" => label_for(:technology, technology_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:part_technology)
+  end
+
+  def record_science_technology(science_id:, technology_id:, relationship_type:, attributes: nil)
+    add("science_technology",
+        "science" => label_for(:science, science_id),
+        "technology" => label_for(:technology, technology_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:science_technology)
+  end
+
+  def record_person_science(person_id:, science_id:, relationship_type:, attributes: nil)
+    add("person_science",
+        "person" => label_for(:person, person_id),
+        "science" => label_for(:science, science_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:person_science)
   end
 
   def record_person_person(person_a_id:, person_b_id:, relationship_type:, attributes: nil)

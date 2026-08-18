@@ -64,6 +64,12 @@
               <li class="nav-item">
                 <%= link_to "Parts", parts_path, class: "nav-link" %>
               </li>
+              <li class="nav-item">
+                <%= link_to "Sciences", sciences_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Technologies", technologies_path, class: "nav-link" %>
+              </li>
             </ul>
 
             <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted text-uppercase small">Types</h6>
@@ -81,6 +87,12 @@
                 <%= link_to "Part Types", part_types_path, class: "nav-link" %>
               </li>
               <li class="nav-item">
+                <%= link_to "Science Types", science_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Technology Types", technology_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
                 <%= link_to "Person ↔ Organization Types", person_organization_types_path, class: "nav-link" %>
               </li>
               <li class="nav-item">
@@ -94,6 +106,15 @@
               </li>
               <li class="nav-item">
                 <%= link_to "Part ↔ Part Types", part_part_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Part ↔ Technology Types", part_technology_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Science ↔ Technology Types", science_technology_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Person ↔ Science Types", person_science_types_path, class: "nav-link" %>
               </li>
             </ul>
 

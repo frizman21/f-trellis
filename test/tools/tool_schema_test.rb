@@ -8,7 +8,9 @@ class ToolSchemaTest < ActiveSupport::TestCase
   BATCHED_TOOLS = {
     UpsertOrganizationTool => "organizations",
     UpsertPersonTool => "people",
-    UpsertPartTool => "parts"
+    UpsertPartTool => "parts",
+    UpsertScienceTool => "sciences",
+    UpsertTechnologyTool => "technologies"
   }.freeze
 
   def schema_for(klass)
@@ -70,6 +72,53 @@ class ToolSchemaTest < ActiveSupport::TestCase
     assert_equal %i[as_stated parameter unit value],
                  specs[:items][:properties].keys.map(&:to_sym).sort
     assert_equal %w[parameter value], specs[:items][:required].map(&:to_s).sort
+  end
+
+  # Types are optional on these two, unlike Part — a science has no parameters
+  # hanging off its type, so a finding with no type is still worth recording.
+  test "UpsertScienceTool requires only a name per entry" do
+    entry = schema_for(UpsertScienceTool).properties[:sciences][:items]
+
+    assert_equal %w[name], entry[:required].map(&:to_s)
+    assert_includes entry[:properties].keys.map(&:to_sym), :summary
+    assert_includes entry[:properties].keys.map(&:to_sym), :science_types
+  end
+
+  test "UpsertTechnologyTool requires only a name per entry" do
+    entry = schema_for(UpsertTechnologyTool).properties[:technologies][:items]
+
+    assert_equal %w[name], entry[:required].map(&:to_s)
+    assert_includes entry[:properties].keys.map(&:to_sym), :technology_types
+  end
+
+  NEW_LINK_TOOLS = {
+    LinkPartTechnologyTool => %i[part_id technology_id],
+    LinkScienceTechnologyTool => %i[science_id technology_id],
+    LinkPersonScienceTool => %i[person_id science_id]
+  }.freeze
+
+  NEW_LINK_TOOLS.each do |klass, endpoints|
+    test "#{klass} requires its two endpoints and the type, and nothing else" do
+      params = klass.parameters
+
+      assert_equal (endpoints + [ :type ]).sort, params.select { |_, p| p.required }.keys.sort
+      endpoints.each { |name| assert_equal "integer", params[name].type.to_s }
+      LINK_PARAMS.each { |name| assert_not params[name].required, "#{name} should be optional" }
+    end
+
+    test "#{klass}'s recording stand-in presents the identical contract" do
+      recording = Object.const_get("Recording#{klass.name.delete_suffix('Tool')}Tool")
+      written = klass.parameters
+      recorded = recording.parameters
+
+      assert_equal written.keys.sort, recorded.keys.sort
+      written.each do |name, param|
+        assert_equal param.type, recorded[name].type, "#{name} type differs"
+        assert_equal param.required, recorded[name].required, "#{name} requiredness differs"
+        assert_equal param.description, recorded[name].description, "#{name} description differs"
+      end
+      assert_equal klass.description, recording.description
+    end
   end
 
   TYPE_TOOLS = {
@@ -137,6 +186,13 @@ class ToolSchemaTest < ActiveSupport::TestCase
     assert_equal "upsert_part", UpsertPartTool.new(nil).name
     assert_equal "link_part_organization", LinkPartOrganizationTool.new(nil).name
     assert_equal "link_part_organization", RecordingLinkPartOrganizationTool.new(nil).name
+    assert_equal "upsert_science", UpsertScienceTool.new(nil).name
+    assert_equal "upsert_science", RecordingUpsertScienceTool.new(nil).name
+    assert_equal "upsert_technology", UpsertTechnologyTool.new(nil).name
+    assert_equal "link_part_technology", LinkPartTechnologyTool.new(nil).name
+    assert_equal "link_science_technology", LinkScienceTechnologyTool.new(nil).name
+    assert_equal "link_person_science", LinkPersonScienceTool.new(nil).name
+    assert_equal "link_person_science", RecordingLinkPersonScienceTool.new(nil).name
     assert_equal "create_person_organization_type", CreatePersonOrganizationTypeTool.new(nil).name
     assert_equal "create_person_person_type", CreatePersonPersonTypeTool.new(nil).name
   end

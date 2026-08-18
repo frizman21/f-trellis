@@ -53,10 +53,15 @@ class RunSkillEvaluationJob < ApplicationJob
       RecordingUpsertPersonTool.new(recorder),
       RecordingUpsertOrganizationTool.new(recorder),
       RecordingUpsertPartTool.new(recorder),
+      RecordingUpsertScienceTool.new(recorder),
+      RecordingUpsertTechnologyTool.new(recorder),
       RecordingLinkPersonOrganizationTool.new(recorder),
       RecordingLinkPartOrganizationTool.new(recorder),
       RecordingLinkPersonPersonTool.new(recorder),
       RecordingLinkOrganizationOrganizationTool.new(recorder),
+      RecordingLinkPartTechnologyTool.new(recorder),
+      RecordingLinkScienceTechnologyTool.new(recorder),
+      RecordingLinkPersonScienceTool.new(recorder),
       RecordingCreatePersonOrganizationTypeTool.new(recorder),
       RecordingCreatePersonPersonTypeTool.new(recorder)
     ]

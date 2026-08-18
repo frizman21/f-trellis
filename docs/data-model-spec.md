@@ -453,6 +453,8 @@ matrix below as items from §5 are completed.
 - **Organization** (`app/models/organization.rb`) — companies, agencies, labs, and other legal entities.
 - **Facility** (`app/models/facility.rb`) — physical locations; required typed column is `address`.
 - **Part** (`app/models/part.rb`) — physical components / assemblies / raw materials; required typed column is `name`.
+- **Science** (`app/models/science.rb`) — fields, principles, effects and phenomena; required typed column is `name`, with an optional `summary`.
+- **Technology** (`app/models/technology.rb`) — engineered capabilities: methods, materials, classes of device, subsystems; required typed column is `name`, with an optional `summary`.
 
 ### Completion matrix
 
@@ -470,27 +472,27 @@ to match. The matrix is a scoreboard, not a source of truth.
 
 Legend: **✓** done · **⚬** partial · **·** not started.
 
-| §5 checklist item                                        | Person | Organization | Facility | Part |
-|----------------------------------------------------------|:------:|:------------:|:--------:|:----:|
-| Entity table (`<entity>s`) migration                     |   ✓    |      ✓       |    ✓     |  ✓   |
-| Details table (`<entity>_details`) migration             |   ✓    |      ✓       |    ✓     |  ✓   |
-| `current_detail_id` FK migration                         |   ✓    |      ✓       |    ✓     |  ✓   |
-| `<entity>_types` migration + unique `name` index         |   ✓    |      ✓       |    ✓     |  ✓   |
-| Detail↔Type M2M join table migration                     |   ✓    |      ✓       |    ✓     |  ✓   |
-| Entity model + `has_many` details + `belongs_to :current_detail` | ✓ |      ✓       |    ✓     |  ✓   |
-| Detail model + `belongs_to :<entity>` + SPR + M2M        |   ✓    |      ✓       |    ✓     |  ✓   |
-| Type model + reverse M2M                                 |   ✓    |      ✓       |    ✓     |  ✓   |
-| Join model                                               |   ✓    |      ✓       |    ✓     |  ✓   |
-| `SourceProcessingReport.has_many :<entity>_details`      |   ✓    |      ✓       |    ✓     |  ✓   |
-| Routes: entity index/show + type full CRUD               |   ✓    |      ✓       |    ✓     |  ✓   |
-| Index view with search + Matched-on column               |   ✓    |      ✓       |    ✓     |  ✓   |
-| Show view with current + attributes + prior              |   ✓    |      ✓       |    ✓     |  ✓   |
-| `<Entity>TypesController` full CRUD + form               |   ✓    |      ✓       |    ✓     |  ✓   |
-| Sidebar links (Knowledge + Types)                        |   ✓    |      ✓       |    ✓     |  ✓   |
-| Seed: multi-detail + real reports + types + current      |   ✓    |      ✓       |    ✓     |  ⚬   |
-| Runtime: views use `entity.current_detail`               |   ✓    |      ✓       |    ✓     |  ✓   |
-| Runtime: `current_detail_id` auto-maintained on new Detail |  ·   |      ·       |    ·     |  ·   |
-| LLM `Upsert<Entity>Tool` + registered in ProcessReportJob |   ✓    |      ✓       |    ·     |  ·   |
+| §5 checklist item                                        | Person | Organization | Facility | Part | Science | Technology |
+|----------------------------------------------------------|:------:|:------------:|:--------:|:----:|:-------:|:----------:|
+| Entity table (`<entity>s`) migration                     |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Details table (`<entity>_details`) migration             |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| `current_detail_id` FK migration                         |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| `<entity>_types` migration + unique `name` index         |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Detail↔Type M2M join table migration                     |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Entity model + `has_many` details + `belongs_to :current_detail` | ✓ |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Detail model + `belongs_to :<entity>` + SPR + M2M        |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Type model + reverse M2M                                 |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Join model                                               |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| `SourceProcessingReport.has_many :<entity>_details`      |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Routes: entity index/show + type full CRUD               |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Index view with search + Matched-on column               |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Show view with current + attributes + prior              |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| `<Entity>TypesController` full CRUD + form               |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Sidebar links (Knowledge + Types)                        |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Seed: multi-detail + real reports + types + current      |   ✓    |      ✓       |    ✓     |  ⚬   |   ✓   |     ✓      |
+| Runtime: views use `entity.current_detail`               |   ✓    |      ✓       |    ✓     |  ✓   |   ✓   |     ✓      |
+| Runtime: `current_detail_id` auto-maintained on new Detail |  ·   |      ·       |    ·     |  ·   |   ·   |     ·      |
+| LLM `Upsert<Entity>Tool` + registered in ProcessReportJob |   ✓    |      ✓       |    ·     |  ·   |   ✓   |     ✓      |
 
 ---
 
@@ -648,6 +650,12 @@ below as items from §7 are completed.
   to an Organization (manufacturer, consumer, demand).
 - **PartPart** (`app/models/part_part.rb`) — self-referential link
   between two parts (composition).
+- **PartTechnology** (`app/models/part_technology.rb`) — links a Part to
+  the Technology it implements, embodies or depends on.
+- **ScienceTechnology** (`app/models/science_technology.rb`) — links a
+  Science to a Technology that applies it or is derived from it.
+- **PersonScience** (`app/models/person_science.rb`) — links a Person to
+  a Science they research, author in or contribute to.
 
 ### Completion matrix
 
@@ -657,31 +665,31 @@ matrix disagrees with reality, update the matrix.
 Legend: **✓** done · **⚬** partial · **·** not started · **—** not applicable
 (e.g. cross-entity-only items in self-referential columns).
 
-Column abbreviations: **PO** PersonOrganization · **PP** PersonPerson · **OO** OrganizationOrganization · **PartO** PartOrganization · **PartP** PartPart.
+Column abbreviations: **PO** PersonOrganization · **PP** PersonPerson · **OO** OrganizationOrganization · **PartO** PartOrganization · **PartP** PartPart · **PartT** PartTechnology · **ST** ScienceTechnology · **PS** PersonScience.
 
-| §7 checklist item                                             | PO | PP | OO | PartO | PartP |
-|---------------------------------------------------------------|:--:|:--:|:--:|:-----:|:-----:|
-| Relationship table (`<rel>s`) + unique edge index             | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Detail table (`<rel>_details`)                                | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| `current_detail_id` FK on `<rel>s`                            | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Type table (`<rel>_types`) + unique `name` index              | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Detail↔Type M2M join table                                    | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Relationship model + FKs + `current_detail` + details         | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Detail model + `<rel>` + SPR + M2M types                      | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Type model + reverse M2M                                      | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Join model                                                    | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Endpoints' `has_many :<rel>s` + `has_many :<other>, through:` | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| `SourceProcessingReport.has_many :<rel>_details`              | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| `<Rel>TypesController` full CRUD + form                       | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Sidebar link to `<Rel>TypesController#index` under Types      | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Endpoint show pages list the other side via this relationship | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| `<Rel>Controller#show` + per-edge link from both endpoints    | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Show: contributing-details table (badge + View link)          | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| `<Rel>DetailsController#show` per-detail provenance page      | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Seed: one `<Rel>` + details + real report + current populated | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Seed: at least one `<Rel>Type` attached to each detail        | ✓  | ✓  | ✓  |   ✓   |   ✓   |
-| Runtime: `current_detail_id` auto-maintained on new Detail    | ·  | ·  | ·  |   ·   |   ·   |
-| LLM `Link<Rel>Tool` (generic, type-as-param) + registered     | ✓  | ·  | ✓  |   ·   |   ·   |
+| §7 checklist item                                             | PO | PP | OO | PartO | PartP | PartT | ST | PS |
+|---------------------------------------------------------------|:--:|:--:|:--:|:-----:|:-----:|:-----:|:--:|:--:|
+| Relationship table (`<rel>s`) + unique edge index             | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Detail table (`<rel>_details`)                                | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| `current_detail_id` FK on `<rel>s`                            | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Type table (`<rel>_types`) + unique `name` index              | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Detail↔Type M2M join table                                    | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Relationship model + FKs + `current_detail` + details         | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Detail model + `<rel>` + SPR + M2M types                      | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Type model + reverse M2M                                      | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Join model                                                    | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Endpoints' `has_many :<rel>s` + `has_many :<other>, through:` | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| `SourceProcessingReport.has_many :<rel>_details`              | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| `<Rel>TypesController` full CRUD + form                       | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Sidebar link to `<Rel>TypesController#index` under Types      | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Endpoint show pages list the other side via this relationship | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| `<Rel>Controller#show` + per-edge link from both endpoints    | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Show: contributing-details table (badge + View link)          | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| `<Rel>DetailsController#show` per-detail provenance page      | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Seed: one `<Rel>` + details + real report + current populated | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Seed: at least one `<Rel>Type` attached to each detail        | ✓  | ✓  | ✓  |   ✓   |   ✓   |   ✓   | ✓  | ✓  |
+| Runtime: `current_detail_id` auto-maintained on new Detail    | ·  | ·  | ·  |   ·   |   ·   |   ·   | ·  | ·  |
+| LLM `Link<Rel>Tool` (generic, type-as-param) + registered     | ✓  | ·  | ✓  |   ·   |   ·   |   ✓   | ✓  | ✓  |
 
 ---
 

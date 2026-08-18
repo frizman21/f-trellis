@@ -16,6 +16,11 @@ organization_organization_types = OrganizationOrganizationType.all.index_by(&:na
 part_types                      = PartType.all.index_by(&:name)
 part_organization_types         = PartOrganizationType.all.index_by(&:name)
 part_part_types                 = PartPartType.all.index_by(&:name)
+science_types                   = ScienceType.all.index_by(&:name)
+technology_types                = TechnologyType.all.index_by(&:name)
+part_technology_types           = PartTechnologyType.all.index_by(&:name)
+science_technology_types        = ScienceTechnologyType.all.index_by(&:name)
+person_science_types            = PersonScienceType.all.index_by(&:name)
 
 summarize_revision = Skill.find_by(name: "Summarize").skill_revisions.first
 
@@ -831,6 +836,179 @@ Part.find_each do |part|
   )
   detail.part_organization_types = [ manufacturer_type ]
   po.update!(current_detail: detail)
+end
+
+# ---------------------------------------------------------------------------
+# Sciences and Technologies: tier 1 + Science↔Technology + Part↔Technology +
+# Person↔Science.
+#
+# Hung off the same Apollo story as the parts above, so the whole graph — people,
+# organizations, parts, the science underneath them and the technology between —
+# is reachable from one source and one processing report.
+# ---------------------------------------------------------------------------
+
+# "Digital Logic" carries two details at different `as_of` values, so the show
+# page has a populated "Prior details" table without waiting for a second run.
+sciences_data = {
+  "Digital Logic" => {
+    types: [ "Discipline" ],
+    details: [
+      { summary: "The study of computation expressed as discrete two-valued states.",
+        as_of: Time.zone.parse("1937-01-01"), confidence_tenths: 700,
+        additional_attributes: { "parent_field" => "Mathematics" } },
+      { summary: "The study of computation expressed as discrete two-valued states, and of " \
+                 "the circuits that realise it.",
+        as_of: Time.zone.parse("1962-01-01"), confidence_tenths: 950,
+        additional_attributes: { "parent_field" => "Computer Science" } }
+    ]
+  },
+  "Ferromagnetism" => {
+    types: [ "Phenomenon" ],
+    details: [
+      { summary: "The retention of magnetisation by certain materials after the applied field is removed.",
+        as_of: Time.zone.parse("1949-01-01"), confidence_tenths: 900,
+        additional_attributes: { "first_observed" => "antiquity" } }
+    ]
+  },
+  "Boolean Algebra" => {
+    types: [ "Principle" ],
+    details: [
+      { summary: "The algebra of truth values, on which every logic gate in a digital computer rests.",
+        as_of: Time.zone.parse("1854-01-01"), confidence_tenths: 1000,
+        additional_attributes: { "named_after" => "George Boole" } }
+    ]
+  }
+}
+
+sciences_by_name = {}
+sciences_data.each do |name, attrs|
+  science = ScienceDetail.find_by(name: name)&.science || Science.create!
+  sciences_by_name[name] = science
+
+  attrs[:details].each do |d|
+    detail = ScienceDetail.find_or_create_by!(science: science, as_of: d[:as_of]) do |row|
+      row.name = name
+      row.summary = d[:summary]
+      row.confidence_tenths = d[:confidence_tenths]
+      row.additional_attributes = d[:additional_attributes]
+      row.source_processing_report = apollo_report
+    end
+    detail.science_types = attrs[:types].map { |t| science_types.fetch(t) }
+  end
+
+  current = science.science_details.order(:as_of).last
+  science.update!(current_detail: current) unless science.current_detail_id == current.id
+end
+
+technologies_data = {
+  "Integrated Circuit" => {
+    types: [ "Device" ],
+    summary: "A complete logic circuit fabricated on a single piece of semiconductor.",
+    as_of: Time.zone.parse("1962-01-01"), confidence_tenths: 950,
+    additional_attributes: { "maturity" => "in production" }
+  },
+  "Core Rope Memory" => {
+    types: [ "Device" ],
+    summary: "Read-only storage woven by hand, where a wire threading a core reads as a one.",
+    as_of: Time.zone.parse("1964-01-01"), confidence_tenths: 900,
+    additional_attributes: { "maturity" => "flight qualified" }
+  },
+  "Real-Time Executive Scheduling" => {
+    types: [ "Method", "Subsystem" ],
+    summary: "Priority scheduling that sheds low-priority work rather than missing a deadline.",
+    as_of: Time.zone.parse("1968-01-01"), confidence_tenths: 850,
+    additional_attributes: { "maturity" => "flight qualified", "host_system" => "Apollo Guidance Computer" }
+  }
+}
+
+technologies_by_name = {}
+technologies_data.each do |name, attrs|
+  detail = TechnologyDetail.find_by(name: name)
+  if detail.nil?
+    technology = Technology.create!
+    detail = TechnologyDetail.create!(
+      technology: technology,
+      name: name,
+      summary: attrs[:summary],
+      as_of: attrs[:as_of],
+      confidence_tenths: attrs[:confidence_tenths],
+      additional_attributes: attrs[:additional_attributes],
+      source_processing_report: apollo_report
+    )
+  end
+  detail.technology_types = attrs[:types].map { |t| technology_types.fetch(t) }
+  detail.technology.update!(current_detail: detail) unless detail.technology.current_detail_id == detail.id
+  technologies_by_name[name] = detail.technology
+end
+
+# Science ↔ Technology: what each technology rests on.
+[
+  { science: "Boolean Algebra", technology: "Integrated Circuit", type: "Enabling Principle",
+    as_of: Time.zone.parse("1962-01-01"), confidence: 900, attributes: {} },
+  { science: "Ferromagnetism", technology: "Core Rope Memory", type: "Application",
+    as_of: Time.zone.parse("1964-01-01"), confidence: 950, attributes: { "since" => "1964" } },
+  { science: "Digital Logic", technology: "Real-Time Executive Scheduling", type: "Derived From",
+    as_of: Time.zone.parse("1968-01-01"), confidence: 700, attributes: { "since" => "1968" } }
+].each do |link|
+  science = sciences_by_name[link[:science]]
+  technology = technologies_by_name[link[:technology]]
+  next unless science && technology
+
+  edge = ScienceTechnology.find_or_create_by!(science: science, technology: technology)
+  detail = edge.science_technology_details.find_or_create_by!(as_of: link[:as_of]) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = link[:confidence]
+    d.additional_attributes = link[:attributes]
+  end
+  detail.science_technology_types = [ science_technology_types.fetch(link[:type]) ]
+  edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
+end
+
+# Part ↔ Technology: which artefact is the built instance of what.
+[
+  { part: "AGC CPU Module", technology: "Integrated Circuit", type: "Implementation",
+    as_of: Time.zone.parse("1966-01-01"), confidence: 950, attributes: { "since" => "1966" } },
+  { part: "AGC Memory Module", technology: "Core Rope Memory", type: "Implementation",
+    as_of: Time.zone.parse("1966-01-01"), confidence: 1000, attributes: { "since" => "1966" } },
+  { part: "Apollo Guidance Computer", technology: "Real-Time Executive Scheduling", type: "Dependency",
+    as_of: Time.zone.parse("1969-07-20"), confidence: 900, attributes: { "subsystem" => "Executive" } }
+].each do |link|
+  part = parts_by_name[link[:part]]
+  technology = technologies_by_name[link[:technology]]
+  next unless part && technology
+
+  edge = PartTechnology.find_or_create_by!(part: part, technology: technology)
+  detail = edge.part_technology_details.find_or_create_by!(as_of: link[:as_of]) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = link[:confidence]
+    d.additional_attributes = link[:attributes]
+  end
+  detail.part_technology_types = [ part_technology_types.fetch(link[:type]) ]
+  edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
+end
+
+# Person ↔ Science: the people behind the field. Looked up by their current
+# detail's name so a person seeded under an earlier name still matches.
+[
+  { last_name: "Turing",   science: "Digital Logic", type: "Contributor",
+    as_of: Time.zone.parse("1937-01-01"), confidence: 900,
+    attributes: { "contribution" => "Computability and the universal machine" } },
+  { last_name: "Lovelace", science: "Digital Logic", type: "Contributor",
+    as_of: Time.zone.parse("1843-10-01"), confidence: 700,
+    attributes: { "contribution" => "First published algorithm for a general-purpose machine" } }
+].each do |link|
+  person = PersonDetail.find_by(last_name: link[:last_name])&.person
+  science = sciences_by_name[link[:science]]
+  next unless person && science
+
+  edge = PersonScience.find_or_create_by!(person: person, science: science)
+  detail = edge.person_science_details.find_or_create_by!(as_of: link[:as_of]) do |d|
+    d.source_processing_report = apollo_report
+    d.confidence_tenths = link[:confidence]
+    d.additional_attributes = link[:attributes]
+  end
+  detail.person_science_types = [ person_science_types.fetch(link[:type]) ]
+  edge.update!(current_detail: detail) unless edge.current_detail_id == detail.id
 end
 
 # Synthetic Chat for the inspection UI. Idempotent via a sentinel content

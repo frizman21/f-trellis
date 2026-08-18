@@ -14,6 +14,10 @@ Rails.application.routes.draw do
   resources :facility_types, only: [:index, :new, :create, :edit, :update]
   resources :parts, only: [:index, :show]
   resources :part_types, only: [:index, :new, :create, :edit, :update]
+  resources :sciences, only: [:index, :show]
+  resources :science_types, only: [:index, :new, :create, :edit, :update]
+  resources :technologies, only: [:index, :show]
+  resources :technology_types, only: [:index, :new, :create, :edit, :update]
   resources :person_organizations,            only: [:show]
   resources :person_organization_details,     only: [:show]
   resources :person_organization_types,       only: [:index, :new, :create, :edit, :update]
@@ -29,6 +33,15 @@ Rails.application.routes.draw do
   resources :part_parts,                      only: [:show]
   resources :part_part_details,               only: [:show]
   resources :part_part_types,                 only: [:index, :new, :create, :edit, :update]
+  resources :part_technologies,               only: [:show]
+  resources :part_technology_details,         only: [:show]
+  resources :part_technology_types,           only: [:index, :new, :create, :edit, :update]
+  resources :science_technologies,            only: [:show]
+  resources :science_technology_details,      only: [:show]
+  resources :science_technology_types,        only: [:index, :new, :create, :edit, :update]
+  resources :person_sciences,                 only: [:show]
+  resources :person_science_details,          only: [:show]
+  resources :person_science_types,            only: [:index, :new, :create, :edit, :update]
   resources :sources, only: [:index, :show, :new, :create] do
     member do
       post :fetch
