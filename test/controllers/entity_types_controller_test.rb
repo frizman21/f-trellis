@@ -107,4 +107,15 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The description is prompt context, not a tidy-up note, and someone typing one
+  # needs to know that while they type it. Asserted on both actions rather than
+  # one: the shared partial is what makes them agree, and a test on `new` alone
+  # would not notice `edit` losing it.
+  test "the form says the description is the extraction context" do
+    get new_project_entity_type_path(@project)
+    assert_match(/context for extracting entities of this type from source material/, response.body)
+
+    get edit_project_entity_type_path(@project, entity_types(:rocket_engine))
+    assert_match(/context for extracting entities of this type from source material/, response.body)
+  end
 end

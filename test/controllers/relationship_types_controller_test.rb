@@ -93,4 +93,12 @@ class RelationshipTypesControllerTest < ActionDispatch::IntegrationTest
 
     assert_select ".badge", text: "Rocket Engine → Launch Vehicle"
   end
+
+  test "the form says the description is the extraction context" do
+    get new_project_relationship_type_path(@project)
+    assert_match(/context for extracting relationships of this type from source material/, response.body)
+
+    get edit_project_relationship_type_path(@project, relationship_types(:powers))
+    assert_match(/context for extracting relationships of this type from source material/, response.body)
+  end
 end

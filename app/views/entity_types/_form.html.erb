@@ -17,6 +17,10 @@
   <div class="mb-3">
     <%= f.label :description, class: "form-label" %>
     <%= f.text_area :description, class: "form-control", rows: 3 %>
+    <div class="form-text">
+      Used as the context for extracting entities of this type from source material. Write it for
+      the model that will read it: what counts as one, and what does not.
+    </div>
   </div>
 
   <%= f.submit submit_label, class: "btn btn-primary" %>

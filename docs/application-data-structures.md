@@ -323,7 +323,7 @@ replaces.
 | Column        | Type     | Notes                                   |
 |---------------|----------|-----------------------------------------|
 | `name`        | `string`, NOT NULL | Unique, case-insensitively.   |
-| `description` | `text`   | What this kind of thing is.             |
+| `description` | `text`   | What this kind of thing is. Used as the context for extracting entities of this type from source material, so it is written for the model that will read it, not only for a person browsing the ontology. |
 
 ### `EntityTypeAttribute`
 
@@ -366,16 +366,68 @@ attribute's declared type cannot leave a stale value behind in a column nothing
 reads. A value that cannot be cast to its declared type is a validation error;
 a blank one records nothing.
 
+### `RelationshipType`
+
+A kind of edge, and what it connects.
+
+| Column | Type | Notes |
+|---|---|---|
+| `project_id` | FK, NOT NULL | |
+| `name` | `string`, NOT NULL | Unique within the project. |
+| `description` | `text` | What this kind of edge means. Used as the context for extracting relationships of this type from source material, so it is written for the model that will read it, not only for a person browsing the ontology. |
+| `from_entity_type_id` | FK, NOT NULL | The kind of thing an edge of this kind starts at. |
+| `to_entity_type_id` | FK, NOT NULL | The kind it ends at. May be the same type. |
+
+The two ends are enforced, not merely recorded: a `Relationship` is invalid
+unless each of its entities is of the type its end declares. Direction is checked
+per end rather than as a pair, so a type from A to B does not permit an edge from
+B to A.
+
+### `RelationshipTypeAttribute`
+
+The relationship counterpart of `EntityTypeAttribute`, with the same four
+`value_type` values and the same reason for not being called `type`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `project_id` | FK, NOT NULL | |
+| `relationship_type_id` | FK, NOT NULL | |
+| `name` | `string`, NOT NULL | Unique within the type. |
+| `value_type` | `string`, NOT NULL | `int`, `float`, `string` or `datetime`. |
+
 ### `Relationship`
 
-| Column           | Type       | Notes                        |
-|------------------|------------|------------------------------|
-| `from_entity_id` | FK, NOT NULL | An `Entity`.               |
-| `to_entity_id`   | FK, NOT NULL | An `Entity`. Must differ.  |
+| Column | Type | Notes |
+|---|---|---|
+| `project_id` | FK, NOT NULL | |
+| `relationship_type_id` | FK, NOT NULL | What kind of edge this is. |
+| `from_entity_id` | FK, NOT NULL | An `Entity`, of the type's `from_entity_type`. |
+| `to_entity_id` | FK, NOT NULL | An `Entity`, of the type's `to_entity_type`. Must differ. |
 
-An untyped edge. It carries no kind or direction semantics yet — that is coming.
 `Relationship#other_end(entity)` answers "the far one from here", which is what
 keeps an entity's relationship table from linking back to the page it is on.
+
+### `RelationshipTypeValue`
+
+One recorded value for one attribute of one relationship. Identical in shape and
+behaviour to `EntityAttributeValue` — both include `TypedValue`, so the rule that
+exactly one of the four columns is live is written once.
+
+| Column | Type | Notes |
+|---|---|---|
+| `project_id` | FK, NOT NULL | |
+| `relationship_id` | FK, NOT NULL | Unique together with the attribute. |
+| `relationship_type_attribute_id` | FK, NOT NULL | |
+| `int_value` / `float_value` / `string_value` / `datetime_value` | | Exactly one is live. |
+
+### Citing a source
+
+Anything recorded can cite the `Source` it came from, through one of four join
+tables — `entity_sources`, `relationship_sources`,
+`entity_attribute_value_sources`, `relationship_type_value_sources` — each
+carrying the cited `source_id` and a `confidence` between 1 and 100, defaulting
+to 100. Citing is optional. A source that is still cited cannot be destroyed:
+losing the page a fact came from must not lose the fact.
 
 ---
 
@@ -390,13 +442,24 @@ Source ─┬─< SourceDatum
         └─< SkillEvaluationResult >─ SkillEvaluation
 
 SourceExclusion              (standalone — consulted when links become Sources)
-Project                      (standalone — owns nothing yet)
+Project                      (owns its ontology and its data)
 
-EntityType ─┬─< EntityTypeAttribute ─┬─< EntityAttributeValue >─ Entity
-            └─< Entity ──────────────┘
+Project ─┬─< EntityType ─┬─< EntityTypeAttribute ─┬─< EntityAttributeValue >─ Entity
+         │                └─< Entity ──────────────┘
+         └─< RelationshipType ─┬─< RelationshipTypeAttribute ─┬─< RelationshipTypeValue
+                               │                              └─< Relationship
+                               ├── EntityType (from_entity_type)
+                               └── EntityType (to_entity_type)
 
 Relationship ─┬─ Entity (from_entity)
-              └─ Entity (to_entity)
+              ├─ Entity (to_entity)
+              └─ RelationshipType
+
+Source ─┬─< EntitySource                >─ Entity
+        ├─< RelationshipSource          >─ Relationship
+        ├─< EntityAttributeValueSource  >─ EntityAttributeValue
+        └─< RelationshipTypeValueSource >─ RelationshipTypeValue
+              (each carries a confidence, 1..100)
 
 SkillEvaluation ─┬─ Skill
                  ├─ LearningSet
