@@ -51,6 +51,15 @@ x-app-env: &app-env
   RAILS_MASTER_KEY: ${RAILS_MASTER_KEY:?RAILS_MASTER_KEY must be set in .env.production}
   RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-5}
   WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+  # Which commit is running, for the navbar badge and the default crawler
+  # user-agent. AppVersion reads ENV["GIT_REV"] first and otherwise falls back
+  # to the .git directory, which .dockerignore keeps out of the image — so
+  # without this the badge reads "version unknown". Dokku sets this var on its
+  # own; a compose deploy has to pass it in:
+  #   GIT_REV=$(git rev-parse HEAD) docker compose ... up --build -d
+  # Left empty it degrades to the same "version unknown" as before, so an
+  # operator who forgets it gets today's behaviour rather than a wrong commit.
+  GIT_REV: ${GIT_REV:-}
   # host.docker.internal, not localhost: Postgres runs on the host, outside
   # compose, so `localhost` inside a container is the container itself. The
   # `extra_hosts: host-gateway` entry on app/worker makes this name resolve.
