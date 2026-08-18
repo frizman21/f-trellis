@@ -9,11 +9,18 @@ class EntitiesController < ApplicationController
     # The columns this type asks for, and the values for them preloaded, so the
     # table costs two queries rather than one per cell.
     @columns = @entity_type.index_columns.to_a
-    @entities = @project.entities
-                        .where(entity_type_id: @entity_type.id)
-                        .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
-                        .order(:id)
-                        .page(params[:page]).per(25)
+    @query = params[:q].to_s.strip
+    @sort_attribute = sort_attribute
+    @direction = direction
+
+    scope = @project.entities
+                    .where(entity_type_id: @entity_type.id)
+                    .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
+
+    scope = search(scope)
+    scope = sort(scope)
+
+    @entities = scope.page(params[:page]).per(25)
   end
 
   def show
@@ -81,6 +88,61 @@ class EntitiesController < ApplicationController
   end
 
   private
+
+  DIRECTIONS = %w[asc desc].freeze
+
+  # An IN against matching value rows rather than a join: an entity matching on
+  # two attributes should appear once, and a join would need a DISTINCT that then
+  # fights the sort.
+  #
+  # String values only. A substring match against a number is not a useful
+  # question, and the sort controls are the right tool there.
+  def search(scope)
+    return scope if @query.blank?
+
+    matches = EntityAttributeValue
+              .where(entity_id: scope.unscope(:includes).select(:id))
+              .where("string_value ILIKE ?", "%#{sanitize_sql_like(@query)}%")
+              .select(:entity_id)
+
+    scope.where(id: matches)
+  end
+
+  # A LEFT JOIN to the values of exactly the sorted attribute. Left, not inner,
+  # so entities with nothing recorded still appear; NULLS LAST so they sort last
+  # in both directions rather than bunching at whichever end nulls fall.
+  def sort(scope)
+    return scope.order(:id) if @sort_attribute.nil?
+
+    join = sanitize_sql_array([
+      "LEFT JOIN entity_attribute_values sort_values " \
+      "ON sort_values.entity_id = entities.id AND sort_values.entity_type_attribute_id = ?",
+      @sort_attribute.id
+    ])
+
+    # The column comes from a fixed map and the direction from a two-element
+    # list, so neither reaches SQL from the query string unchecked.
+    scope.joins(join)
+         .order(Arel.sql("sort_values.#{@sort_attribute.value_column} #{@direction} NULLS LAST"))
+         .order(:id)
+  end
+
+  # Looked up among this type's own attributes, so a sort naming another type's
+  # attribute — or one that no longer exists — falls back to the default order
+  # rather than erroring. A URL someone kept after a type changed still works.
+  def sort_attribute
+    name = params[:sort].to_s
+    return nil if name.blank?
+
+    @entity_type.entity_type_attributes.detect { |attribute| attribute.name == name }
+  end
+
+  def direction
+    DIRECTIONS.include?(params[:dir]) ? params[:dir] : "asc"
+  end
+
+  def sanitize_sql_like(value) = ActiveRecord::Base.sanitize_sql_like(value)
+  def sanitize_sql_array(array) = ActiveRecord::Base.send(:sanitize_sql_array, array)
 
   def set_project
     @project = Project.find(params[:project_id])

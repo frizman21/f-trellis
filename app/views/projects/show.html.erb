@@ -10,13 +10,12 @@
         <div class="card h-100">
           <div class="card-body">
             <h2 class="card-title h5 mb-1">
-              <%# Plural: a card stands for the collection, not for one of them. %>
+              <%# Plural: a card stands for the collection, not for one of them.
+                  No attribute popover here — a card is a way in, and the list it
+                  opens shows the attributes as columns anyway. %>
               <%= link_to entity_type.name.pluralize,
                           project_typed_entities_path(@project, entity_type.slug),
-                          class: "stretched-link text-decoration-none",
-                          data: { controller: "type-popover",
-                                  bs_title: entity_type.name,
-                                  bs_content: type_attribute_summary(entity_type) } %>
+                          class: "stretched-link text-decoration-none" %>
             </h2>
             <p class="card-subtitle text-muted small mb-2">
               <%= pluralize @counts.fetch(entity_type.id, 0), "entity", plural: "entities" %>

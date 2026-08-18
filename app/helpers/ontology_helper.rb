@@ -23,4 +23,19 @@ module OntologyHelper
 
     attributes.map { |attribute| "#{attribute.name} (#{attribute.value_type})" }.join("\n")
   end
+
+  # A column header that sorts by its attribute, toggling direction and marking
+  # which way the list currently runs.
+  #
+  # Every attribute is sortable — strings alphabetically, the rest by their own
+  # ordering — so this has no "is this sortable?" branch to get wrong.
+  def sort_header(attribute, current_attribute:, direction:, query:)
+    active = current_attribute&.id == attribute.id
+    next_direction = active && direction == "asc" ? "desc" : "asc"
+    arrow = active ? (direction == "asc" ? " ↑" : " ↓") : ""
+
+    link_to safe_join([ attribute.name, arrow ]),
+            url_for(sort: attribute.name, dir: next_direction, q: query.presence),
+            class: "text-decoration-none#{' fw-bold' if active}"
+  end
 end

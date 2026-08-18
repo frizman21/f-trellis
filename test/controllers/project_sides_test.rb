@@ -460,4 +460,18 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
     assert_not attribute.reload.is_displayed_on_index?
   end
+
+  # A card is a way in; the list it opens shows the attributes as columns.
+  test "the project page cards carry no attribute popover" do
+    get project_path(@project)
+
+    assert_select ".card a[data-controller=?]", "type-popover", count: 0
+  end
+
+  # Still present where a type is named rather than opened.
+  test "the structure page still carries popovers" do
+    get structure_project_path(@project)
+
+    assert_select "a[data-controller=?]", "type-popover"
+  end
 end
