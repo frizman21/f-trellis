@@ -3,13 +3,6 @@ require "test_helper"
 class EntityTypesControllerTest < ActionDispatch::IntegrationTest
   setup { @project = projects(:apollo) }
 
-  test "index renders and lists each type with its counts" do
-    get project_entity_types_path(@project)
-
-    assert_response :success
-    assert_select "h1", "Entity Types"
-    assert_select "a", text: "Rocket Engine"
-  end
 
   test "show lists the type's attributes and their value types" do
     get project_entity_type_path(@project, entity_types(:rocket_engine))
@@ -19,11 +12,6 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
     assert_select "td", text: "float"
   end
 
-  test "show links the entities of the type" do
-    get project_entity_type_path(@project, entity_types(:rocket_engine))
-
-    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
-  end
 
   test "show renders empty states for a type with no attributes and no entities" do
     type = @project.entity_types.create!(name: "Lonely")
@@ -32,7 +20,6 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match(/No attributes defined/, response.body)
-    assert_match(/No entities of this type yet/, response.body)
   end
 
   test "create makes a type" do
@@ -76,7 +63,7 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
       delete project_entity_type_path(@project, type)
     end
 
-    assert_redirected_to project_entity_types_path(@project)
+    assert_redirected_to structure_project_path(@project)
   end
 
   # A type with instances is not something to cascade away on a button press.
@@ -93,14 +80,6 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
 
   # --- scoping ---------------------------------------------------------------
 
-  test "index shows only this project's entity types" do
-    get project_entity_types_path(@project)
-
-    assert_response :success
-    assert_select "a", text: "Rocket Engine"
-    assert_select "a", text: "Capsule", count: 0
-    assert_select "tbody tr", @project.entity_types.count
-  end
 
   test "another project's entity type is not found under this project" do
     get project_entity_type_path(@project, entity_types(:gemini_capsule))
@@ -122,11 +101,39 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the ontology side renders the project header" do
-    get project_entity_types_path(@project)
+  # The description is prompt context, not a tidy-up note, and someone typing one
+  # needs to know that while they type it. Asserted on both actions rather than
+  # one: the shared partial is what makes them agree, and a test on `new` alone
+  # would not notice `edit` losing it.
+  test "the form says the description is the extraction context" do
+    get new_project_entity_type_path(@project)
+    assert_match(/context for extracting entities of this type from source material/, response.body)
 
-    assert_select "a[href=?]", projects_path
-    assert_select "a.nav-link.active[href=?]", project_entity_types_path(@project)
-    assert_select "a.nav-link[href=?]", project_entities_path(@project)
+    get edit_project_entity_type_path(@project, entity_types(:rocket_engine))
+    assert_match(/context for extracting entities of this type from source material/, response.body)
+  end
+
+  # The type's page says what the type is; what exists of it belongs on the list
+  # built for that, which is paginated and reached from the card and sidebar.
+  test "show renders no entity list" do
+    get project_entity_type_path(@project, entity_types(:rocket_engine))
+
+    assert_response :success
+    assert_select "h2", { text: "Entities", count: 0 }
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1)), count: 0
+  end
+
+  test "show still renders the type itself" do
+    get project_entity_type_path(@project, entity_types(:rocket_engine))
+
+    assert_select "h1", "Rocket Engine"
+    assert_select "td", text: "thrust_kn"
+  end
+
+  test "the type's entities are still reachable at their own address" do
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+
+    assert_response :success
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
   end
 end

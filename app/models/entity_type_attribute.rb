@@ -9,7 +9,10 @@ class EntityTypeAttribute < ApplicationRecord
   belongs_to :entity_type
   scoped_to_project_through :entity_type
 
-  has_many :entity_attribute_values, dependent: :destroy
+  has_many :entity_attribute_values, dependent: :restrict_with_error
+
+  # What TypedAttribute#used? asks.
+  alias_method :recorded_values, :entity_attribute_values
 
   validates :name, presence: true,
                    uniqueness: { scope: :entity_type_id, case_sensitive: false }

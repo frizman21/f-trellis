@@ -19,6 +19,7 @@ class Relationship < ApplicationRecord
   validate :ends_are_different
   validate :ends_share_a_project
   validate :type_is_in_the_same_project
+  validate :ends_match_the_type
 
   # The far end, seen from one of them. The show page lists a relationship from
   # either side, and asking each row which entity is "the other one" is what
@@ -27,14 +28,19 @@ class Relationship < ApplicationRecord
     from_entity_id == entity.id ? to_entity : from_entity
   end
 
+  def values_by_attribute_id = relationship_type_values.index_by(&:relationship_type_attribute_id)
+
   # The type's attributes paired with this relationship's values, including
   # attributes with nothing recorded — the same shape the entity side shows, so
   # a blank is a row rather than a missing one.
   def attribute_rows
     recorded = relationship_type_values.index_by(&:relationship_type_attribute_id)
 
-    relationship_type.relationship_type_attributes.map do |attribute|
-      [ attribute, recorded[attribute.id] ]
+    relationship_type.relationship_type_attributes.filter_map do |attribute|
+      value = recorded[attribute.id]
+      next if attribute.is_disabled? && value.nil?
+
+      [ attribute, value ]
     end
   end
 
@@ -43,7 +49,7 @@ class Relationship < ApplicationRecord
   def build_missing_attribute_values
     recorded = relationship_type_values.index_by(&:relationship_type_attribute_id)
 
-    relationship_type.relationship_type_attributes.each do |attribute|
+    relationship_type.relationship_type_attributes.active.each do |attribute|
       next if recorded.key?(attribute.id)
 
       relationship_type_values.build(relationship_type_attribute: attribute)
@@ -51,6 +57,26 @@ class Relationship < ApplicationRecord
   end
 
   private
+
+  # The type says what it connects, and that is checked rather than assumed.
+  # Direction is not symmetric: a type from A to B does not permit B to A, so
+  # each end is checked against its own declared type rather than against the
+  # pair as a set.
+  def ends_match_the_type
+    return if relationship_type.nil?
+
+    if from_entity && from_entity.entity_type_id != relationship_type.from_entity_type_id
+      errors.add(:from_entity,
+                 "must be a #{relationship_type.from_entity_type.name} " \
+                 "for a #{relationship_type.name} relationship")
+    end
+
+    return unless to_entity && to_entity.entity_type_id != relationship_type.to_entity_type_id
+
+    errors.add(:to_entity,
+               "must be a #{relationship_type.to_entity_type.name} " \
+               "for a #{relationship_type.name} relationship")
+  end
 
   # As with an entity and its type: one project's edges cannot be typed by
   # another project's ontology.

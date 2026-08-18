@@ -9,15 +9,27 @@ Rails.application.routes.draw do
   # A project has two sides: the ontology it describes things with, and the data
   # recorded against it. Both live under the project — with everything scoped, a
   # top-level ontology screen would have no project to show.
-  resources :projects, only: [:index, :new, :create, :edit, :update] do
-    resources :entity_types do
-      resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+  resources :projects, only: [:index, :show, :new, :create, :edit, :update] do
+    # A project's data view is the project itself; its structure has its own
+    # address.
+    member do
+      get :structure
     end
-    resources :relationship_types do
-      resources :relationship_type_attributes, only: [:new, :create, :edit, :update, :destroy]
-    end
-    resources :entities
+
+    # Index actions live at :ontology and :data above; these carry the records.
+    # Attributes are edited on their type's own form, so they have no screens of
+    # their own — two places to add an attribute is how the two drift.
+    resources :entity_types, except: [:index]
+    resources :relationship_types, except: [:index]
+    resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]
+
+    # A project's entities of one kind, at the type's own slug — /projects/1/
+    # rocket-engines. Declared last so every named route above wins the match
+    # first; EntityType additionally refuses a slug that would collide with one,
+    # because route ordering alone would let such a type save and then be
+    # unreachable.
+    get ":type_slug", to: "entities#index", as: :typed_entities
   end
 
   resources :sources, only: [:index, :show, :new, :create] do

@@ -5,25 +5,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   # --- index -----------------------------------------------------------------
 
-  test "index renders and labels each entity" do
-    get project_entities_path(@project)
 
-    assert_response :success
-    assert_select "h1", "Entities"
-    assert_select "a", text: "Rocketdyne F-1"
-  end
-
-  test "index shows the empty state when there are no entities" do
-    RelationshipTypeValue.delete_all
-    Relationship.delete_all
-    EntityAttributeValue.delete_all
-    Entity.delete_all
-
-    get project_entities_path(@project)
-
-    assert_response :success
-    assert_match(/No entities yet/, response.body)
-  end
 
   # --- show: the attributes table -------------------------------------------
 
@@ -192,7 +174,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
       delete project_entity_path(@project, entities(:bare))
     end
 
-    assert_redirected_to project_entities_path(@project)
+    assert_redirected_to project_path(@project)
   end
 
   # --- scoping ---------------------------------------------------------------
@@ -200,14 +182,6 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   # Asserted as isolation rather than as "the page rendered". A scoped screen
   # that still shows another project's rows renders perfectly well.
 
-  test "index shows only this project's entities" do
-    get project_entities_path(@project)
-
-    assert_response :success
-    assert_select "a", text: "Rocketdyne F-1"
-    assert_select "a[href=?]", project_entity_path(projects(:gemini), entities(:gemini_capsule)), count: 0
-    assert_select "tbody tr", @project.entities.count
-  end
 
   test "another project's entity is not found under this project" do
     get project_entity_path(@project, entities(:gemini_capsule))
@@ -258,13 +232,6 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   # --- the project header ----------------------------------------------------
 
-  test "the data side renders the project header with the way back to the listing" do
-    get project_entities_path(@project)
-
-    assert_select "a[href=?]", projects_path
-    assert_select "a.nav-link.active[href=?]", project_entities_path(@project)
-    assert_select "a.nav-link[href=?]", project_entity_types_path(@project)
-  end
 
   test "the relationship table names the kind of each edge" do
     get project_entity_path(@project, entities(:f1))
@@ -273,16 +240,6 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_select "td", text: "Powers"
   end
 
-  test "the relationship picker offers only this project's relationship types" do
-    get project_entity_path(@project, entities(:f1))
-
-    assert_select "select[name=?] option", "relationship[relationship_type_id]" do |options|
-      offered = options.map { |o| o["value"] }.compact_blank.map(&:to_i)
-
-      assert_equal @project.relationship_types.pluck(:id).sort, offered.sort
-      assert_not_includes offered, relationship_types(:gemini_docks).id
-    end
-  end
 
   # --- citing a source -------------------------------------------------------
 
@@ -379,5 +336,147 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
     assert_select "[data-controller=?]", "source-search"
     assert_select "input[name=?]", "entity[entity_sources_attributes][0][source_id]"
+  end
+
+  # --- the relationship picker respects the declared ends --------------------
+
+
+
+  # What the narrowing controller reads to hide entities that cannot be the far
+  # end of the chosen kind.
+
+  # --- the relationships table -----------------------------------------------
+
+  test "the relationships table leads with the kind of relationship" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "h2", text: "Relationships"
+    headers = css_select("table").last.css("th").map { |th| th.text.strip }
+
+    # The far end's name and type are one fact, so one column; plus a column per
+    # relationship attribute the type asks to show.
+    # The far end's name and type are one fact, so one column; then a column per
+    # relationship attribute the type asks to show, in name order.
+    assert_equal [ "Relationship", "Direction", "Entity",
+                   "certified_on", "engine_count", "stage", "thrust_share", "" ], headers
+  end
+
+  test "a row reads type, direction, other entity, other entity's type" do
+    get project_entity_path(@project, entities(:f1))
+
+    cells = css_select("table").last.css("tbody tr").first.css("td").map { |td| td.text.strip }
+
+    assert_equal "Powers", cells[0]
+    assert_equal "→ to", cells[1]
+    # The launch_vehicle fixture type declares no `name` attribute, so the label
+    # is the type-and-id fallback. Name and type share the cell.
+    assert_match(/#{Regexp.escape(entities(:saturn_v).label)}/, cells[2])
+    assert_match(/Launch Vehicle/, cells[2])
+  end
+
+  # A column reorder is exactly the edit that can silently swap two cells, so
+  # the far-end link is re-asserted from both directions.
+  test "the other entity is still the far end, from either side" do
+    get project_entity_path(@project, entities(:f1))
+    assert_select "a[href=?]", project_entity_path(@project, entities(:saturn_v))
+
+    get project_entity_path(@project, entities(:saturn_v))
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
+    assert_select "table a[href=?]", project_entity_path(@project, entities(:saturn_v)), count: 0
+  end
+
+  test "the page offers no relationship form" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "select[name=?]", "relationship[relationship_type_id]", count: 0
+    assert_select "select[name=?]", "relationship[to_entity_id]", count: 0
+    assert_select "input[value=?]", "Add relationship", count: 0
+  end
+
+  test "an existing relationship can still be edited and removed" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "a[href=?]", edit_project_relationship_path(@project, relationships(:f1_powers_saturn_v))
+    assert_select "form[action*=?]", project_relationship_path(@project, relationships(:f1_powers_saturn_v))
+  end
+
+  # --- retired attributes ----------------------------------------------------
+
+  test "the edit form offers no field for a disabled attribute" do
+    entity_type_attributes(:engine_chambers).update!(is_disabled: true)
+
+    get edit_project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "form label", { text: "chambers", count: 0 }
+    assert_select "form label", text: "thrust_kn"
+  end
+
+  # Dropping a recorded fact from the screen because its attribute was retired
+  # would be losing data from the page, so the value stays and is marked.
+  test "show still displays a value recorded against a disabled attribute, marked" do
+    entity_type_attributes(:engine_name).update!(is_disabled: true)
+
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "td", text: /Rocketdyne F-1/
+    assert_select ".badge", text: "disabled"
+  end
+
+  test "show omits a disabled attribute that holds no value" do
+    entity_type_attributes(:engine_chambers).update!(is_disabled: true)
+
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "td", { text: /chambers/, count: 0 }
+  end
+
+  # The popover states what the type tracks now.
+  test "a disabled attribute is not listed in the type popover" do
+    entity_type_attributes(:engine_chambers).update!(is_disabled: true)
+
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "a[data-bs-title=?]", "Rocket Engine" do |links|
+      assert_no_match(/chambers/, links.first["data-bs-content"])
+      assert_match(/thrust_kn/, links.first["data-bs-content"])
+    end
+  end
+
+  # --- the far end's cell ----------------------------------------------------
+
+  test "the far end's cell links the entity and its type, from both ends" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "a[href=?]", project_entity_path(@project, entities(:saturn_v))
+    assert_select "a[href=?]", project_typed_entities_path(@project, entity_types(:launch_vehicle).slug)
+
+    get project_entity_path(@project, entities(:saturn_v))
+
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
+    assert_select "a[href=?]", project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+  end
+
+  # --- columns the type asks for ---------------------------------------------
+
+  test "the relationships table shows a column for a displayed relationship attribute" do
+    get project_entity_path(@project, entities(:f1))
+
+    headers = css_select("table").last.css("th").map { |th| th.text.strip }
+    assert_includes headers, "engine_count"
+
+    cells = css_select("table").last.css("tbody tr").first.css("td").map { |td| td.text.strip }
+    assert_equal "5", cells[headers.index("engine_count")]
+  end
+
+  test "an undisplayed relationship attribute is not a column" do
+    relationship_type_attributes(:powers_engine_count).update!(is_displayed_on_index: false)
+
+    get project_entity_path(@project, entities(:f1))
+
+    headers = css_select("table").last.css("th").map { |th| th.text.strip }
+    assert_not_includes headers, "engine_count"
   end
 end

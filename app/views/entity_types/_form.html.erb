@@ -17,8 +17,41 @@
   <div class="mb-3">
     <%= f.label :description, class: "form-label" %>
     <%= f.text_area :description, class: "form-control", rows: 3 %>
+    <div class="form-text">
+      Used as the context for extracting entities of this type from source material. Write it for
+      the model that will read it: what counts as one, and what does not.
+    </div>
   </div>
 
+
+  <%# A type is its name, its description and what it carries. Editing those one
+      field at a time across three screens is what made defining a type feel
+      heavier than it is. %>
+  <hr class="my-4">
+  <h2 class="h5">Attributes</h2>
+
+  <div data-controller="nested-fields"
+       data-nested-fields-start-index-value="<%= entity_type.entity_type_attributes.size %>">
+    <div data-nested-fields-target="list">
+      <%= f.fields_for :entity_type_attributes do |af| %>
+        <%= render "shared/type_attribute_fields", f: af %>
+      <% end %>
+    </div>
+
+    <%# The blank row's markup lives here rather than in JavaScript, so it
+        cannot drift from the rows rendered above it. %>
+    <template data-nested-fields-target="template">
+      <%= f.fields_for :entity_type_attributes, EntityTypeAttribute.new, child_index: "NEW_RECORD" do |af| %>
+        <%= render "shared/type_attribute_fields", f: af %>
+      <% end %>
+    </template>
+
+    <%= link_to "Add attribute", "#", class: "btn btn-sm btn-outline-primary",
+                data: { action: "click->nested-fields#add" } %>
+  </div>
+
+  <hr class="my-4">
+
   <%= f.submit submit_label, class: "btn btn-primary" %>
-  <%= link_to "Cancel", project_entity_types_path(@project), class: "btn btn-outline-secondary" %>
+  <%= link_to "Cancel", structure_project_path(@project), class: "btn btn-outline-secondary" %>
 <% end %>

@@ -1,31 +1,64 @@
-<% content_for :title, "Entities" %>
-<%= render "projects/header", project: @project, side: :data %>
+<% content_for :title, "#{@entity_type.name} — #{@project.name}" %>
+<p class="mb-3">
+  <%= link_to "← #{@project.name}", project_path(@project), class: "text-decoration-none" %>
+</p>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="mb-0">Entities</h1>
+  <h1 class="mb-0"><%= @entity_type.name %></h1>
   <%= link_to "New entity", new_project_entity_path(@project), class: "btn btn-primary" %>
 </div>
 
+<%# Search and sort live in the query string, so a filtered, ordered list is a
+    link you can keep and send. %>
+<%= form_with url: url_for(sort: params[:sort], dir: params[:dir]), method: :get,
+              local: true, class: "row g-2 align-items-end mb-3" do %>
+  <div class="col-auto">
+    <%= label_tag :q, "Search", class: "form-label" %>
+    <%= text_field_tag :q, @query, class: "form-control", placeholder: "Match any text value…" %>
+  </div>
+  <div class="col-auto">
+    <%= submit_tag "Search", class: "btn btn-outline-primary", name: nil %>
+    <% if @query.present? %>
+      <%= link_to "Clear", url_for(sort: params[:sort], dir: params[:dir]),
+                  class: "btn btn-outline-secondary" %>
+    <% end %>
+  </div>
+<% end %>
+
 <% if @entities.any? %>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Entity</th>
-        <th>Type</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @entities.each do |entity| %>
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
         <tr>
-          <td><%= link_to entity.label, project_entity_path(@project, entity) %></td>
-          <td><%= link_to entity.entity_type.name, project_entity_type_path(@project, entity.entity_type) %></td>
-          <td><%= link_to "Edit", edit_project_entity_path(@project, entity), class: "btn btn-sm btn-outline-primary" %></td>
+          <th>Entity</th>
+          <%# A column per attribute the type asks to show. %>
+          <% @columns.each do |attribute| %>
+            <th>
+              <%= sort_header attribute, current_attribute: @sort_attribute,
+                              direction: @direction, query: @query %>
+            </th>
+          <% end %>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <% @entities.each do |entity| %>
+          <% values = entity.values_by_attribute_id %>
+          <tr>
+            <td><%= link_to entity.label, project_entity_path(@project, entity) %></td>
+            <% @columns.each do |attribute| %>
+              <%# Truncated in the cell, not in the data: a string attribute has
+                  no length limit, and one long value would otherwise decide the
+                  width of every column. %>
+              <td><%= values[attribute.id]&.display_value.to_s.truncate(60) %></td>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
   <%= paginate @entities %>
+<% elsif @query.present? %>
+  <p>No <%= @entity_type.name %> entities match <%= tag.strong @query %>.</p>
 <% else %>
-  <p>No entities yet.</p>
+  <p>No <%= @entity_type.name %> entities yet.</p>
 <% end %>

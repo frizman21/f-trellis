@@ -19,6 +19,7 @@ class RelationshipsController < ApplicationController
     @relationship = find_relationship
     @relationship.build_missing_attribute_values
     build_missing_citations
+    set_compatible_types
   end
 
   def update
@@ -30,6 +31,7 @@ class RelationshipsController < ApplicationController
     else
       @relationship.build_missing_attribute_values
       build_missing_citations
+      set_compatible_types
       render :edit, status: :unprocessable_entity
     end
   end
@@ -51,6 +53,15 @@ class RelationshipsController < ApplicationController
 
   def find_relationship
     @project.relationships.find(params[:id])
+  end
+
+  # Retyping an edge is only possible to a kind whose declared ends match the
+  # two entities it already joins.
+  def set_compatible_types
+    @compatible_types = @project.relationship_types.where(
+      from_entity_type_id: @relationship.from_entity.entity_type_id,
+      to_entity_type_id: @relationship.to_entity.entity_type_id
+    )
   end
 
   def build_missing_citations

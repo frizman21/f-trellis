@@ -1,12 +1,13 @@
 <% content_for :title, "Edit Relationship" %>
-<%= render "projects/header", project: @project, side: :data %>
+<%= render "projects/back", project: @project, side: :data %>
 
 <h1>Edit Relationship</h1>
 <p class="text-muted">
   <%= link_to @relationship.from_entity.label, project_entity_path(@project, @relationship.from_entity) %>
   →
   <%= link_to @relationship.to_entity.label, project_entity_path(@project, @relationship.to_entity) %>
-  · <%= @relationship.relationship_type.name %>
+  · <%= type_with_attributes @relationship.relationship_type,
+                             project_relationship_type_path(@project, @relationship.relationship_type) %>
 </p>
 
 <%= form_with model: [ @project, @relationship ], local: true do |f| %>
@@ -22,7 +23,9 @@
 
   <div class="mb-3">
     <%= f.label :relationship_type_id, "Relationship type", class: "form-label" %>
-    <%= f.collection_select :relationship_type_id, @project.relationship_types, :id, :name,
+    <%# Only kinds whose declared ends match the two entities this edge already
+        joins — anything else would be rejected on save. %>
+    <%= f.collection_select :relationship_type_id, @compatible_types, :id, :name,
                             {}, class: "form-select", required: true %>
   </div>
 

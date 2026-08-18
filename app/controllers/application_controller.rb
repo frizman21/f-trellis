@@ -10,6 +10,12 @@ class ApplicationController < ActionController::Base
 
   READ_ONLY_MESSAGE = "This account is read-only. Only GET requests are permitted.".freeze
 
+  # The project the current page is inside, or nil outside one. Set by the
+  # scoped controllers; exposed so the banner is driven by the same object the
+  # page is, rather than by a second lookup or a controller-name check.
+  def current_project = @project
+  helper_method :current_project
+
   private
 
   # A read-only account may read anything and change nothing.

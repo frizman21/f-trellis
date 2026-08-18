@@ -1,5 +1,5 @@
 <% content_for :title, "Edit #{@relationship_type.name}" %>
-<%= render "projects/header", project: @project, side: :ontology, section: :relationship_types %>
+<%= render "projects/back", project: @project, side: :structure %>
 <h1>Edit <%= @relationship_type.name %></h1>
 
 <%= render "form", project: @project, relationship_type: @relationship_type, submit_label: "Update relationship type" %>

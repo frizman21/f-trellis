@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_18_213947) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_18_231028) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -111,6 +111,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213947) do
   create_table "entity_type_attributes", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "entity_type_id", null: false
+    t.boolean "is_disabled", default: false, null: false
+    t.boolean "is_displayed_on_index", default: true, null: false
     t.string "name", null: false
     t.bigint "project_id", null: false
     t.datetime "updated_at", null: false
@@ -231,6 +233,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213947) do
 
   create_table "relationship_type_attributes", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.boolean "is_disabled", default: false, null: false
+    t.boolean "is_displayed_on_index", default: true, null: false
     t.string "name", null: false
     t.bigint "project_id", null: false
     t.bigint "relationship_type_id", null: false
@@ -271,11 +275,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213947) do
   create_table "relationship_types", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "description"
+    t.bigint "from_entity_type_id", null: false
     t.string "name", null: false
     t.bigint "project_id", null: false
+    t.bigint "to_entity_type_id", null: false
     t.datetime "updated_at", null: false
     t.index "project_id, lower((name)::text)", name: "index_relationship_types_on_project_and_lower_name", unique: true
+    t.index ["from_entity_type_id"], name: "index_relationship_types_on_from_entity_type_id"
     t.index ["project_id"], name: "index_relationship_types_on_project_id"
+    t.index ["to_entity_type_id"], name: "index_relationship_types_on_to_entity_type_id"
   end
 
   create_table "relationships", force: :cascade do |t|
@@ -528,6 +536,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213947) do
   add_foreign_key "relationship_type_values", "projects"
   add_foreign_key "relationship_type_values", "relationship_type_attributes"
   add_foreign_key "relationship_type_values", "relationships"
+  add_foreign_key "relationship_types", "entity_types", column: "from_entity_type_id"
+  add_foreign_key "relationship_types", "entity_types", column: "to_entity_type_id"
   add_foreign_key "relationship_types", "projects"
   add_foreign_key "relationships", "entities", column: "from_entity_id"
   add_foreign_key "relationships", "entities", column: "to_entity_id"

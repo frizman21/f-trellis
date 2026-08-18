@@ -1,5 +1,5 @@
 <% content_for :title, @relationship_type.name %>
-<%= render "projects/header", project: @project, side: :ontology, section: :relationship_types %>
+<%= render "projects/back", project: @project, side: :structure %>
 
 <div class="d-flex justify-content-between align-items-center mb-1">
   <h1 class="mb-0"><%= @relationship_type.name %></h1>
@@ -10,13 +10,12 @@
                   form: { class: "d-inline", data: { turbo_confirm: "Delete this relationship type?" } } %>
   </div>
 </div>
+<p class="mb-1">
+  <span class="badge text-bg-secondary"><%= @relationship_type.shape %></span>
+</p>
 <p class="text-muted"><%= @relationship_type.description %></p>
 
-<div class="d-flex justify-content-between align-items-center mb-3 mt-4">
-  <h2 class="h5 mb-0">Attributes</h2>
-  <%= link_to "New attribute", new_project_relationship_type_relationship_type_attribute_path(@project, @relationship_type),
-              class: "btn btn-sm btn-primary" %>
-</div>
+<h2 class="h5 mt-4 mb-3">Attributes</h2>
 
 <% if @relationship_type.relationship_type_attributes.any? %>
   <table class="table">
@@ -24,21 +23,20 @@
       <tr>
         <th>Name</th>
         <th>Type</th>
-        <th></th>
+        <th>On the list</th>
       </tr>
     </thead>
     <tbody>
       <% @relationship_type.relationship_type_attributes.each do |attribute| %>
         <tr>
-          <td><%= attribute.name %></td>
-          <td><%= attribute.value_type %></td>
           <td>
-            <%= link_to "Edit", edit_project_relationship_type_relationship_type_attribute_path(@project, @relationship_type, attribute),
-                        class: "btn btn-sm btn-outline-primary" %>
-            <%= button_to "Delete", project_relationship_type_relationship_type_attribute_path(@project, @relationship_type, attribute),
-                          method: :delete, class: "btn btn-sm btn-outline-danger",
-                          form: { class: "d-inline", data: { turbo_confirm: "Delete this attribute?" } } %>
+            <%= attribute.name %>
+            <% if attribute.is_disabled? %>
+              <span class="badge text-bg-light">disabled</span>
+            <% end %>
           </td>
+          <td><%= attribute.value_type %></td>
+          <td class="text-muted"><%= attribute.is_displayed_on_index? ? "yes" : "no" %></td>
         </tr>
       <% end %>
     </tbody>

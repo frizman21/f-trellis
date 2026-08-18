@@ -1,5 +1,5 @@
 <% content_for :title, "Edit #{@entity.label}" %>
-<%= render "projects/header", project: @project, side: :data %>
+<%= render "projects/back", project: @project, side: :data %>
 <h1>Edit <%= @entity.label %></h1>
 <p class="text-muted">
   <%= link_to @entity.entity_type.name, project_entity_type_path(@project, @entity.entity_type) %>

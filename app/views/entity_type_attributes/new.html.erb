@@ -1,6 +1,0 @@
-<% content_for :title, "New Attribute" %>
-<%= render "projects/header", project: @project, side: :ontology, section: :entity_types %>
-<h1>New Attribute</h1>
-<p class="text-muted">On <%= link_to @entity_type.name, project_entity_type_path(@project, @entity_type) %></p>
-
-<%= render "form", project: @project, entity_type: @entity_type, attribute: @attribute, submit_label: "Add attribute" %>

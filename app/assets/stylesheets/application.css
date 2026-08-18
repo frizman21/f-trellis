@@ -8,3 +8,9 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+
+/* Attribute lists in a type popover are one per line, and read as data. */
+.type-popover .popover-body {
+  white-space: pre-line;
+  font-size: 0.85rem;
+}

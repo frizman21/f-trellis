@@ -5,6 +5,28 @@ class ProjectsController < ApplicationController
     @projects = Project.includes(:entity_types, :entities).order(:name)
   end
 
+  # A project's structure is its entity types and the relationship types between
+  # them — one idea, so one page. Reading either alone was never enough.
+  #
+  # "Structure" rather than "ontology" is what the product calls this screen; the
+  # code keeps the modelling vocabulary.
+  def structure
+    @project = Project.find(params[:id])
+    @entity_types = @project.entity_types.includes(:entity_type_attributes, :entities)
+    @relationship_types = @project.relationship_types
+                                  .includes(:relationship_type_attributes, :relationships,
+                                            :from_entity_type, :to_entity_type)
+  end
+
+  # A project's data is not one list, it is a list per kind of thing, so the
+  # view is a card per entity type rather than a heading over everything at
+  # once. Counts come from one grouped query, not one per card.
+  def show
+    @project = Project.find(params[:id])
+    @entity_types = @project.entity_types.includes(:entity_type_attributes)
+    @counts = @project.entities.group(:entity_type_id).count
+  end
+
   def new
     @project = Project.new
   end

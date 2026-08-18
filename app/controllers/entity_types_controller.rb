@@ -1,10 +1,6 @@
-# The ontology side of a project.
+# The entity half of a project's structure.
 class EntityTypesController < ApplicationController
   before_action :set_project
-
-  def index
-    @entity_types = @project.entity_types
-  end
 
   def show
     @entity_type = find_entity_type
@@ -44,7 +40,7 @@ class EntityTypesController < ApplicationController
     @entity_type = find_entity_type
 
     if @entity_type.destroy
-      redirect_to project_entity_types_path(@project),
+      redirect_to structure_project_path(@project),
                   notice: "Entity type \"#{@entity_type.name}\" deleted."
     else
       # restrict_with_error: a type with entities of it still in the project is
@@ -65,6 +61,10 @@ class EntityTypesController < ApplicationController
   end
 
   def entity_type_params
-    params.require(:entity_type).permit(:name, :description)
+    params.require(:entity_type).permit(
+      :name, :description,
+      entity_type_attributes_attributes: [ :id, :name, :value_type,
+                                           :is_displayed_on_index, :is_disabled, :_destroy ]
+    )
   end
 end
