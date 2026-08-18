@@ -1,0 +1,5 @@
+<% content_for :title, "Edit Attribute" %>
+<h1>Edit <%= @attribute.name %></h1>
+<p class="text-muted">On <%= link_to @entity_type.name, entity_type_path(@entity_type) %></p>
+
+<%= render "form", entity_type: @entity_type, attribute: @attribute, submit_label: "Update attribute" %>

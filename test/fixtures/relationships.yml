@@ -1,0 +1,3 @@
+f1_powers_saturn_v:
+  from_entity: f1
+  to_entity: saturn_v

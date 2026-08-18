@@ -1,10 +1,14 @@
 # Application Data Structures
 
-This document describes the operational data structures that support the
-application but are **not** tier 1 knowledge entities. See
-`docs/data-model-spec.md` for the tier 1 pattern.
+This document describes the data structures the application is built from.
 
-Two families live here today:
+It used to be the counterpart to `docs/data-model-spec.md`, which defined a
+"tier 1 knowledge entity" pattern — a stable identity plus versioned,
+confidence-scored, source-attributed detail records — repeated across seven
+entities and thirteen relationships. That concept and every entity following it
+were removed (change request #4), and this is now the whole data model.
+
+The families here today:
 
 - **Sources** — external references the system ingests (URLs, documents),
   along with their raw payload.
@@ -282,7 +286,100 @@ pair is recorded on its own row and the rest of the run continues.
 
 ---
 
-## 5. Relationship map
+## 5. `Project`
+
+A named body of work. The application's landing page (`root`) is the list of
+projects — the first screen you see is "which body of work am I in".
+
+| Column        | Type     | Notes                          |
+|---------------|----------|--------------------------------|
+| `name`        | `string`, NOT NULL | Display name. Validated for presence. |
+| `created_at` / `updated_at` | `datetime` | Standard timestamps. |
+
+`Project` is deliberately **not** a tier 1 knowledge entity. It is a container
+the application organises work into, not a real-world subject extracted from a
+source by a skill, so it carries `name` directly on the table rather than
+through a versioned, confidence-scored `ProjectDetail` with
+`source_processing_report_id` provenance.
+
+It owns nothing yet: no other record belongs to a project. Scoping the rest of
+the application to a selected project is separate work.
+
+The projects screens render full width with no sidebar, by setting
+`content_for :full_width`, which the layout reads through the `sidebar?` helper.
+They sit outside the knowledge and research navigation the sidebar offers.
+
+---
+
+## 6. The ontology
+
+The knowledge model, rebuilt generically after the tier 1 entity concept was
+removed (#4). Adding a new kind of thing is a row in `entity_types`, not a
+migration and a new set of tables — which is the specific failure of what it
+replaces.
+
+### `EntityType`
+
+| Column        | Type     | Notes                                   |
+|---------------|----------|-----------------------------------------|
+| `name`        | `string`, NOT NULL | Unique, case-insensitively.   |
+| `description` | `text`   | What this kind of thing is.             |
+
+### `EntityTypeAttribute`
+
+One typed attribute things of a type may carry.
+
+| Column           | Type     | Notes                                              |
+|------------------|----------|----------------------------------------------------|
+| `entity_type_id` | FK, NOT NULL | The type that declares it.                     |
+| `name`           | `string`, NOT NULL | Unique within the type.              |
+| `value_type`     | `string`, NOT NULL | One of `int`, `float`, `string`, `datetime`. |
+
+The column is **`value_type`, not `type`**. Rails reserves `type` for
+single-table inheritance: a column named `type` here would make ActiveRecord try
+to instantiate a class named `"int"` on every load.
+
+### `Entity`
+
+| Column           | Type     | Notes                          |
+|------------------|----------|--------------------------------|
+| `entity_type_id` | FK, NOT NULL | What kind of thing it is.  |
+
+An entity carries **no name**. It is identity plus type; anything nameable is an
+attribute value. `Entity#label` is the single place that decides what an entity
+is called: the value of an attribute named `name` when its type declares one and
+a value is recorded, and `"<type name> #<id>"` otherwise.
+
+### `EntityAttributeValue`
+
+| Column                     | Type       | Notes                                  |
+|----------------------------|------------|----------------------------------------|
+| `entity_id`                | FK, NOT NULL |                                      |
+| `entity_type_attribute_id` | FK, NOT NULL | Unique together with `entity_id`.    |
+| `int_value`                | `integer`  | Exactly one of these four is live,     |
+| `float_value`              | `float`    | chosen by the attribute's              |
+| `string_value`             | `string`   | `value_type`. `#value` and `#value=`   |
+| `datetime_value`           | `datetime` | are the only things that know which.   |
+
+Writing through `#value=` clears the other three columns, so changing an
+attribute's declared type cannot leave a stale value behind in a column nothing
+reads. A value that cannot be cast to its declared type is a validation error;
+a blank one records nothing.
+
+### `Relationship`
+
+| Column           | Type       | Notes                        |
+|------------------|------------|------------------------------|
+| `from_entity_id` | FK, NOT NULL | An `Entity`.               |
+| `to_entity_id`   | FK, NOT NULL | An `Entity`. Must differ.  |
+
+An untyped edge. It carries no kind or direction semantics yet — that is coming.
+`Relationship#other_end(entity)` answers "the far one from here", which is what
+keeps an entity's relationship table from linking back to the page it is on.
+
+---
+
+## 7. Relationship map
 
 ```
 Source ─┬─< SourceDatum
@@ -293,6 +390,13 @@ Source ─┬─< SourceDatum
         └─< SkillEvaluationResult >─ SkillEvaluation
 
 SourceExclusion              (standalone — consulted when links become Sources)
+Project                      (standalone — owns nothing yet)
+
+EntityType ─┬─< EntityTypeAttribute ─┬─< EntityAttributeValue >─ Entity
+            └─< Entity ──────────────┘
+
+Relationship ─┬─ Entity (from_entity)
+              └─ Entity (to_entity)
 
 SkillEvaluation ─┬─ Skill
                  ├─ LearningSet

@@ -1,0 +1,25 @@
+engine_name:
+  entity_type: rocket_engine
+  name: name
+  value_type: string
+
+engine_thrust:
+  entity_type: rocket_engine
+  name: thrust_kn
+  value_type: float
+
+engine_chambers:
+  entity_type: rocket_engine
+  name: chambers
+  value_type: int
+
+engine_first_flight:
+  entity_type: rocket_engine
+  name: first_flight
+  value_type: datetime
+
+# Deliberately has no `name` attribute, so the #label fallback is reachable.
+vehicle_stages:
+  entity_type: launch_vehicle
+  name: stages
+  value_type: int

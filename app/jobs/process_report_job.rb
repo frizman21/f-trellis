@@ -17,28 +17,9 @@ class ProcessReportJob < ApplicationJob
     chat = Chat.create!(model: report.model)
     report.update!(chat: chat)
     chat.with_instructions(skill_content)
-    chat.with_tools(
-      UpsertPersonTool.new(report),
-      UpsertOrganizationTool.new(report),
-      UpsertPartTool.new(report),
-      UpsertScienceTool.new(report),
-      UpsertTechnologyTool.new(report),
-      UpsertContractTool.new(report),
-      LinkPersonOrganizationTool.new(report),
-      LinkPartOrganizationTool.new(report),
-      LinkPersonPersonTool.new(report),
-      LinkOrganizationOrganizationTool.new(report),
-      LinkPartTechnologyTool.new(report),
-      LinkScienceTechnologyTool.new(report),
-      LinkPersonScienceTool.new(report),
-      LinkContractOrganizationTool.new(report),
-      LinkContractPersonTool.new(report),
-      LinkContractTechnologyTool.new(report),
-      LinkContractPartTool.new(report),
-      LinkOrganizationTechnologyTool.new(report),
-      CreatePersonOrganizationTypeTool.new(report),
-      CreatePersonPersonTypeTool.new(report)
-    )
+    # No tools. The knowledge graph these reports used to write into is gone, so
+    # a run is now the skill's instructions applied to the page and the model's
+    # reply kept on the chat — nothing is extracted into records. See #4.
     chat.ask(source_text)
 
     report.update!(status: "complete", error: nil)

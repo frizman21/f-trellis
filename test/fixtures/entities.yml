@@ -1,0 +1,13 @@
+f1:
+  entity_type: rocket_engine
+
+# A rocket engine with nothing recorded at all, for the blank-row and
+# label-fallback cases.
+unnamed_engine:
+  entity_type: rocket_engine
+
+saturn_v:
+  entity_type: launch_vehicle
+
+bare:
+  entity_type: bare

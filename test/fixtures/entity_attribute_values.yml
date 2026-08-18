@@ -1,0 +1,14 @@
+f1_name:
+  entity: f1
+  entity_type_attribute: engine_name
+  string_value: Rocketdyne F-1
+
+f1_thrust:
+  entity: f1
+  entity_type_attribute: engine_thrust
+  float_value: 6770.0
+
+saturn_v_stages:
+  entity: saturn_v
+  entity_type_attribute: vehicle_stages
+  int_value: 3

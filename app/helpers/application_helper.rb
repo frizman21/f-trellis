@@ -39,6 +39,18 @@ module ApplicationHelper
             title: "Running commit — open on GitHub"
   end
 
+  # Whether the navigation sidebar should render.
+  #
+  # Signed-out pages have never had one. A signed-in page opts out by setting
+  # `content_for :full_width` — the projects list does, because it is the
+  # "which body of work am I in" screen and sits outside the knowledge and
+  # research navigation the sidebar offers. Kept as one predicate rather than a
+  # controller-name check in the layout so the sidebar and the <main> column
+  # width cannot disagree about which mode the page is in.
+  def sidebar?
+    user_signed_in? && !content_for?(:full_width)
+  end
+
   # Standard text-token pricing as "$<in> in / $<out> out per Mtok",
   # or nil when the model carries no pricing at all.
   def model_pricing_label(model)

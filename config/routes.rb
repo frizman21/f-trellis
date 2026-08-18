@@ -6,59 +6,16 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  resources :people, only: [:index, :show]
-  resources :person_types, only: [:index, :new, :create, :edit, :update]
-  resources :organizations, only: [:index, :show, :edit, :update]
-  resources :organization_types, only: [:index, :new, :create, :edit, :update]
-  resources :facilities, only: [:index, :show]
-  resources :facility_types, only: [:index, :new, :create, :edit, :update]
-  resources :parts, only: [:index, :show]
-  resources :part_types, only: [:index, :new, :create, :edit, :update]
-  resources :sciences, only: [:index, :show]
-  resources :science_types, only: [:index, :new, :create, :edit, :update]
-  resources :technologies, only: [:index, :show]
-  resources :technology_types, only: [:index, :new, :create, :edit, :update]
-  resources :contracts, only: [:index, :show]
-  resources :contract_types, only: [:index, :new, :create, :edit, :update]
-  resources :person_organizations,            only: [:show]
-  resources :person_organization_details,     only: [:show]
-  resources :person_organization_types,       only: [:index, :new, :create, :edit, :update]
-  resources :person_people,                   only: [:show]
-  resources :person_person_details,           only: [:show]
-  resources :person_person_types,             only: [:index, :new, :create, :edit, :update]
-  resources :organization_organizations,        only: [:show]
-  resources :organization_organization_details, only: [:show]
-  resources :organization_organization_types,   only: [:index, :new, :create, :edit, :update]
-  resources :part_organizations,              only: [:show]
-  resources :part_organization_details,       only: [:show]
-  resources :part_organization_types,         only: [:index, :new, :create, :edit, :update]
-  resources :part_parts,                      only: [:show]
-  resources :part_part_details,               only: [:show]
-  resources :part_part_types,                 only: [:index, :new, :create, :edit, :update]
-  resources :part_technologies,               only: [:show]
-  resources :part_technology_details,         only: [:show]
-  resources :part_technology_types,           only: [:index, :new, :create, :edit, :update]
-  resources :science_technologies,            only: [:show]
-  resources :science_technology_details,      only: [:show]
-  resources :science_technology_types,        only: [:index, :new, :create, :edit, :update]
-  resources :person_sciences,                 only: [:show]
-  resources :person_science_details,          only: [:show]
-  resources :person_science_types,            only: [:index, :new, :create, :edit, :update]
-  resources :contract_organizations,          only: [:show]
-  resources :contract_organization_details,   only: [:show]
-  resources :contract_organization_types,     only: [:index, :new, :create, :edit, :update]
-  resources :contract_people,                 only: [:show]
-  resources :contract_person_details,         only: [:show]
-  resources :contract_person_types,           only: [:index, :new, :create, :edit, :update]
-  resources :contract_technologies,           only: [:show]
-  resources :contract_technology_details,     only: [:show]
-  resources :contract_technology_types,       only: [:index, :new, :create, :edit, :update]
-  resources :contract_parts,                  only: [:show]
-  resources :contract_part_details,           only: [:show]
-  resources :contract_part_types,             only: [:index, :new, :create, :edit, :update]
-  resources :organization_technologies,       only: [:show]
-  resources :organization_technology_details, only: [:show]
-  resources :organization_technology_types,   only: [:index, :new, :create, :edit, :update]
+  resources :projects, only: [:index, :new, :create, :edit, :update]
+
+  # The ontology. Attributes are nested because an attribute has no meaning
+  # apart from the type that owns it.
+  resources :entities
+  resources :entity_types do
+    resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+  end
+  resources :relationships, only: [:create, :destroy]
+
   resources :sources, only: [:index, :show, :new, :create] do
     member do
       post :fetch
@@ -112,5 +69,5 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  root "people#index"
+  root "projects#index"
 end

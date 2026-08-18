@@ -20,7 +20,7 @@ class AppVersionDisplayTest < ActionDispatch::IntegrationTest
   end
 
   test "the running commit appears on a signed-in page" do
-    get people_path
+    get domains_path
 
     assert_response :success
     assert_select "a[href=?]", "https://github.com/frizman21/f-dod/commit/#{SHA}", text: "012345"
@@ -36,7 +36,7 @@ class AppVersionDisplayTest < ActionDispatch::IntegrationTest
   end
 
   test "the sha is shortened to six characters, not the full forty" do
-    get people_path
+    get domains_path
 
     assert_response :success
     assert_select "a", text: "012345"
