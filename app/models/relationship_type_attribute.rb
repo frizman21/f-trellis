@@ -6,7 +6,9 @@ class RelationshipTypeAttribute < ApplicationRecord
   belongs_to :relationship_type
   scoped_to_project_through :relationship_type
 
-  has_many :relationship_type_values, dependent: :destroy
+  has_many :relationship_type_values, dependent: :restrict_with_error
+
+  alias_method :recorded_values, :relationship_type_values
 
   validates :name, presence: true,
                    uniqueness: { scope: :relationship_type_id, case_sensitive: false }

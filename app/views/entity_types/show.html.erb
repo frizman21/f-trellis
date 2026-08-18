@@ -30,14 +30,28 @@
     <tbody>
       <% @entity_type.entity_type_attributes.each do |attribute| %>
         <tr>
-          <td><%= attribute.name %></td>
-          <td><%= attribute.value_type %></td>
           <td>
+            <%= attribute.name %>
+            <% if attribute.is_disabled? %>
+              <span class="badge text-bg-light">disabled</span>
+            <% end %>
+          </td>
+          <td><%= attribute.value_type %></td>
+          <td class="text-nowrap">
             <%= link_to "Edit", edit_project_entity_type_entity_type_attribute_path(@project, @entity_type, attribute),
                         class: "btn btn-sm btn-outline-primary" %>
-            <%= button_to "Delete", project_entity_type_entity_type_attribute_path(@project, @entity_type, attribute),
-                          method: :delete, class: "btn btn-sm btn-outline-danger",
-                          form: { class: "d-inline", data: { turbo_confirm: "Delete this attribute?" } } %>
+            <%# Once something has been recorded against an attribute, deleting it
+                would delete that too — so it can only be retired. %>
+            <% if attribute.used? %>
+              <%= button_to attribute.is_disabled? ? "Enable" : "Disable",
+                            toggle_disabled_project_entity_type_entity_type_attribute_path(@project, @entity_type, attribute),
+                            method: :patch, class: "btn btn-sm btn-outline-secondary",
+                            form: { class: "d-inline" } %>
+            <% else %>
+              <%= button_to "Delete", project_entity_type_entity_type_attribute_path(@project, @entity_type, attribute),
+                            method: :delete, class: "btn btn-sm btn-outline-danger",
+                            form: { class: "d-inline", data: { turbo_confirm: "Delete this attribute?" } } %>
+            <% end %>
           </td>
         </tr>
       <% end %>

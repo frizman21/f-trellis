@@ -20,7 +20,17 @@ module TypedAttribute
   included do
     validates :value_type, inclusion: { in: VALUE_TYPES,
                                         message: "must be one of #{VALUE_TYPES.join(', ')}" }
+
+    # What the forms and the type popover read: what this type tracks now.
+    scope :active, -> { where(is_disabled: false) }
   end
 
+  # Whether anything has ever been recorded against this attribute. Deleting one
+  # that has been used would delete those values, so the UI offers Disable
+  # instead and the association below refuses the deletion either way.
+  def used? = recorded_values.exists?
+
   def value_column = VALUE_COLUMNS.fetch(value_type)
+
+  def enabled? = !is_disabled?
 end

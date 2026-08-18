@@ -18,10 +18,14 @@ Rails.application.routes.draw do
 
     # Index actions live at :ontology and :data above; these carry the records.
     resources :entity_types, except: [:index] do
-      resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+      resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy] do
+        member { patch :toggle_disabled }
+      end
     end
     resources :relationship_types, except: [:index] do
-      resources :relationship_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+      resources :relationship_type_attributes, only: [:new, :create, :edit, :update, :destroy] do
+        member { patch :toggle_disabled }
+      end
     end
     resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]

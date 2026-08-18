@@ -31,12 +31,28 @@ class RelationshipTypeAttributesController < ApplicationController
     end
   end
 
-  def destroy
+  # Retiring rather than deleting: the attribute stops being offered and keeps
+  # everything recorded under it.
+  def toggle_disabled
     @attribute = find_attribute
-    @attribute.destroy
+    @attribute.update!(is_disabled: !@attribute.is_disabled?)
+    state = @attribute.is_disabled? ? "disabled" : "enabled"
 
     redirect_to project_relationship_type_path(@project, @relationship_type),
-                notice: "Attribute \"#{@attribute.name}\" deleted."
+                notice: "Attribute \"#{@attribute.name}\" #{state}."
+  end
+
+  def destroy
+    @attribute = find_attribute
+
+    if @attribute.destroy
+      redirect_to project_relationship_type_path(@project, @relationship_type),
+                  notice: "Attribute \"#{@attribute.name}\" deleted."
+    else
+      redirect_to project_relationship_type_path(@project, @relationship_type),
+                  alert: "\"#{@attribute.name}\" has values recorded against it. " \
+                         "Disable it instead of deleting it."
+    end
   end
 
   private

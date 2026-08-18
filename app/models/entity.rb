@@ -64,7 +64,9 @@ class Entity < ApplicationRecord
   def build_missing_attribute_values
     recorded = entity_attribute_values.index_by(&:entity_type_attribute_id)
 
-    entity_type.entity_type_attributes.each do |attribute|
+    # Active only: a retired attribute keeps what it holds but is not offered
+    # for anything new.
+    entity_type.entity_type_attributes.active.each do |attribute|
       next if recorded.key?(attribute.id)
 
       entity_attribute_values.build(entity_type_attribute: attribute)
@@ -74,11 +76,18 @@ class Entity < ApplicationRecord
   # The type's attributes paired with this entity's values, including attributes
   # with nothing recorded. The show page renders the shape of the type as well as
   # what has been filled in, so a missing value is a blank row, not a missing one.
+  # Every active attribute, valued or not, plus any retired one that still holds
+  # a value. "What does this type track?" and "what do we know about this thing?"
+  # are different questions; dropping a recorded fact because its attribute was
+  # retired would answer the second with the first.
   def attribute_rows
     recorded = entity_attribute_values.index_by(&:entity_type_attribute_id)
 
-    entity_type.entity_type_attributes.map do |attribute|
-      [ attribute, recorded[attribute.id] ]
+    entity_type.entity_type_attributes.filter_map do |attribute|
+      value = recorded[attribute.id]
+      next if attribute.is_disabled? && value.nil?
+
+      [ attribute, value ]
     end
   end
 end

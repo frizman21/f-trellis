@@ -52,13 +52,47 @@ class EntityTypeAttributesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "stage_count", attribute.reload.name
   end
 
-  test "destroy removes an attribute and the values recorded against it" do
+  # Deleting a used attribute would delete the values recorded under it, which
+  # are knowledge rather than schema.
+  test "destroy is refused for an attribute that has been used" do
     attribute = entity_type_attributes(:vehicle_stages)
 
-    assert_difference [ -> { EntityTypeAttribute.count }, -> { EntityAttributeValue.count } ], -1 do
+    assert_no_difference [ -> { EntityTypeAttribute.count }, -> { EntityAttributeValue.count } ] do
       delete project_entity_type_entity_type_attribute_path(@project, @type, attribute)
     end
 
+    assert flash[:alert].present?
+  end
+
+  test "destroy removes an attribute nothing has been recorded against" do
+    unused = @type.entity_type_attributes.create!(name: "range_km", value_type: "float")
+
+    assert_difference -> { EntityTypeAttribute.count }, -1 do
+      delete project_entity_type_entity_type_attribute_path(@project, @type, unused)
+    end
+
     assert_redirected_to project_entity_type_path(@project, @type)
+  end
+
+  test "the type page offers Disable for a used attribute and Delete for an unused one" do
+    unused = @type.entity_type_attributes.create!(name: "range_km", value_type: "float")
+
+    get project_entity_type_path(@project, @type)
+
+    assert_response :success
+    assert_select "form[action=?]",
+                  toggle_disabled_project_entity_type_entity_type_attribute_path(@project, @type, entity_type_attributes(:vehicle_stages))
+    assert_select "form[action=?]",
+                  project_entity_type_entity_type_attribute_path(@project, @type, unused)
+  end
+
+  test "disabling and enabling round-trips from the page" do
+    attribute = entity_type_attributes(:vehicle_stages)
+
+    patch toggle_disabled_project_entity_type_entity_type_attribute_path(@project, @type, attribute)
+    assert_predicate attribute.reload, :is_disabled?
+
+    patch toggle_disabled_project_entity_type_entity_type_attribute_path(@project, @type, attribute)
+    assert_not attribute.reload.is_disabled?
   end
 end

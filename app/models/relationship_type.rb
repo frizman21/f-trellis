@@ -10,15 +10,15 @@ class RelationshipType < ApplicationRecord
   belongs_to :from_entity_type, class_name: "EntityType"
   belongs_to :to_entity_type,   class_name: "EntityType"
 
-  has_many :relationship_type_attributes, -> { order(:name) }, dependent: :destroy
   has_many :relationships, dependent: :restrict_with_error
+  has_many :relationship_type_attributes, -> { order(:name) }, dependent: :destroy
 
   validates :name, presence: true,
                    uniqueness: { scope: :project_id, case_sensitive: false }
 
   validate :ends_are_in_this_project
 
-  def declared_attributes = relationship_type_attributes
+  def declared_attributes = relationship_type_attributes.active
 
   # The shape this type permits, for anywhere that states it in one line.
   def shape = "#{from_entity_type.name} → #{to_entity_type.name}"

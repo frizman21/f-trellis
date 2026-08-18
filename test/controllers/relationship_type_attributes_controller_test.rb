@@ -43,12 +43,22 @@ class RelationshipTypeAttributesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "stage_name", attribute.reload.name
   end
 
-  test "destroy removes an attribute and the values recorded against it" do
+  test "destroy is refused for an attribute that has been used" do
     attribute = relationship_type_attributes(:powers_engine_count)
     type = relationship_types(:powers)
 
-    assert_difference [ -> { RelationshipTypeAttribute.count }, -> { RelationshipTypeValue.count } ], -1 do
+    assert_no_difference [ -> { RelationshipTypeAttribute.count }, -> { RelationshipTypeValue.count } ] do
       delete project_relationship_type_relationship_type_attribute_path(@project, type, attribute)
+    end
+
+    assert flash[:alert].present?
+  end
+
+  test "destroy removes an attribute nothing has been recorded against" do
+    unused = @type.relationship_type_attributes.create!(name: "notes", value_type: "string")
+
+    assert_difference -> { RelationshipTypeAttribute.count }, -1 do
+      delete project_relationship_type_relationship_type_attribute_path(@project, @type, unused)
     end
   end
 end

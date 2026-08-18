@@ -34,8 +34,11 @@ class Relationship < ApplicationRecord
   def attribute_rows
     recorded = relationship_type_values.index_by(&:relationship_type_attribute_id)
 
-    relationship_type.relationship_type_attributes.map do |attribute|
-      [ attribute, recorded[attribute.id] ]
+    relationship_type.relationship_type_attributes.filter_map do |attribute|
+      value = recorded[attribute.id]
+      next if attribute.is_disabled? && value.nil?
+
+      [ attribute, value ]
     end
   end
 
@@ -44,7 +47,7 @@ class Relationship < ApplicationRecord
   def build_missing_attribute_values
     recorded = relationship_type_values.index_by(&:relationship_type_attribute_id)
 
-    relationship_type.relationship_type_attributes.each do |attribute|
+    relationship_type.relationship_type_attributes.active.each do |attribute|
       next if recorded.key?(attribute.id)
 
       relationship_type_values.build(relationship_type_attribute: attribute)

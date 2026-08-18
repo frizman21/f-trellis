@@ -34,6 +34,9 @@
           <td>
             <%= attribute.name %>
             <span class="text-muted small">(<%= attribute.value_type %>)</span>
+            <% if attribute.is_disabled? %>
+              <span class="badge text-bg-light">disabled</span>
+            <% end %>
           </td>
           <td><%= value&.display_value %></td>
           <td>

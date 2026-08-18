@@ -395,4 +395,48 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", edit_project_relationship_path(@project, relationships(:f1_powers_saturn_v))
     assert_select "form[action*=?]", project_relationship_path(@project, relationships(:f1_powers_saturn_v))
   end
+
+  # --- retired attributes ----------------------------------------------------
+
+  test "the edit form offers no field for a disabled attribute" do
+    entity_type_attributes(:engine_chambers).update!(is_disabled: true)
+
+    get edit_project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "form label", { text: "chambers", count: 0 }
+    assert_select "form label", text: "thrust_kn"
+  end
+
+  # Dropping a recorded fact from the screen because its attribute was retired
+  # would be losing data from the page, so the value stays and is marked.
+  test "show still displays a value recorded against a disabled attribute, marked" do
+    entity_type_attributes(:engine_name).update!(is_disabled: true)
+
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "td", text: /Rocketdyne F-1/
+    assert_select ".badge", text: "disabled"
+  end
+
+  test "show omits a disabled attribute that holds no value" do
+    entity_type_attributes(:engine_chambers).update!(is_disabled: true)
+
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "td", { text: /chambers/, count: 0 }
+  end
+
+  # The popover states what the type tracks now.
+  test "a disabled attribute is not listed in the type popover" do
+    entity_type_attributes(:engine_chambers).update!(is_disabled: true)
+
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "a[data-bs-title=?]", "Rocket Engine" do |links|
+      assert_no_match(/chambers/, links.first["data-bs-content"])
+      assert_match(/thrust_kn/, links.first["data-bs-content"])
+    end
+  end
 end
