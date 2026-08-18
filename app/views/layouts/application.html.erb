@@ -70,6 +70,9 @@
               <li class="nav-item">
                 <%= link_to "Technologies", technologies_path, class: "nav-link" %>
               </li>
+              <li class="nav-item">
+                <%= link_to "Contracts", contracts_path, class: "nav-link" %>
+              </li>
             </ul>
 
             <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted text-uppercase small">Types</h6>
@@ -91,6 +94,9 @@
               </li>
               <li class="nav-item">
                 <%= link_to "Technology Types", technology_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Contract Types", contract_types_path, class: "nav-link" %>
               </li>
               <li class="nav-item">
                 <%= link_to "Person ↔ Organization Types", person_organization_types_path, class: "nav-link" %>
@@ -115,6 +121,21 @@
               </li>
               <li class="nav-item">
                 <%= link_to "Person ↔ Science Types", person_science_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Organization ↔ Technology Types", organization_technology_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Contract ↔ Organization Types", contract_organization_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Contract ↔ Person Types", contract_person_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Contract ↔ Technology Types", contract_technology_types_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
+                <%= link_to "Contract ↔ Part Types", contract_part_types_path, class: "nav-link" %>
               </li>
             </ul>
 

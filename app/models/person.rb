@@ -6,6 +6,9 @@ class Person < ApplicationRecord
   has_many :person_sciences, dependent: :destroy
   has_many :sciences, through: :person_sciences
 
+  has_many :contract_people, dependent: :destroy
+  has_many :contracts, through: :contract_people
+
   has_many :person_people_as_a,
            class_name: "PersonPerson",
            foreign_key: :person_a_id,

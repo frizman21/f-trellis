@@ -108,4 +108,21 @@
         }
       } %>
 
+<% cps = @person.contract_people.includes(:contract, current_detail: :contract_person_types) %>
+<%= render "shared/relationship_table",
+      title: "Contracts",
+      column_header: "Contract",
+      empty_message: "No contracts recorded for this person.",
+      rows: cps.map { |cp|
+        other_detail = cp.contract.current_detail
+        rel_detail = cp.current_detail
+        {
+          name: other_detail ? other_detail.label : "Contract ##{cp.contract_id}",
+          record: cp.contract,
+          types: rel_detail&.contract_person_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: contract_person_path(cp)
+        }
+      } %>
+
 <p><%= link_to "Back to people", people_path %></p>

@@ -28,6 +28,7 @@ class SourceProcessingReport < ApplicationRecord
   has_many :part_details, dependent: :destroy
   has_many :science_details, dependent: :destroy
   has_many :technology_details, dependent: :destroy
+  has_many :contract_details, dependent: :destroy
   has_many :person_organization_details, dependent: :destroy
   has_many :person_person_details, dependent: :destroy
   has_many :organization_organization_details, dependent: :destroy
@@ -36,6 +37,11 @@ class SourceProcessingReport < ApplicationRecord
   has_many :part_technology_details, dependent: :destroy
   has_many :science_technology_details, dependent: :destroy
   has_many :person_science_details, dependent: :destroy
+  has_many :contract_organization_details, dependent: :destroy
+  has_many :contract_person_details, dependent: :destroy
+  has_many :contract_technology_details, dependent: :destroy
+  has_many :contract_part_details, dependent: :destroy
+  has_many :organization_technology_details, dependent: :destroy
 
   private
 

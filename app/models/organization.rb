@@ -5,6 +5,12 @@ class Organization < ApplicationRecord
   has_many :part_organizations, dependent: :destroy
   has_many :parts, through: :part_organizations
 
+  has_many :contract_organizations, dependent: :destroy
+  has_many :contracts, through: :contract_organizations
+
+  has_many :organization_technologies, dependent: :destroy
+  has_many :technologies, through: :organization_technologies
+
   has_many :organization_organizations_as_a,
            class_name: "OrganizationOrganization",
            foreign_key: :organization_a_id,

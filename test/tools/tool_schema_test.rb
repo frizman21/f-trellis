@@ -10,7 +10,8 @@ class ToolSchemaTest < ActiveSupport::TestCase
     UpsertPersonTool => "people",
     UpsertPartTool => "parts",
     UpsertScienceTool => "sciences",
-    UpsertTechnologyTool => "technologies"
+    UpsertTechnologyTool => "technologies",
+    UpsertContractTool => "contracts"
   }.freeze
 
   def schema_for(klass)
@@ -91,10 +92,27 @@ class ToolSchemaTest < ActiveSupport::TestCase
     assert_includes entry[:properties].keys.map(&:to_sym), :technology_types
   end
 
+  # The contract's identifier is required; everything else about it is optional,
+  # because a page that names an award number and nothing else is still worth
+  # recording.
+  test "UpsertContractTool requires only an identifier per entry" do
+    entry = schema_for(UpsertContractTool).properties[:contracts][:items]
+
+    assert_equal %w[identifier], entry[:required].map(&:to_s)
+    %i[title value_usd start_date end_date contract_types].each do |field|
+      assert_includes entry[:properties].keys.map(&:to_sym), field
+    end
+  end
+
   NEW_LINK_TOOLS = {
     LinkPartTechnologyTool => %i[part_id technology_id],
     LinkScienceTechnologyTool => %i[science_id technology_id],
-    LinkPersonScienceTool => %i[person_id science_id]
+    LinkPersonScienceTool => %i[person_id science_id],
+    LinkContractOrganizationTool => %i[contract_id organization_id],
+    LinkContractPersonTool => %i[contract_id person_id],
+    LinkContractTechnologyTool => %i[contract_id technology_id],
+    LinkContractPartTool => %i[contract_id part_id],
+    LinkOrganizationTechnologyTool => %i[organization_id technology_id]
   }.freeze
 
   NEW_LINK_TOOLS.each do |klass, endpoints|
@@ -193,6 +211,13 @@ class ToolSchemaTest < ActiveSupport::TestCase
     assert_equal "link_science_technology", LinkScienceTechnologyTool.new(nil).name
     assert_equal "link_person_science", LinkPersonScienceTool.new(nil).name
     assert_equal "link_person_science", RecordingLinkPersonScienceTool.new(nil).name
+    assert_equal "upsert_contract", UpsertContractTool.new(nil).name
+    assert_equal "upsert_contract", RecordingUpsertContractTool.new(nil).name
+    assert_equal "link_contract_organization", LinkContractOrganizationTool.new(nil).name
+    assert_equal "link_contract_person", LinkContractPersonTool.new(nil).name
+    assert_equal "link_contract_technology", LinkContractTechnologyTool.new(nil).name
+    assert_equal "link_contract_part", LinkContractPartTool.new(nil).name
+    assert_equal "link_organization_technology", LinkOrganizationTechnologyTool.new(nil).name
     assert_equal "create_person_organization_type", CreatePersonOrganizationTypeTool.new(nil).name
     assert_equal "create_person_person_type", CreatePersonPersonTypeTool.new(nil).name
   end

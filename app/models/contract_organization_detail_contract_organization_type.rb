@@ -1,0 +1,4 @@
+class ContractOrganizationDetailContractOrganizationType < ApplicationRecord
+  belongs_to :contract_organization_detail
+  belongs_to :contract_organization_type
+end

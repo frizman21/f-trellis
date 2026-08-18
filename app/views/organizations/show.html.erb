@@ -118,4 +118,38 @@
         }
       } %>
 
+<% ots = @organization.organization_technologies.includes(:technology, current_detail: :organization_technology_types) %>
+<%= render "shared/relationship_table",
+      title: "Technologies",
+      column_header: "Technology",
+      empty_message: "No technologies recorded for this organization.",
+      rows: ots.map { |ot|
+        other_detail = ot.technology.current_detail
+        rel_detail = ot.current_detail
+        {
+          name: other_detail ? other_detail.name : "Technology ##{ot.technology_id}",
+          record: ot.technology,
+          types: rel_detail&.organization_technology_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: organization_technology_path(ot)
+        }
+      } %>
+
+<% cos = @organization.contract_organizations.includes(:contract, current_detail: :contract_organization_types) %>
+<%= render "shared/relationship_table",
+      title: "Contracts",
+      column_header: "Contract",
+      empty_message: "No contracts recorded for this organization.",
+      rows: cos.map { |co|
+        other_detail = co.contract.current_detail
+        rel_detail = co.current_detail
+        {
+          name: other_detail ? other_detail.label : "Contract ##{co.contract_id}",
+          record: co.contract,
+          types: rel_detail&.contract_organization_types&.map(&:name)&.join(", "),
+          as_of: rel_detail&.as_of,
+          relationship_path: contract_organization_path(co)
+        }
+      } %>
+
 <p><%= link_to "Back to organizations", organizations_path %></p>

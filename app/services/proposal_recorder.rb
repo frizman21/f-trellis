@@ -103,6 +103,23 @@ class ProposalRecorder
     [ id, created ]
   end
 
+  # The identifier is the label, not the title: two runs that both found award
+  # FA2541-26-C-B007 agree, whether one read the title off the header and the
+  # other off the abstract.
+  def record_contract(identifier:, title: nil, value_usd: nil, contract_types: [], attributes: nil)
+    label = normalize(identifier)
+    id, created = identify(:contract, label)
+
+    add("contract",
+        "identifier" => label,
+        "title" => normalize(title).presence,
+        "value_usd" => normalize(value_usd).presence,
+        "contract_types" => Array(contract_types).map { |t| normalize(t) }.sort,
+        "attributes" => normalize_attributes(attributes))
+
+    [ id, created ]
+  end
+
   def record_person_organization(person_id:, organization_id:, relationship_type:, attributes: nil)
     add("person_organization",
         "person" => label_for(:person, person_id),
@@ -151,6 +168,56 @@ class ProposalRecorder
         "attributes" => normalize_attributes(attributes))
 
     next_id(:person_science)
+  end
+
+  def record_contract_organization(contract_id:, organization_id:, relationship_type:, attributes: nil)
+    add("contract_organization",
+        "contract" => label_for(:contract, contract_id),
+        "organization" => label_for(:organization, organization_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:contract_organization)
+  end
+
+  def record_contract_person(contract_id:, person_id:, relationship_type:, attributes: nil)
+    add("contract_person",
+        "contract" => label_for(:contract, contract_id),
+        "person" => label_for(:person, person_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:contract_person)
+  end
+
+  def record_contract_technology(contract_id:, technology_id:, relationship_type:, attributes: nil)
+    add("contract_technology",
+        "contract" => label_for(:contract, contract_id),
+        "technology" => label_for(:technology, technology_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:contract_technology)
+  end
+
+  def record_contract_part(contract_id:, part_id:, relationship_type:, attributes: nil)
+    add("contract_part",
+        "contract" => label_for(:contract, contract_id),
+        "part" => label_for(:part, part_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:contract_part)
+  end
+
+  def record_organization_technology(organization_id:, technology_id:, relationship_type:, attributes: nil)
+    add("organization_technology",
+        "organization" => label_for(:organization, organization_id),
+        "technology" => label_for(:technology, technology_id),
+        "relationship_type" => normalize(relationship_type),
+        "attributes" => normalize_attributes(attributes))
+
+    next_id(:organization_technology)
   end
 
   def record_person_person(person_a_id:, person_b_id:, relationship_type:, attributes: nil)
