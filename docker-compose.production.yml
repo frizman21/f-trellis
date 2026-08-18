@@ -94,6 +94,16 @@ services:
     # create+load schema on a fresh deployment), then start the web server.
     command: >
       sh -c "./bin/rails db:prepare && exec ./bin/thrust ./bin/rails server"
+    # Passes through the runtime-only settings the app reads from ENV but that
+    # x-app-env does not enumerate: CRAWLER_USER_AGENT, CRAWLER_CONTACT_URL and
+    # the LLM API keys. `--env-file` alone only feeds ${...} interpolation in
+    # this file; it puts nothing in the container. Keys absent from the file
+    # stay absent in the container, which CrawlerIdentity depends on — an empty
+    # CRAWLER_CONTACT_URL means "send none", a missing one means "use default".
+    env_file:
+      - .env.production
+    # `environment:` wins over `env_file:`, so the values above stay
+    # authoritative and .env.production cannot override the database URLs.
     environment:
       <<: *app-env
     extra_hosts:
@@ -114,6 +124,10 @@ services:
     image: f-dod:${APP_VERSION:-latest}
     restart: unless-stopped
     command: ["./bin/jobs"]
+    # Same passthrough as `app` — the worker runs the crawl jobs, so it is the
+    # service that actually reads CRAWLER_USER_AGENT.
+    env_file:
+      - .env.production
     environment:
       <<: *app-env
     extra_hosts:
