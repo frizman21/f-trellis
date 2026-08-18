@@ -1,5 +1,5 @@
 <% content_for :title, "New Attribute" %>
-<%= render "projects/header", project: @project, side: :ontology %>
+<%= render "projects/back", project: @project, side: :ontology %>
 <h1>New Attribute</h1>
 <p class="text-muted">On <%= link_to @relationship_type.name, project_relationship_type_path(@project, @relationship_type) %></p>
 

@@ -184,4 +184,61 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
     assert_select "a[data-controller=?][data-bs-title=?]", "type-popover", "Powers"
   end
+
+  # --- tabs belong only to the two sides -------------------------------------
+  #
+  # A record page is neither index, so the tabs would render with neither active
+  # — a control with no state. Asserted per template, because they are separate
+  # files and one of them keeping the tabs is exactly the mistake being fixed.
+
+  ONTOLOGY_RECORD_PAGES = %i[show new edit].freeze
+
+  test "an entity type's pages carry a back link to the ontology and no tabs" do
+    [ project_entity_type_path(@project, entity_types(:rocket_engine)),
+      new_project_entity_type_path(@project),
+      edit_project_entity_type_path(@project, entity_types(:rocket_engine)) ].each do |path|
+      get path
+
+      assert_response :success
+      assert_select "ul.nav-tabs", { count: 0 }, "#{path} should not carry the side tabs"
+      # minimum rather than exactly one: a form also offers Cancel to the
+      # same place, which is correct, not a duplicate.
+      assert_select "a[href=?]", ontology_project_path(@project), { minimum: 1 },
+                    "#{path} should link back to the ontology"
+    end
+  end
+
+  test "a relationship type's pages and an attribute form do the same" do
+    [ project_relationship_type_path(@project, relationship_types(:powers)),
+      new_project_relationship_type_path(@project),
+      edit_project_relationship_type_path(@project, relationship_types(:powers)),
+      new_project_relationship_type_relationship_type_attribute_path(@project, relationship_types(:powers)) ].each do |path|
+      get path
+
+      assert_response :success
+      assert_select "ul.nav-tabs", { count: 0 }, "#{path} should not carry the side tabs"
+    end
+  end
+
+  test "an entity's pages and a relationship's edit page carry a back link to the data" do
+    [ project_entity_path(@project, entities(:f1)),
+      new_project_entity_path(@project),
+      edit_project_entity_path(@project, entities(:f1)),
+      edit_project_relationship_path(@project, relationships(:f1_powers_saturn_v)) ].each do |path|
+      get path
+
+      assert_response :success
+      assert_select "ul.nav-tabs", { count: 0 }, "#{path} should not carry the side tabs"
+      assert_select "a[href=?]", data_project_path(@project), { minimum: 1 },
+                    "#{path} should link back to the data"
+    end
+  end
+
+  test "the two side pages keep their tabs" do
+    [ ontology_project_path(@project), data_project_path(@project) ].each do |path|
+      get path
+
+      assert_select "ul.nav-tabs a.nav-link", 2
+    end
+  end
 end
