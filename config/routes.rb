@@ -6,6 +6,8 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  resources :projects, only: [:index, :new, :create, :edit, :update]
+
   resources :people, only: [:index, :show]
   resources :person_types, only: [:index, :new, :create, :edit, :update]
   resources :organizations, only: [:index, :show, :edit, :update]
@@ -112,5 +114,5 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  root "people#index"
+  root "projects#index"
 end

@@ -13,6 +13,15 @@ if Rails.env.local?
   end
 end
 
+# Projects — the named bodies of work the application organises around, and the
+# list you land on at the root. Seeded in every environment: unlike the demo
+# knowledge base below, an empty projects list is a dead landing page.
+[
+  "Apollo Program",
+  "Gemini Program",
+  "Skylab"
+].each { |name| Project.find_or_create_by!(name: name) }
+
 skills = [
   { name: "Summarize",  purpose: "Condense a long document into a short brief." },
   { name: "Translate",  purpose: "Translate text from one language to another." }

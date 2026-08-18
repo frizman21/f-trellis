@@ -4,7 +4,7 @@ This document describes the operational data structures that support the
 application but are **not** tier 1 knowledge entities. See
 `docs/data-model-spec.md` for the tier 1 pattern.
 
-Two families live here today:
+The families here today:
 
 - **Sources** — external references the system ingests (URLs, documents),
   along with their raw payload.
@@ -279,6 +279,31 @@ dropped. `#stalled?` reports pairs sitting in `pending`/`running` past
 `RunSkillEvaluationJob` each; the job sends the revision as instructions and the
 page's extracted text as the message, with **no tools registered**. A failed
 pair is recorded on its own row and the rest of the run continues.
+
+---
+
+## 5. `Project`
+
+A named body of work. The application's landing page (`root`) is the list of
+projects — the first screen you see is "which body of work am I in".
+
+| Column        | Type     | Notes                          |
+|---------------|----------|--------------------------------|
+| `name`        | `string`, NOT NULL | Display name. Validated for presence. |
+| `created_at` / `updated_at` | `datetime` | Standard timestamps. |
+
+`Project` is deliberately **not** a tier 1 knowledge entity. It is a container
+the application organises work into, not a real-world subject extracted from a
+source by a skill, so it carries `name` directly on the table rather than
+through a versioned, confidence-scored `ProjectDetail` with
+`source_processing_report_id` provenance.
+
+It owns nothing yet: no other record belongs to a project. Scoping the rest of
+the application to a selected project is separate work.
+
+The projects screens render full width with no sidebar, by setting
+`content_for :full_width`, which the layout reads through the `sidebar?` helper.
+They sit outside the knowledge and research navigation the sidebar offers.
 
 ---
 

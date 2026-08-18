@@ -1,0 +1,28 @@
+<% content_for :title, "Projects" %>
+<% content_for :full_width, true %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Projects</h1>
+  <%= link_to "New project", new_project_path, class: "btn btn-primary" %>
+</div>
+
+<% if @projects.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @projects.each do |project| %>
+        <tr>
+          <td><%= project.name %></td>
+          <td><%= link_to "Edit", edit_project_path(project), class: "btn btn-sm btn-outline-primary" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>No projects yet.</p>
+<% end %>
