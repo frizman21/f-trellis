@@ -1,0 +1,38 @@
+<%# One attribute of a type, edited in place on the type's own form.
+
+    The removal control depends on whether anything has been recorded against
+    the attribute: an unused one can be deleted outright, a used one can only be
+    retired, because deleting it would take the values with it. Rendering the
+    right control rather than both keeps the form from offering an action the
+    model will refuse. %>
+<div class="row g-2 align-items-end border-bottom pb-3 mb-3">
+  <div class="col-sm-4">
+    <%= f.label :name, "Name", class: "form-label small text-muted mb-1" %>
+    <%= f.text_field :name, class: "form-control form-control-sm" %>
+  </div>
+  <div class="col-sm-3">
+    <%= f.label :value_type, "Type", class: "form-label small text-muted mb-1" %>
+    <%= f.select :value_type, TypedAttribute::VALUE_TYPES,
+                 { prompt: "Choose" }, class: "form-select form-select-sm" %>
+  </div>
+  <div class="col-sm-3">
+    <div class="form-check">
+      <%= f.check_box :is_displayed_on_index, class: "form-check-input" %>
+      <%= f.label :is_displayed_on_index, "Column on the list", class: "form-check-label small" %>
+    </div>
+  </div>
+  <div class="col-sm-2">
+    <% if f.object.persisted? && f.object.used? %>
+      <div class="form-check">
+        <%= f.check_box :is_disabled, class: "form-check-input" %>
+        <%= f.label :is_disabled, "Disabled", class: "form-check-label small" %>
+      </div>
+      <div class="form-text small">In use — cannot be deleted.</div>
+    <% elsif f.object.persisted? %>
+      <div class="form-check">
+        <%= f.check_box :_destroy, class: "form-check-input" %>
+        <%= f.label :_destroy, "Delete", class: "form-check-label small text-danger" %>
+      </div>
+    <% end %>
+  </div>
+</div>

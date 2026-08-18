@@ -13,6 +13,9 @@ class RelationshipType < ApplicationRecord
   has_many :relationships, dependent: :restrict_with_error
   has_many :relationship_type_attributes, -> { order(:name) }, dependent: :destroy
 
+  accepts_nested_attributes_for :relationship_type_attributes, allow_destroy: true,
+                                reject_if: :all_blank
+
   validates :name, presence: true,
                    uniqueness: { scope: :project_id, case_sensitive: false }
 

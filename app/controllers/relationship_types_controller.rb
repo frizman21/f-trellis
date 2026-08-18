@@ -61,7 +61,10 @@ class RelationshipTypesController < ApplicationController
   end
 
   def relationship_type_params
-    params.require(:relationship_type).permit(:name, :description,
-                                             :from_entity_type_id, :to_entity_type_id)
+    params.require(:relationship_type).permit(
+      :name, :description, :from_entity_type_id, :to_entity_type_id,
+      relationship_type_attributes_attributes: [ :id, :name, :value_type,
+                                                 :is_displayed_on_index, :is_disabled, :_destroy ]
+    )
   end
 end

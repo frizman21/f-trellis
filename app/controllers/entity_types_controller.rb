@@ -61,6 +61,10 @@ class EntityTypesController < ApplicationController
   end
 
   def entity_type_params
-    params.require(:entity_type).permit(:name, :description)
+    params.require(:entity_type).permit(
+      :name, :description,
+      entity_type_attributes_attributes: [ :id, :name, :value_type,
+                                           :is_displayed_on_index, :is_disabled, :_destroy ]
+    )
   end
 end

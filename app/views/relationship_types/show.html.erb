@@ -15,11 +15,7 @@
 </p>
 <p class="text-muted"><%= @relationship_type.description %></p>
 
-<div class="d-flex justify-content-between align-items-center mb-3 mt-4">
-  <h2 class="h5 mb-0">Attributes</h2>
-  <%= link_to "New attribute", new_project_relationship_type_relationship_type_attribute_path(@project, @relationship_type),
-              class: "btn btn-sm btn-primary" %>
-</div>
+<h2 class="h5 mt-4 mb-3">Attributes</h2>
 
 <% if @relationship_type.relationship_type_attributes.any? %>
   <table class="table">
@@ -27,7 +23,7 @@
       <tr>
         <th>Name</th>
         <th>Type</th>
-        <th></th>
+        <th>On the list</th>
       </tr>
     </thead>
     <tbody>
@@ -40,20 +36,7 @@
             <% end %>
           </td>
           <td><%= attribute.value_type %></td>
-          <td class="text-nowrap">
-            <%= link_to "Edit", edit_project_relationship_type_relationship_type_attribute_path(@project, @relationship_type, attribute),
-                        class: "btn btn-sm btn-outline-primary" %>
-            <% if attribute.used? %>
-              <%= button_to attribute.is_disabled? ? "Enable" : "Disable",
-                            toggle_disabled_project_relationship_type_relationship_type_attribute_path(@project, @relationship_type, attribute),
-                            method: :patch, class: "btn btn-sm btn-outline-secondary",
-                            form: { class: "d-inline" } %>
-            <% else %>
-              <%= button_to "Delete", project_relationship_type_relationship_type_attribute_path(@project, @relationship_type, attribute),
-                            method: :delete, class: "btn btn-sm btn-outline-danger",
-                            form: { class: "d-inline", data: { turbo_confirm: "Delete this attribute?" } } %>
-            <% end %>
-          </td>
+          <td class="text-muted"><%= attribute.is_displayed_on_index? ? "yes" : "no" %></td>
         </tr>
       <% end %>
     </tbody>

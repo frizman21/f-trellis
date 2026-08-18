@@ -31,10 +31,20 @@
       <div class="container-fluid">
         <div class="d-flex align-items-center">
           <a class="navbar-brand me-0" href="/">Trellis</a>
-          <% if current_project %>
+          <% if current_project&.persisted? %>
             <span class="text-white-50 mx-2">/</span>
             <%= link_to current_project.name, projects_path,
                         class: "navbar-brand mb-0 text-white text-decoration-none" %>
+            <%# Into the project's structure — the settings of the thing you are in. %>
+            <%= link_to structure_project_path(current_project),
+                        class: "text-white-50 ms-2 text-decoration-none",
+                        title: "Structure", "aria-label": "Structure" do %>
+              <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"
+                   fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
+                <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.765.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.765.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>
+              </svg>
+            <% end %>
           <% end %>
         </div>
         <div class="d-flex align-items-center">
@@ -65,7 +75,7 @@
             <%# A fresh query rather than current_project.entity_types: on a "new type"
                 page the unsaved record is already in the association's target, and it
                 has no name and so no address to link to. %>
-            <% project_types = current_project ? EntityType.where(project_id: current_project.id) : [] %>
+            <% project_types = current_project&.persisted? ? EntityType.where(project_id: current_project.id) : [] %>
             <% if project_types.any? %>
               <h6 class="sidebar-heading px-3 mt-3 mb-1 text-muted text-uppercase small">
                 <%= current_project.name %>
@@ -81,23 +91,37 @@
               </ul>
             <% end %>
 
+            <%# Three sections by what you are doing: finding material, fetching
+                it, and running models over it. Source Imports, Source
+                Exclusions, Triage and Skill Evaluations were not named when
+                these sections were defined and are placed by affinity —
+                importing and excluding are about which sources exist, and
+                triage and evaluation are about which skill runs and how well. %>
             <h6 class="sidebar-heading px-3 <%= project_types.any? ? "mt-4" : "mt-3" %> mb-1 text-muted text-uppercase small">Research</h6>
             <ul class="nav flex-column">
-              <li class="nav-item">
-                <%= link_to "Starting Points", research_starting_points_path, class: "nav-link" %>
-              </li>
               <li class="nav-item">
                 <%= link_to "Sources", sources_path, class: "nav-link" %>
               </li>
               <li class="nav-item">
+                <%= link_to "Starting Points", research_starting_points_path, class: "nav-link" %>
+              </li>
+              <li class="nav-item">
                 <%= link_to "Source Imports", source_imports_path, class: "nav-link" %>
               </li>
+            </ul>
+
+            <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted text-uppercase small">Crawling</h6>
+            <ul class="nav flex-column">
               <li class="nav-item">
                 <%= link_to "Domains", domains_path, class: "nav-link" %>
               </li>
               <li class="nav-item">
                 <%= link_to "Source Exclusions", source_exclusions_path, class: "nav-link" %>
               </li>
+            </ul>
+
+            <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted text-uppercase small">AI</h6>
+            <ul class="nav flex-column">
               <li class="nav-item">
                 <%= link_to "Skills", skills_path, class: "nav-link" %>
               </li>

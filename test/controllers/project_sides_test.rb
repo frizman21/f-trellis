@@ -150,11 +150,20 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     assert_select ".card"
   end
 
-  test "the banner is the only way between the two sides" do
+  # The banner carries both: the project name back to the listing, and a gear
+  # into the project's structure.
+  test "the banner links the listing and the project's structure" do
     get project_path(@project)
 
     assert_select "nav.navbar a[href=?]", projects_path, text: @project.name
-    assert_select "a[href=?]", structure_project_path(@project), count: 0
+    assert_select "nav.navbar a[href=?]", structure_project_path(@project)
+  end
+
+  test "the gear is absent where there is no project yet" do
+    get new_project_path
+
+    assert_response :success
+    assert_select "nav.navbar svg", count: 0
   end
 
   # The old index addresses moved; the per-record ones did not.
@@ -287,7 +296,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     [ project_relationship_type_path(@project, relationship_types(:powers)),
       new_project_relationship_type_path(@project),
       edit_project_relationship_type_path(@project, relationship_types(:powers)),
-      new_project_relationship_type_relationship_type_attribute_path(@project, relationship_types(:powers)) ].each do |path|
+      edit_project_relationship_type_path(@project, relationship_types(:powers)) ].each do |path|
       get path
 
       assert_response :success
@@ -400,7 +409,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     assert_response :success
     headers = css_select("table th").map { |th| th.text.strip }
 
-    assert_equal [ "Entity", "chambers", "first_flight", "name", "thrust_kn", "" ], headers
+    assert_equal [ "Entity", "chambers", "first_flight", "name", "thrust_kn" ], headers
   end
 
   # Read as a list rather than cell by cell, so a column shift is caught.
@@ -441,24 +450,15 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
 
     assert_response :success
-    assert_equal [ "Entity", "" ], css_select("table th").map { |th| th.text.strip }
+    assert_equal [ "Entity" ], css_select("table th").map { |th| th.text.strip }
     assert_select "a", text: "Rocketdyne F-1"
   end
 
-  test "the attribute form carries the display checkbox" do
-    get new_project_entity_type_entity_type_attribute_path(@project, entity_types(:rocket_engine))
+  # Attributes are edited on their type's form now, so the checkbox lives there.
+  test "the type form carries a display checkbox per attribute" do
+    get edit_project_entity_type_path(@project, entity_types(:rocket_engine))
 
-    assert_select "input[type=checkbox][name=?]", "entity_type_attribute[is_displayed_on_index]"
-  end
-
-  test "saving the checkbox off clears the flag" do
-    attribute = entity_type_attributes(:engine_thrust)
-
-    patch project_entity_type_entity_type_attribute_path(@project, entity_types(:rocket_engine), attribute),
-          params: { entity_type_attribute: { name: "thrust_kn", value_type: "float",
-                                             is_displayed_on_index: "0" } }
-
-    assert_not attribute.reload.is_displayed_on_index?
+    assert_select "input[type=checkbox][name*=?]", "[is_displayed_on_index]"
   end
 
   # A card is a way in; the list it opens shows the attributes as columns.

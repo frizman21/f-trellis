@@ -38,7 +38,6 @@
                               direction: @direction, query: @query %>
             </th>
           <% end %>
-          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -52,7 +51,6 @@
                   width of every column. %>
               <td><%= values[attribute.id]&.display_value.to_s.truncate(60) %></td>
             <% end %>
-            <td><%= link_to "Edit", edit_project_entity_path(@project, entity), class: "btn btn-sm btn-outline-primary" %></td>
           </tr>
         <% end %>
       </tbody>

@@ -1,10 +1,12 @@
 <% content_for :title, "New Entity" %>
 <%= render "projects/back", project: @project, side: :data %>
-<h1>New Entity</h1>
+<h1>New <%= @entity.entity_type&.name || "Entity" %></h1>
 
-<%# Step one of two: an entity is its type, and the type decides which
-    attribute fields the next page can offer. %>
-<p class="text-muted">Choose a type. You will fill in its attributes next.</p>
+<% unless @entity.entity_type %>
+  <%# Without a type there is nothing to ask about yet, so this is step one of
+      two: choose the kind, then fill it in. Arriving with ?type=<slug> skips it. %>
+  <p class="text-muted">Choose a type. You will fill in its attributes next.</p>
+<% end %>
 
 <%= form_with model: [ @project, @entity ], local: true do |f| %>
   <% if @entity.errors.any? %>
@@ -23,9 +25,35 @@
                             { prompt: "Choose a type" }, class: "form-select", required: true %>
   </div>
 
+  <%# The type's attributes, when the type is already known. %>
+  <% if @entity.entity_attribute_values.any? %>
+    <%= f.fields_for :entity_attribute_values do |vf| %>
+      <% attribute = vf.object.entity_type_attribute %>
+      <div class="mb-3">
+        <%= vf.label :value, attribute.name, class: "form-label" %>
+        <span class="text-muted small">(<%= attribute.value_type %>)</span>
+        <%= vf.hidden_field :entity_type_attribute_id, value: attribute.id %>
+        <% case attribute.value_type %>
+        <% when "int" %>
+          <%= vf.number_field :value, value: vf.object.value, step: 1, class: "form-control" %>
+        <% when "float" %>
+          <%= vf.number_field :value, value: vf.object.value, step: "any", class: "form-control" %>
+        <% when "datetime" %>
+          <%= vf.datetime_field :value, value: vf.object.value, class: "form-control" %>
+        <% else %>
+          <%= vf.text_field :value, value: vf.object.value, class: "form-control" %>
+        <% end %>
+
+        <%= vf.fields_for :entity_attribute_value_sources do |sf| %>
+          <%= render "shared/source_field", f: sf, label: "Source for #{attribute.name} (optional)" %>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+
   <div class="mb-3">
     <%= f.fields_for :entity_sources do |sf| %>
-      <%= render "shared/source_field", f: sf, label: "Source (optional)" %>
+      <%= render "shared/source_field", f: sf, label: "Source for this entity (optional)" %>
     <% end %>
   </div>
 

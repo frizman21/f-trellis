@@ -17,16 +17,10 @@ Rails.application.routes.draw do
     end
 
     # Index actions live at :ontology and :data above; these carry the records.
-    resources :entity_types, except: [:index] do
-      resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy] do
-        member { patch :toggle_disabled }
-      end
-    end
-    resources :relationship_types, except: [:index] do
-      resources :relationship_type_attributes, only: [:new, :create, :edit, :update, :destroy] do
-        member { patch :toggle_disabled }
-      end
-    end
+    # Attributes are edited on their type's own form, so they have no screens of
+    # their own — two places to add an attribute is how the two drift.
+    resources :entity_types, except: [:index]
+    resources :relationship_types, except: [:index]
     resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]
 

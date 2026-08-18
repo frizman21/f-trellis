@@ -42,8 +42,18 @@ class EntitiesController < ApplicationController
   # Creating is two steps: pick the type here, fill in its attributes on the
   # edit page. One form whose fields change with the type dropdown would need
   # JavaScript to re-render; this needs none.
+  # ?type=<slug> answers the first of the two create steps up front, and the form
+  # then offers that type's attributes straight away — so arriving from a type's
+  # list is one step, not two. Without it the type is chosen here and the
+  # attributes come on the next page.
   def new
-    @entity = @project.entities.new
+    @entity = @project.entities.new(entity_type: preselected_entity_type)
+
+    if @entity.entity_type
+      @entity.build_missing_attribute_values
+      build_missing_citations
+    end
+
     # One blank citation row for the form to bind to. Left empty it is rejected,
     # which is how "no source" is said.
     @entity.entity_sources.build
@@ -53,9 +63,19 @@ class EntitiesController < ApplicationController
     @entity = @project.entities.new(entity_params)
 
     if @entity.save
-      redirect_to edit_project_entity_path(@project, @entity),
-                  notice: "Entity created. Fill in its attributes."
+      # If the form already carried the attributes there is nothing left to ask,
+      # so go to the entity rather than to a second step that would be empty.
+      if @entity.entity_attribute_values.any?
+        redirect_to project_entity_path(@project, @entity), notice: "Entity created."
+      else
+        redirect_to edit_project_entity_path(@project, @entity),
+                    notice: "Entity created. Fill in its attributes."
+      end
     else
+      if @entity.entity_type
+        @entity.build_missing_attribute_values
+        build_missing_citations
+      end
       @entity.entity_sources.build if @entity.entity_sources.empty?
       render :new, status: :unprocessable_entity
     end
@@ -88,6 +108,16 @@ class EntitiesController < ApplicationController
   end
 
   private
+
+  # Named by slug, the same vocabulary the type's own address uses, and looked up
+  # among this project's types — a slug from elsewhere is ignored rather than
+  # pre-selecting something the model would reject.
+  def preselected_entity_type
+    slug = params[:type].to_s
+    return nil if slug.blank?
+
+    @project.entity_types.detect { |type| type.slug == slug }
+  end
 
   DIRECTIONS = %w[asc desc].freeze
 
