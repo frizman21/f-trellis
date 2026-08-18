@@ -291,15 +291,18 @@ inactive until the change is merged to `main`.
 
 The repo includes `docker-compose.production.yml` for single-host production
 deployments. It builds the existing `Dockerfile` (Thruster + non-root user)
-and runs four services:
+and runs three services:
 
 - `nginx` — Public-facing reverse proxy. The **only** service that publishes
   a port to the host. Config lives at `docker/nginx/default.conf`.
 - `app` — Rails application, served by Thruster (container port 80, internal
   only). Runs `bin/rails db:prepare` on every start to pick up new migrations.
 - `worker` — Solid Queue worker (`bin/jobs`).
-- `postgres` — Postgres 17. An init script creates the Solid cache, queue,
-  and cable databases on first boot of an empty data volume.
+
+Postgres is **not** part of the stack. The bundled `postgres` service is
+commented out in the compose file and the app connects to a server running on
+the host via `host.docker.internal`. See "Running the production stack
+locally" below for what that server needs.
 
 Request flow: `client → nginx:80 → app:80 (Thruster) → Puma`.
 
@@ -315,31 +318,79 @@ cp .env.production.example .env.production
 Fill in the required values:
 
 - `RAILS_MASTER_KEY` — contents of `config/master.key`.
-- `APP_DATABASE_PASSWORD` — password for the `app` Postgres role
-  (`openssl rand -hex 32`).
+- `APP_DATABASE_PASSWORD` — password for the `f_dod_user` Postgres role
+  (`openssl rand -hex 32`). It must match the password actually set on that
+  role, or the app will fail to connect.
 
 `.env.production` is gitignored. Optional tuning vars (`APP_HTTP_PORT`,
-`RAILS_MAX_THREADS`, `WEB_CONCURRENCY`, `APP_VERSION`) are documented in
-the example file.
+`RAILS_MAX_THREADS`, `WEB_CONCURRENCY`, `APP_VERSION`, `GIT_REV`) are
+documented in the example file.
 
-### 2. Build and start
+`app` and `worker` load this whole file via `env_file:`, so runtime settings
+the app reads from `ENV` — `CRAWLER_USER_AGENT`, `CRAWLER_CONTACT_URL`,
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY` — take effect by being present in it.
+Note that `--env-file` on its own does **not** do this: that flag only feeds
+`${...}` interpolation inside the compose file and puts nothing in the
+container.
+
+### 2. Prepare the database
+
+The stack expects a Postgres server on the host, reachable at 5432, with a
+`f_dod_user` role that can log in and owns four databases:
 
 ```sh
-docker compose -f docker-compose.production.yml --env-file .env.production build
-docker compose -f docker-compose.production.yml --env-file .env.production up -d
+createuser --createdb --login f_dod_user
+psql -d postgres -c "ALTER ROLE f_dod_user WITH PASSWORD '<APP_DATABASE_PASSWORD>';"
+for db in f_dod_production f_dod_production_cache \
+          f_dod_production_queue f_dod_production_cable; do
+  createdb -O f_dod_user "$db"
+done
 ```
+
+All four are required — Solid Cache, Solid Queue, and Solid Cable each get a
+dedicated database via the per-database `*_DATABASE_URL` vars. Because
+Postgres is external, `db/postgres-init/` never runs, so nothing creates the
+`_cache` / `_queue` / `_cable` trio for you.
+
+On Docker Desktop for Mac, `host.docker.internal` is proxied to the host's
+loopback, so a server on the default `listen_addresses = 'localhost'` is
+reachable as-is and the connection arrives as `127.0.0.1`. On Linux the host
+gateway is a real interface, so a deployment there additionally needs
+`listen_addresses` to cover it plus a matching `pg_hba.conf` line.
+
+### 3. Build and start
+
+```sh
+GIT_REV=$(git rev-parse HEAD) docker compose -f docker-compose.production.yml \
+  --env-file .env.production up --build -d
+```
+
+Then open <http://localhost:3080> (or whatever `APP_HTTP_PORT` is set to).
+
+`--env-file .env.production` is required on **every** compose invocation.
+Without it `${RAILS_MASTER_KEY}` has nothing to interpolate from and the
+command aborts with `required variable RAILS_MASTER_KEY is missing a value`.
+
+`GIT_REV` is what the navbar version badge displays, and it is also the
+version in the default crawler user-agent. Omit it and the badge reads
+"version unknown" — `AppVersion` falls back to reading `.git`, which
+`.dockerignore` keeps out of the image. A shell variable takes precedence
+over `.env.production` for interpolation, which is why this works as a
+one-liner. It describes your *working tree*, so build from a clean checkout
+or the badge will name a commit that does not match the image.
 
 Startup order is enforced by healthchecks:
 
-1. `postgres` becomes healthy (`pg_isready`).
-2. `app` runs `bin/rails db:prepare` (creates+loads schema on a fresh DB,
+1. `app` runs `bin/rails db:prepare` (creates+loads schema on a fresh DB,
    runs `db:migrate` on an existing DB), then starts Thruster.
-3. `app` becomes healthy (`GET /up`).
-4. `worker` and `nginx` start once `app` is healthy.
+2. `app` becomes healthy (`GET /up`).
+3. `worker` and `nginx` start once `app` is healthy.
 
 This guarantees migrations finish before jobs run or traffic is served.
+Nothing waits on Postgres, since it is outside the stack — if the host server
+is down, `app` fails `db:prepare` and restarts until it comes back.
 
-### 3. Migrations on every start
+### 4. Migrations on every start
 
 `db:prepare` is invoked by the `app` service's `command:` override on
 every container start. Running an explicit `db:migrate` after a deploy is
@@ -351,7 +402,7 @@ docker compose -f docker-compose.production.yml --env-file .env.production \
   exec app ./bin/rails db:migrate
 ```
 
-### 4. TLS
+### 5. TLS
 
 The bundled nginx terminates plain HTTP only. Two options for HTTPS:
 
@@ -368,48 +419,58 @@ The bundled nginx terminates plain HTTP only. Two options for HTTPS:
   at the bottom of that file), mount certs into the nginx container via a
   bind mount, and publish `443:443` instead of `80:80`.
 
-### 5. Persistent volumes
+### 6. Persistent volumes
 
-Two named volumes hold all stateful data:
+Stateful data lives in two places:
 
-- `postgres_data` — Postgres data directory. **Survives** `docker compose
-  down`, container rebuilds, host reboots, and `docker compose up`
-  re-runs. Only `docker compose down -v` or `docker volume rm` will
-  destroy it.
-- `app_storage` — Rails `storage/` directory (used by any local file
-  storage; safe to mount on both `app` and `worker`).
+- **The host's Postgres data directory** — outside Docker's lifecycle
+  entirely, so no compose command can destroy it, `down -v` included.
+- `app_storage` — a named volume holding the Rails `storage/` directory
+  (used by any local file storage; safe to mount on both `app` and
+  `worker`). **Survives** `docker compose down`, container rebuilds, host
+  reboots, and `docker compose up` re-runs. Only `docker compose down -v`
+  or `docker volume rm` will destroy it.
 
 Back both up before destructive operations or host migrations:
 
 ```sh
-# Postgres logical dump
-docker compose -f docker-compose.production.yml --env-file .env.production \
-  exec postgres pg_dumpall -U app > backups/pg_$(date +%Y%m%d_%H%M%S).sql
+# Postgres logical dump — run against the host server, not a container
+pg_dump f_dod_production > backups/pg_$(date +%Y%m%d_%H%M%S).sql
 
 # Active Storage / local files
-docker run --rm -v f-dod_app_storage:/data -v "$PWD/backups":/backup alpine \
+docker run --rm -v f-dod-prod_app_storage:/data -v "$PWD/backups":/backup alpine \
   tar czf /backup/app_storage_$(date +%Y%m%d_%H%M%S).tar.gz -C /data .
 ```
 
-### 6. Updating the application
+### 7. Updating the application
 
 Ship a new version (code + migrations) like this:
 
 ```sh
 git pull
-docker compose -f docker-compose.production.yml --env-file .env.production build
-docker compose -f docker-compose.production.yml --env-file .env.production up -d
+GIT_REV=$(git rev-parse HEAD) docker compose -f docker-compose.production.yml \
+  --env-file .env.production up --build -d
 ```
 
 What happens:
 
 1. `build` produces a new image tagged `f-dod:${APP_VERSION:-latest}`.
 2. `up -d` recreates the `app` and `worker` containers using the new
-   image, leaving `postgres` and `nginx` untouched (their configs didn't
-   change). The `postgres_data` volume is preserved.
+   image, leaving `nginx` untouched (its config didn't change). The host's
+   Postgres is never touched by a deploy.
 3. The new `app` container runs `bin/rails db:prepare`, applying any
    pending migrations against the existing database.
 4. Once `app` is healthy, `worker` starts (or restarts) on the new image.
+
+Recreating `app` gives it a new container IP, which `nginx` will not pick up
+on its own — its `upstream` block resolves the name once at startup, so it
+serves `502` until restarted. Until that is fixed in
+`docker/nginx/default.conf`, follow a deploy with:
+
+```sh
+docker compose -f docker-compose.production.yml --env-file .env.production \
+  restart nginx
+```
 
 If only nginx config changed, restart just that service:
 
@@ -423,19 +484,22 @@ To roll back, set `APP_VERSION` to a previously built image tag in
 upgrading if you want this option — by default the build overwrites
 `f-dod:latest`.)
 
-### 7. Adding the cache/queue/cable databases to an existing deployment
+### 8. Adding the cache/queue/cable databases to an existing deployment
 
-The Postgres init script only runs against an empty data volume. If you
-are upgrading a deployment whose `postgres_data` volume predates the
-init script, create the databases manually once:
+If you are upgrading a deployment that predates the Solid Cache / Queue /
+Cable split, create the three extra databases once, on the host server:
 
 ```sh
-docker compose -f docker-compose.production.yml --env-file .env.production \
-  exec postgres psql -U app -d app_production -c \
-  "CREATE DATABASE app_production_cache OWNER app;
-   CREATE DATABASE app_production_queue OWNER app;
-   CREATE DATABASE app_production_cable OWNER app;"
+psql -d postgres -c \
+  "CREATE DATABASE f_dod_production_cache OWNER f_dod_user;
+   CREATE DATABASE f_dod_production_queue OWNER f_dod_user;
+   CREATE DATABASE f_dod_production_cable OWNER f_dod_user;"
 ```
+
+`db/postgres-init/00-create-databases.sh` did this automatically when
+Postgres ran as a container in this stack. It is dead code as long as the
+`postgres` service stays commented out, and is kept only for the case where
+that service is restored.
 
 ## Deploying to a local Dokku instance
 
