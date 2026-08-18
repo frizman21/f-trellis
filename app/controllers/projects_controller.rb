@@ -18,12 +18,13 @@ class ProjectsController < ApplicationController
                                             :from_entity_type, :to_entity_type)
   end
 
-  def data
+  # A project's data is not one list, it is a list per kind of thing, so the
+  # view is a card per entity type rather than a heading over everything at
+  # once. Counts come from one grouped query, not one per card.
+  def show
     @project = Project.find(params[:id])
-    @entities = @project.entities
-                        .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
-                        .order(:id)
-                        .page(params[:page]).per(25)
+    @entity_types = @project.entity_types.includes(:entity_type_attributes)
+    @counts = @project.entities.group(:entity_type_id).count
   end
 
   def new

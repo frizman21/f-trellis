@@ -4,6 +4,6 @@
   <% if side == :structure %>
     <%= link_to "← Structure", structure_project_path(project), class: "text-decoration-none" %>
   <% else %>
-    <%= link_to "← Data", data_project_path(project), class: "text-decoration-none" %>
+    <%= link_to "← #{project.name}", project_path(project), class: "text-decoration-none" %>
   <% end %>
 </p>

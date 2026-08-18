@@ -2,6 +2,17 @@
 class EntitiesController < ApplicationController
   before_action :set_project
 
+  # Entities of one kind. There is no unfiltered list: every entity is reached
+  # through its type's card.
+  def index
+    @entity_type = find_entity_type_by_slug
+    @entities = @project.entities
+                        .where(entity_type_id: @entity_type.id)
+                        .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
+                        .order(:id)
+                        .page(params[:page]).per(25)
+  end
+
   def show
     @entity = find_entity
     @rows = @entity.attribute_rows
@@ -67,13 +78,22 @@ class EntitiesController < ApplicationController
     label = @entity.label
     @entity.destroy
 
-    redirect_to data_project_path(@project), notice: "Entity \"#{label}\" deleted."
+    redirect_to project_path(@project), notice: "Entity \"#{label}\" deleted."
   end
 
   private
 
   def set_project
     @project = Project.find(params[:project_id])
+  end
+
+  # Slugs are derived from names rather than stored, so the lookup compares
+  # derived slugs. A project has a handful of types and they are one query away;
+  # this is what keeps a type's name and its address in step by construction.
+  def find_entity_type_by_slug
+    slug = params[:type_slug].to_s
+    @project.entity_types.detect { |type| type.slug == slug } ||
+      raise(ActiveRecord::RecordNotFound, "no entity type at #{slug.inspect}")
   end
 
   # Always through the project. An id from another project is then a 404 by

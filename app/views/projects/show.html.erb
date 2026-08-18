@@ -1,0 +1,31 @@
+<% content_for :title, @project.name %>
+
+<%# A card per kind of thing. The first question anyone has of a project's data
+    is "show me the people" or "show me the contracts", and a card to click is a
+    better answer than a type column to scan. %>
+<% if @entity_types.any? %>
+  <div class="row g-3">
+    <% @entity_types.each do |entity_type| %>
+      <div class="col-sm-6 col-lg-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="card-title h5 mb-1">
+              <%= type_with_attributes entity_type,
+                                       project_typed_entities_path(@project, entity_type.slug),
+                                       css_class: "stretched-link text-decoration-none" %>
+            </h2>
+            <p class="card-subtitle text-muted small mb-2">
+              <%= pluralize @counts.fetch(entity_type.id, 0), "entity", plural: "entities" %>
+            </p>
+            <p class="card-text small text-muted mb-0"><%= entity_type.description %></p>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <p class="text-muted">
+    This project has no entity types yet. Define one in its
+    <%= link_to "structure", structure_project_path(@project) %>.
+  </p>
+<% end %>

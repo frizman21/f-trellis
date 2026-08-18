@@ -55,24 +55,81 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
   # --- the data side ---------------------------------------------------------
 
-  test "data lists this project's entities" do
-    get data_project_path(@project)
+  # A project's data is a card per kind of thing, not one list of everything.
+  test "the project page is a card per entity type, with its count" do
+    get project_path(@project)
 
     assert_response :success
-    assert_select "a", text: "Rocketdyne F-1"
-    assert_select "a", text: "Capsule", count: 0
+    assert_select ".card", @project.entity_types.count
+    assert_select ".card", text: /Rocket Engine/
+    assert_select ".card", text: /2 entities/
+    assert_select ".card", text: /Capsule/, count: 0
   end
 
-  test "data shows the empty state when there are no entities" do
-    RelationshipTypeValue.delete_all
-    Relationship.delete_all
-    EntityAttributeValue.delete_all
-    Entity.delete_all
+  test "the project page has no Entities heading and no unfiltered list" do
+    get project_path(@project)
 
-    get data_project_path(@project)
+    assert_select "h1", { text: "Entities", count: 0 }
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1)), count: 0
+  end
+
+  # The card's own href is followed, so the link and the route are checked
+  # against each other rather than separately.
+  test "a card opens that type's entities and no other type's" do
+    get project_path(@project)
+    href = css_select(".card a").detect { |a| a.text.strip == "Rocket Engine" }["href"]
+
+    get href
 
     assert_response :success
-    assert_match(/No entities yet/, response.body)
+    assert_select "h1", "Rocket Engine"
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
+    assert_select "a[href=?]", project_entity_path(@project, entities(:saturn_v)), count: 0
+  end
+
+  test "the typed route is the type's name, hyphenated and pluralised" do
+    assert_equal "rocket-engines", entity_types(:rocket_engine).slug
+
+    get project_typed_entities_path(@project, "rocket-engines")
+
+    assert_response :success
+    assert_select "h1", "Rocket Engine"
+  end
+
+  test "an unknown slug is not found rather than an empty list" do
+    get project_typed_entities_path(@project, "no-such-things")
+
+    assert_response :not_found
+  end
+
+  test "another project's type does not resolve under this project" do
+    get project_typed_entities_path(@project, entity_types(:gemini_capsule).slug)
+
+    assert_response :not_found
+  end
+
+  test "a type with no entities of it says so" do
+    empty = @project.entity_types.create!(name: "Ground Station")
+
+    get project_typed_entities_path(@project, empty.slug)
+
+    assert_response :success
+    assert_match(/No Ground Station entities yet/, response.body)
+  end
+
+  test "a project with no entity types says so rather than showing no cards" do
+    get project_path(projects(:gemini))
+
+    assert_response :success
+
+    Relationship.where(project: projects(:gemini)).destroy_all
+    projects(:gemini).relationship_types.destroy_all
+    projects(:gemini).entities.destroy_all
+    projects(:gemini).entity_types.destroy_all
+
+    get project_path(projects(:gemini))
+
+    assert_match(/no entity types yet/, response.body)
   end
 
   # --- the tabs --------------------------------------------------------------
@@ -86,29 +143,34 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     assert_select "ul.nav-tabs", count: 0
     assert_select "h1", text: "Entity Types"
 
-    get data_project_path(@project)
+    get project_path(@project)
     assert_response :success
     assert_select "ul.nav-tabs", count: 0
-    assert_select "h1", text: "Entities"
+    assert_select ".card"
   end
 
   test "the banner is the only way between the two sides" do
-    get data_project_path(@project)
+    get project_path(@project)
 
     assert_select "nav.navbar a[href=?]", projects_path, text: @project.name
     assert_select "a[href=?]", structure_project_path(@project), count: 0
   end
 
   # The old index addresses moved; the per-record ones did not.
-  test "the old index routes no longer resolve" do
-    get "/projects/#{@project.id}/entities"
-    assert_response :not_found
+  # These now match the typed-entities catch-all, so they must fail as unknown
+  # slugs rather than as unroutable paths — which is what the reserved-slug
+  # validation exists to keep true.
+  test "the old index paths do not list anything" do
+    %w[entities entity_types relationship_types data].each do |path|
+      # Rendering the 404 page drops the test session, so each pass signs in
+      # again rather than the second one redirecting to the login page and
+      # looking like a pass for the wrong reason.
+      sign_in users(:admin)
 
-    get "/projects/#{@project.id}/entity_types"
-    assert_response :not_found
+      get "/projects/#{@project.id}/#{path}"
 
-    get "/projects/#{@project.id}/relationship_types"
-    assert_response :not_found
+      assert_response :not_found, "#{path} should not resolve"
+    end
   end
 
   test "the per-record routes still resolve" do
@@ -241,7 +303,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       assert_select "ul.nav-tabs", { count: 0 }, "#{path} should not carry the side tabs"
-      assert_select "a[href=?]", data_project_path(@project), { minimum: 1 },
+      assert_select "a[href=?]", project_path(@project), { minimum: 1 },
                     "#{path} should link back to the data"
     end
   end

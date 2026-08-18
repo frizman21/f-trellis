@@ -174,7 +174,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
       delete project_entity_path(@project, entities(:bare))
     end
 
-    assert_redirected_to data_project_path(@project)
+    assert_redirected_to project_path(@project)
   end
 
   # --- scoping ---------------------------------------------------------------

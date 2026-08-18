@@ -104,9 +104,9 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     get projects_path
 
     assert_select "a[href=?]", structure_project_path(projects(:apollo))
-    assert_select "a[href=?]", data_project_path(projects(:apollo))
+    assert_select "a[href=?]", project_path(projects(:apollo))
     assert_select "a[href=?]", structure_project_path(projects(:gemini))
-    assert_select "a[href=?]", data_project_path(projects(:gemini))
+    assert_select "a[href=?]", project_path(projects(:gemini))
   end
 
   test "the listing counts what each project holds on each side" do
@@ -114,7 +114,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
     assert_select "a[href=?]", structure_project_path(projects(:apollo)),
                   text: /Structure\s+#{projects(:apollo).entity_types.count}/
-    assert_select "a[href=?]", data_project_path(projects(:gemini)),
+    assert_select "a[href=?]", project_path(projects(:gemini)),
                   text: /Data\s+#{projects(:gemini).entities.count}/
   end
 
