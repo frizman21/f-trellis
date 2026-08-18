@@ -257,11 +257,6 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "an entity's own page carries the popover on the type it names" do
-    get project_entity_path(@project, entities(:f1))
-
-    assert_select "a[data-controller=?][data-bs-title=?]", "type-popover", "Rocket Engine"
-  end
 
   test "a relationship's edit page carries the popover on its type" do
     get edit_project_relationship_path(@project, relationships(:f1_powers_saturn_v))
@@ -473,5 +468,38 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     get structure_project_path(@project)
 
     assert_select "a[data-controller=?]", "type-popover"
+  end
+
+  # Descriptions are full extraction definitions now; a card is a way in rather
+  # than the place to read one.
+  test "a card truncates a long description" do
+    long = "A" * 400
+    entity_types(:rocket_engine).update!(description: long)
+
+    get project_path(@project)
+
+    assert_no_match(/A{150}/, response.body)
+    assert_match(/A{90}/, response.body)
+  end
+
+  test "the structure page truncates long descriptions" do
+    entity_types(:rocket_engine).update!(description: "B" * 400)
+    relationship_types(:powers).update!(description: "C" * 400)
+
+    get structure_project_path(@project)
+
+    assert_no_match(/B{150}/, response.body)
+    assert_no_match(/C{150}/, response.body)
+    assert_match(/B{90}/, response.body)
+  end
+
+  # The name opens the type, which is where editing lives.
+  test "the structure tables carry no per-row edit button" do
+    get structure_project_path(@project)
+
+    assert_response :success
+    assert_select "a[href=?]", edit_project_entity_type_path(@project, entity_types(:rocket_engine)), count: 0
+    assert_select "a[href=?]", edit_project_relationship_type_path(@project, relationship_types(:powers)), count: 0
+    assert_select "a[href=?]", project_entity_type_path(@project, entity_types(:rocket_engine))
   end
 end

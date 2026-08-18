@@ -433,17 +433,6 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_select "td", { text: /chambers/, count: 0 }
   end
 
-  # The popover states what the type tracks now.
-  test "a disabled attribute is not listed in the type popover" do
-    entity_type_attributes(:engine_chambers).update!(is_disabled: true)
-
-    get project_entity_path(@project, entities(:f1))
-
-    assert_select "a[data-bs-title=?]", "Rocket Engine" do |links|
-      assert_no_match(/chambers/, links.first["data-bs-content"])
-      assert_match(/thrust_kn/, links.first["data-bs-content"])
-    end
-  end
 
   # --- the far end's cell ----------------------------------------------------
 
@@ -510,5 +499,14 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
     get edit_project_entity_path(@project, entities(:f1))
     assert_select "input[name=?][value=?]", "entity[name]", "Rocketdyne F-1"
+  end
+
+  # The type is what this entity is, not somewhere else to go.
+  test "the entity page names its type without linking it" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "p.text-muted", text: "Rocket Engine"
+    assert_select "a[href=?]", project_entity_type_path(@project, entity_types(:rocket_engine)), count: 0
   end
 end

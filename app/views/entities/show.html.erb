@@ -10,10 +10,7 @@
                   form: { class: "d-inline", data: { turbo_confirm: "Delete this entity?" } } %>
   </div>
 </div>
-<p class="text-muted">
-  <%= type_with_attributes @entity.entity_type,
-                           project_entity_type_path(@project, @entity.entity_type) %>
-</p>
+<p class="text-muted"><%= @entity.entity_type.name %></p>
 
 <h2 class="h5 mt-4">Attributes</h2>
 <% if @rows.any? %>

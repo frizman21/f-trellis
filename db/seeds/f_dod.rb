@@ -19,27 +19,66 @@ end
 
 ENTITY_TYPES = {
   "Person" => {
-    description: "A named individual.",
+    description: <<~TEXT.squish,
+      An individual human being named in the source. Record people who take part in
+      the subject matter: engineers, researchers, officials, executives, or the authors of
+      the work being described. Do not record the journalist or editor who wrote the source
+      itself, people named only in a passing comparison, or a job title with no named
+      holder. A team, an office, or a committee is an Organization, not a Person.
+    TEXT
     attributes: { "first_name" => "string", "last_name" => "string" }
   },
   "Organization" => {
-    description: "A company, agency, laboratory or institution.",
+    description: <<~TEXT.squish,
+      A company, government agency, laboratory, university, programme office, or other
+      named body that acts as a unit. Record it when the source treats it as an actor:
+      awarding, building, funding, employing, regulating, or operating something. Record a
+      named division or subunit as its own Organization when the source names it separately
+      from its parent. Do not record a place, a product line, or a project name as an
+      Organization; a named built thing is a Part.
+    TEXT
     attributes: { "acronym" => "string" }
   },
   "Science" => {
-    description: "A body of knowledge: a field, a principle, a law, an effect.",
+    description: <<~TEXT.squish,
+      A body of knowledge about how the world behaves: a field, a discipline, a principle,
+      a law, or an observed effect. Record it when the source invokes it as the reason
+      something works or as the subject of research. Do not record a way of doing something,
+      which is a Technology, and do not record a specific built object, which is a Part.
+      Superconductivity is a Science; superconducting magnet design is a Technology.
+    TEXT
     attributes: { "summary" => "string" }
   },
   "Technology" => {
-    description: "An engineered capability: a method, a process, a material.",
+    description: <<~TEXT.squish,
+      An engineered capability: a method, process, technique, material, or class of device
+      that can be applied to make something happen. Record it when the source describes a way
+      of achieving something that could be applied more than once. Do not record a single
+      built artefact or product, which is a Part, and do not record the underlying physics,
+      which is a Science. Stealth shaping is a Technology; a particular aircraft built using
+      it is a Part.
+    TEXT
     attributes: { "summary" => "string" }
   },
   "Part" => {
-    description: "A concrete artefact — a built thing with specifications.",
+    description: <<~TEXT.squish,
+      A concrete, built artefact with an identity of its own: an engine, a stage, a computer,
+      an airframe, an instrument, a subassembly. Record it when the source names a specific
+      thing that was built, is being built, or is to be delivered. Record a component
+      separately when the source names it apart from the whole it belongs to. Do not record a
+      capability or a method, which is a Technology, and do not record a product category
+      with no named instance.
+    TEXT
     attributes: { "mass_kg" => "float" }
   },
   "Contract" => {
-    description: "An award: who is paid, by whom, to do what.",
+    description: <<~TEXT.squish,
+      A specific award of money for work: a contract, grant, task order, or other
+      transaction agreement. Record it when the source names an award identifier, a value, a
+      period of performance, or the parties to a particular award. Do not record a general
+      funding relationship, a budget line, or a programme with no award behind it. A statement
+      that an agency funded the work is not a Contract unless the source names the award.
+    TEXT
     attributes: { "identifier" => "string", "title" => "string",
                   "start_date" => "datetime", "end_date" => "datetime",
                   "value_usd" => "float" }
@@ -53,17 +92,201 @@ ENTITY_TYPES = {
 # Employment, declared to run Person → Organization: the kind and the edge are
 # one object now.
 
+# What makes each kind of edge true. "Both appear on the page" is not a
+# relationship, so each definition says what the source must actually state.
+RELATIONSHIP_DESCRIPTIONS = {
+  "Employment" => <<~TEXT.squish,
+    The person is or was paid staff of the organization. Record it when the
+    source states a role, a post held, or that the person works or worked there.
+    A one-off consultation or a quoted opinion is not employment; use
+    Affiliation when the tie is looser than a job.
+  TEXT
+  "Affiliation" => <<~TEXT.squish,
+    The person is associated with the organization without being its staff: a
+    fellow, an advisor, a board member, a visiting researcher, or a named
+    collaborator. Record it when the source ties the two together but stops
+    short of stating employment.
+  TEXT
+  "Marriage" => <<~TEXT.squish,
+    The two people are or were married to each other. Record it only when the
+    source says so.
+  TEXT
+  "Friendship" => <<~TEXT.squish,
+    The two people are known associates outside a reporting line. Record it when
+    the source describes a personal or professional acquaintance that is neither
+    employment nor family.
+  TEXT
+  "Family" => <<~TEXT.squish,
+    The two people are related by blood or by marriage. Record the relation the
+    source states.
+  TEXT
+  "Partnership" => <<~TEXT.squish,
+    The two organizations work together on something the source names: a joint
+    venture, a teaming arrangement, a consortium, or a stated collaboration. Do
+    not record two organizations merely appearing in the same document.
+  TEXT
+  "Subsidiary" => <<~TEXT.squish,
+    The first organization is owned or controlled by the second. Record it for a
+    wholly owned unit, a named division, or an acquired company. Direction
+    matters: from is the owned, to is the owner.
+  TEXT
+  "Manufacturer" => <<~TEXT.squish,
+    The organization builds or built the part. Record it when the source says
+    who made the thing, including a prime contractor building it under its own
+    name.
+  TEXT
+  "Consumer" => <<~TEXT.squish,
+    The organization uses or operates the part. Record it for the fielded user,
+    not for whoever paid for it.
+  TEXT
+  "Demand" => <<~TEXT.squish,
+    The organization wants the part built or has stated a requirement for it.
+    Record it for a stated need that has not yet produced an award; once an
+    award exists, use the Contract relationships instead.
+  TEXT
+  "Composition" => <<~TEXT.squish,
+    The first part is a component of the second. Record it when the source
+    places one built thing inside another, and record the quantity when the
+    source gives one.
+  TEXT
+  "Implementation" => <<~TEXT.squish,
+    The part implements the technology: it is a working instance of the method
+    or capability. Record it when the source says the artefact is how the
+    technology was realised.
+  TEXT
+  "Dependency" => <<~TEXT.squish,
+    The part depends on the technology to function. Record it when the source
+    says the artefact could not work without it, as distinct from the artefact
+    being an instance of it.
+  TEXT
+  "Enabler" => <<~TEXT.squish,
+    The part is what made the technology practical. Record it when the source
+    credits a specific built thing with making a capability usable, rather than
+    the other way round.
+  TEXT
+  "Application" => <<~TEXT.squish,
+    The technology applies the science: it puts the principle to work. Record it
+    when the source explains a capability by naming the knowledge behind it.
+  TEXT
+  "Derived From" => <<~TEXT.squish,
+    The technology came out of research in the science. Record it when the
+    source describes a lineage from a field of study to an engineered
+    capability.
+  TEXT
+  "Enabling Principle" => <<~TEXT.squish,
+    The science is the reason the technology works at all. Record it for the
+    fundamental effect or law the capability rests on, rather than for a field
+    that merely relates to it.
+  TEXT
+  "Researcher" => <<~TEXT.squish,
+    The person conducts or conducted research in the field. Record it when the
+    source describes them working in the discipline, whether or not a
+    publication is named.
+  TEXT
+  "Author" => <<~TEXT.squish,
+    The person wrote a paper, book, or report in the field. Record it when the
+    source names the person as an author of work in that discipline.
+  TEXT
+  "Contributor" => <<~TEXT.squish,
+    The person contributed to the field without being described as a researcher
+    or as an author of a named work: an advisor, a reviewer, or a named
+    collaborator. Record it when the source credits them without saying they did
+    the research or wrote it up.
+  TEXT
+  "Awardee" => <<~TEXT.squish,
+    The organization holds the contract and is responsible for delivering the
+    work. Record it for the prime recipient of the award.
+  TEXT
+  "Awarding Agency" => <<~TEXT.squish,
+    The organization issued the contract and is paying for the work. Record it
+    for the buyer, not for the recipient.
+  TEXT
+  "Subcontractor" => <<~TEXT.squish,
+    The organization performs part of the work under the contract but does not
+    hold it. Record it when the source names a supplier or subcontractor beneath
+    a prime.
+  TEXT
+  "Research Institution" => <<~TEXT.squish,
+    The organization performs research under the contract as a university,
+    laboratory, or research centre rather than as a commercial supplier. Record
+    it when the source names the institution's research role rather than a
+    delivery role.
+  TEXT
+  "Principal Investigator" => <<~TEXT.squish,
+    The person leads the technical work under the contract. Record it for the
+    named lead, whatever the source calls the role.
+  TEXT
+  "Technical Contact" => <<~TEXT.squish,
+    The person is the named technical point of contact for the contract, without
+    being described as leading the work. Record it when the source gives a
+    contact rather than a lead.
+  TEXT
+  "Contracting Officer" => <<~TEXT.squish,
+    The person administers the award on the buyer's side: signing, modifying, or
+    overseeing the contract itself rather than the work. Record it for the named
+    administering official, not for the technical lead.
+  TEXT
+  "Develop" => <<~TEXT.squish,
+    The contract funds developing the technology. Record it when the source says
+    the award is to build or advance the capability.
+  TEXT
+  "Apply" => <<~TEXT.squish,
+    The contract funds applying an existing technology rather than developing
+    it. Record it when the award uses a capability that already exists.
+  TEXT
+  "Evaluate" => <<~TEXT.squish,
+    The contract funds assessing or testing the technology rather than
+    developing or applying it. Record it for test, trial, and assessment awards
+    where nothing new is being built.
+  TEXT
+  "Mature" => <<~TEXT.squish,
+    The contract funds raising the technology's readiness, moving it from
+    demonstrated toward fielded. Record it for maturation, qualification, or
+    transition rather than initial development.
+  TEXT
+  "Deliverable" => <<~TEXT.squish,
+    The part is delivered under the contract. Record it when the source names
+    the thing the award produces.
+  TEXT
+  "Component" => <<~TEXT.squish,
+    The part is a component covered by the contract without being the contract's
+    headline deliverable. Record it for a subassembly or supplied item named in
+    the award alongside what the award is for.
+  TEXT
+  "Procurement" => <<~TEXT.squish,
+    The contract buys existing parts rather than funding their development.
+    Record it for a purchase of something already designed.
+  TEXT
+  "Developer" => <<~TEXT.squish,
+    The organization builds or develops the technology. Record it for the party
+    doing the engineering, whether or not an award is named.
+  TEXT
+  "Funder" => <<~TEXT.squish,
+    The organization pays for work on the technology without necessarily doing
+    it. Record it when the source names a funding role but no specific award;
+    when the award is named, use the Contract relationships.
+  TEXT
+  "Adopter" => <<~TEXT.squish,
+    The organization uses the technology in its own work or products. Record it
+    for a stated user, as distinct from a developer or a funder.
+  TEXT
+  "Licensee" => <<~TEXT.squish,
+    The organization licensed the technology from whoever owns it. Record it
+    when the source names a licensing arrangement.
+  TEXT
+}.freeze
+
 RELATIONSHIP_TYPES = [
-  { name: "Employment",         from: "Person",       to: "Organization", description: "The person is employed by the organization.", attributes: { "since" => "datetime", "role" => "string" } },
-  { name: "Affiliation",        from: "Person",       to: "Organization", description: "A looser association than employment." },
+  { name: "Employment",         from: "Person",       to: "Organization", attributes: { "since" => "datetime", "role" => "string" } },
+  { name: "Affiliation",        from: "Person",       to: "Organization" },
   { name: "Marriage",           from: "Person",       to: "Person",       description: "The two people are married." },
   { name: "Friendship",         from: "Person",       to: "Person",       description: "The two people are known associates." },
   { name: "Family",             from: "Person",       to: "Person",       description: "The two people are related." },
-  { name: "Partnership",        from: "Organization", to: "Organization", description: "The two organizations work together." },
-  { name: "Subsidiary",         from: "Organization", to: "Organization", description: "The first is owned by the second." },
-  { name: "Manufacturer",       from: "Part",         to: "Organization", description: "The organization builds the part." },
-  { name: "Consumer",           from: "Part",         to: "Organization", description: "The organization uses the part." },
-  { name: "Demand",             from: "Part",         to: "Organization", description: "The organization wants the part built." },
+  { name: "Partnership",        from: "Organization", to: "Organization" },
+  { name: "Subsidiary",         from: "Organization", to: "Organization" },
+  { name: "Manufacturer",       from: "Part",         to: "Organization" },
+  { name: "Consumer",           from: "Part",         to: "Organization" },
+  { name: "Demand",             from: "Part",         to: "Organization" },
   { name: "Composition",        from: "Part",         to: "Part",         description: "The first part is a component of the second.", attributes: { "quantity" => "int" } },
   { name: "Implementation",     from: "Part",         to: "Technology",   description: "The part implements the technology." },
   { name: "Dependency",         from: "Part",         to: "Technology",   description: "The part depends on the technology." },
@@ -74,10 +297,10 @@ RELATIONSHIP_TYPES = [
   { name: "Researcher",         from: "Person",       to: "Science",      description: "The person researches the field." },
   { name: "Author",             from: "Person",       to: "Science",      description: "The person wrote in the field." },
   { name: "Contributor",        from: "Person",       to: "Science",      description: "The person contributed to the field." },
-  { name: "Awardee",            from: "Contract",     to: "Organization", description: "The organization holds the contract." },
-  { name: "Awarding Agency",    from: "Contract",     to: "Organization", description: "The organization awarded the contract." },
-  { name: "Subcontractor",      from: "Contract",     to: "Organization", description: "The organization works under the contract." },
-  { name: "Research Institution", from: "Contract",   to: "Organization", description: "The institution performs research under the contract." },
+  { name: "Awardee",            from: "Contract",     to: "Organization" },
+  { name: "Awarding Agency",    from: "Contract",     to: "Organization" },
+  { name: "Subcontractor",      from: "Contract",     to: "Organization" },
+  { name: "Research Institution", from: "Contract",   to: "Organization" },
   { name: "Principal Investigator", from: "Contract", to: "Person",       description: "The person leads the work." },
   { name: "Technical Contact",  from: "Contract",     to: "Person",       description: "The person is the technical point of contact." },
   { name: "Contracting Officer", from: "Contract",    to: "Person",       description: "The person administers the award." },
@@ -219,7 +442,7 @@ end
 
 relationship_types = RELATIONSHIP_TYPES.to_h do |spec|
   type = project.relationship_types.find_or_create_by!(name: spec[:name]) do |t|
-    t.description = spec[:description]
+    t.description = RELATIONSHIP_DESCRIPTIONS.fetch(spec[:name])
     t.from_entity_type = entity_types.fetch(spec[:from])
     t.to_entity_type   = entity_types.fetch(spec[:to])
   end

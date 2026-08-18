@@ -106,4 +106,49 @@ class FDodSeedTest < ActiveSupport::TestCase
 
     assert_equal before, counts.call
   end
+
+  # --- descriptions as extraction context ------------------------------------
+  #
+  # #31 renders these into the extraction prompt, so their job is to tell a model
+  # what counts as one of each thing. Asserted by shape rather than by wording:
+  # the wording is editorial and will change, but "a definition, not a label"
+  # should not.
+
+  def all_types = @project.entity_types.to_a + @project.relationship_types.to_a
+
+  test "every type has a description" do
+    all_types.each do |type|
+      assert type.description.present?, "#{type.class} #{type.name} has no description"
+    end
+  end
+
+  # A label is one clause. The shape these need — what it is, what to record,
+  # what not to — cannot be said in one sentence.
+  test "no description is a bare label" do
+    all_types.each do |type|
+      sentences = type.description.split(/(?<=[.?!])\s+/).reject(&:blank?)
+
+      assert_operator sentences.size, :>=, 2,
+                      "#{type.name}: #{type.description.inspect} is a label, not a definition"
+    end
+  end
+
+  test "every description reads as prose" do
+    all_types.each do |type|
+      assert type.description.strip.end_with?("."),
+             "#{type.name} does not end in a full stop"
+      assert_no_match(/\s{2,}/, type.description,
+                      "#{type.name} has collapsed whitespace left in it")
+    end
+  end
+
+  # The actual contract between this seed and the prompt.
+  test "the generated prompt carries every type's description" do
+    prompt = ExtractionPrompt.new(@project).to_s
+
+    all_types.each do |type|
+      assert_includes prompt, type.description,
+                      "#{type.name}'s definition is missing from the prompt"
+    end
+  end
 end

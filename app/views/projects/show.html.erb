@@ -25,7 +25,9 @@
             <p class="card-subtitle text-muted small mb-2">
               <%= pluralize @counts.fetch(entity_type.id, 0), "entity", plural: "entities" %>
             </p>
-            <p class="card-text small text-muted mb-0"><%= entity_type.description %></p>
+            <%# Truncated: these are full extraction definitions now, and a card is
+                a way in rather than the place to read one. %>
+            <p class="card-text small text-muted mb-0"><%= entity_type.description.to_s.truncate(100) %></p>
           </div>
         </div>
       </div>
