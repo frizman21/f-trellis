@@ -1,0 +1,34 @@
+<% content_for :title, "Relationship Types" %>
+<%= render "projects/header", project: @project, side: :ontology, section: :relationship_types %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Relationship Types</h1>
+  <%= link_to "New relationship type", new_project_relationship_type_path(@project), class: "btn btn-primary" %>
+</div>
+
+<% if @relationship_types.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Attributes</th>
+        <th>Relationships</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @relationship_types.each do |relationship_type| %>
+        <tr>
+          <td><%= link_to relationship_type.name, project_relationship_type_path(@project, relationship_type) %></td>
+          <td><%= relationship_type.description %></td>
+          <td><%= relationship_type.relationship_type_attributes.size %></td>
+          <td><%= relationship_type.relationships.size %></td>
+          <td><%= link_to "Edit", edit_project_relationship_type_path(@project, relationship_type), class: "btn btn-sm btn-outline-primary" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>No relationship types yet.</p>
+<% end %>

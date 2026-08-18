@@ -34,7 +34,8 @@ class EntityTest < ActiveSupport::TestCase
   test "relationships include edges in both directions" do
     f1 = entities(:f1)
     saturn = entities(:saturn_v)
-    incoming = Relationship.create!(from_entity: saturn, to_entity: entities(:unnamed_engine))
+    incoming = Relationship.create!(relationship_type: relationship_types(:powers),
+                                    from_entity: saturn, to_entity: entities(:unnamed_engine))
 
     assert_includes f1.relationships, relationships(:f1_powers_saturn_v)
     assert_includes entities(:unnamed_engine).relationships, incoming

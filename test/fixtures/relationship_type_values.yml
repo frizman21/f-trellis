@@ -1,0 +1,5 @@
+f1_powers_saturn_v_engine_count:
+  project: apollo
+  relationship: f1_powers_saturn_v
+  relationship_type_attribute: powers_engine_count
+  int_value: 5

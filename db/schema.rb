@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_18_213127) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_18_213356) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -196,14 +196,54 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213127) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "relationship_type_attributes", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "project_id", null: false
+    t.bigint "relationship_type_id", null: false
+    t.datetime "updated_at", null: false
+    t.string "value_type", null: false
+    t.index ["project_id"], name: "index_relationship_type_attributes_on_project_id"
+    t.index ["relationship_type_id", "name"], name: "index_relationship_type_attributes_on_type_and_name", unique: true
+    t.index ["relationship_type_id"], name: "index_relationship_type_attributes_on_relationship_type_id"
+  end
+
+  create_table "relationship_type_values", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "datetime_value"
+    t.float "float_value"
+    t.integer "int_value"
+    t.bigint "project_id", null: false
+    t.bigint "relationship_id", null: false
+    t.bigint "relationship_type_attribute_id", null: false
+    t.string "string_value"
+    t.datetime "updated_at", null: false
+    t.index ["project_id"], name: "index_relationship_type_values_on_project_id"
+    t.index ["relationship_id", "relationship_type_attribute_id"], name: "index_relationship_type_values_on_relationship_and_attribute", unique: true
+    t.index ["relationship_id"], name: "index_relationship_type_values_on_relationship_id"
+    t.index ["relationship_type_attribute_id"], name: "idx_on_relationship_type_attribute_id_bac6f1f974"
+  end
+
+  create_table "relationship_types", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.bigint "project_id", null: false
+    t.datetime "updated_at", null: false
+    t.index "project_id, lower((name)::text)", name: "index_relationship_types_on_project_and_lower_name", unique: true
+    t.index ["project_id"], name: "index_relationship_types_on_project_id"
+  end
+
   create_table "relationships", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "from_entity_id", null: false
     t.bigint "project_id", null: false
+    t.bigint "relationship_type_id", null: false
     t.bigint "to_entity_id", null: false
     t.datetime "updated_at", null: false
     t.index ["from_entity_id"], name: "index_relationships_on_from_entity_id"
     t.index ["project_id"], name: "index_relationships_on_project_id"
+    t.index ["relationship_type_id"], name: "index_relationships_on_relationship_type_id"
     t.index ["to_entity_id"], name: "index_relationships_on_to_entity_id"
   end
 
@@ -431,9 +471,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_213127) do
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "models"
   add_foreign_key "messages", "tool_calls"
+  add_foreign_key "relationship_type_attributes", "projects"
+  add_foreign_key "relationship_type_attributes", "relationship_types"
+  add_foreign_key "relationship_type_values", "projects"
+  add_foreign_key "relationship_type_values", "relationship_type_attributes"
+  add_foreign_key "relationship_type_values", "relationships"
+  add_foreign_key "relationship_types", "projects"
   add_foreign_key "relationships", "entities", column: "from_entity_id"
   add_foreign_key "relationships", "entities", column: "to_entity_id"
   add_foreign_key "relationships", "projects"
+  add_foreign_key "relationships", "relationship_types"
   add_foreign_key "skill_evaluation_models", "models"
   add_foreign_key "skill_evaluation_models", "skill_evaluations", on_delete: :cascade
   add_foreign_key "skill_evaluation_results", "chats"

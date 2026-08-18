@@ -1,0 +1,5 @@
+<% content_for :title, "New Relationship Type" %>
+<%= render "projects/header", project: @project, side: :ontology, section: :relationship_types %>
+<h1>New Relationship Type</h1>
+
+<%= render "form", project: @project, relationship_type: @relationship_type, submit_label: "Create relationship type" %>

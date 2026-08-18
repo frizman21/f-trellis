@@ -1,6 +1,11 @@
 <%# The two sides of a project, and the way back to the listing. Rendered on
     every ontology and data page so moving between them never needs the
-    browser's back button. `side` is :ontology or :data. %>
+    browser's back button.
+
+    `side` is :ontology or :data. The ontology side has two halves of its own —
+    what things can be, and what edges between them can be — so it carries a
+    second row rather than a third top-level tab: they are one side of the
+    project, not a third. `section` names which half. %>
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb mb-1">
     <li class="breadcrumb-item"><%= link_to "Projects", projects_path %></li>
@@ -18,3 +23,16 @@
                 class: "nav-link #{'active' if side == :data}" %>
   </li>
 </ul>
+
+<% if side == :ontology %>
+  <ul class="nav nav-pills mb-4">
+    <li class="nav-item">
+      <%= link_to "Entity Types", project_entity_types_path(project),
+                  class: "nav-link #{'active' if local_assigns[:section] == :entity_types}" %>
+    </li>
+    <li class="nav-item">
+      <%= link_to "Relationship Types", project_relationship_types_path(project),
+                  class: "nav-link #{'active' if local_assigns[:section] == :relationship_types}" %>
+    </li>
+  </ul>
+<% end %>

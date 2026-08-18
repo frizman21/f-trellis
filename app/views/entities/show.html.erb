@@ -51,8 +51,9 @@
     <thead>
       <tr>
         <th>Direction</th>
+        <th>Relationship</th>
         <th>Entity</th>
-        <th>Type</th>
+        <th>Entity type</th>
         <th></th>
       </tr>
     </thead>
@@ -63,13 +64,16 @@
           <td class="text-muted">
             <%= relationship.from_entity_id == @entity.id ? "→ to" : "← from" %>
           </td>
+          <td><%= relationship.relationship_type.name %></td>
           <%# Links to the far end, never back to the page it is on. %>
           <td><%= link_to other.label, project_entity_path(@project, other) %></td>
           <td class="text-muted"><%= other.entity_type.name %></td>
-          <td>
+          <td class="text-nowrap">
+            <%= link_to "Edit", edit_project_relationship_path(@project, relationship),
+                        class: "btn btn-sm btn-outline-primary" %>
             <%= button_to "Remove", project_relationship_path(@project, relationship, entity_id: @entity.id),
                           method: :delete, class: "btn btn-sm btn-outline-danger",
-                          form: { class: "m-0" } %>
+                          form: { class: "d-inline m-0" } %>
           </td>
         </tr>
       <% end %>
@@ -79,16 +83,28 @@
   <p class="text-muted">No relationships yet.</p>
 <% end %>
 
-<% if @candidates.any? %>
+<% if @candidates.any? && @project.relationship_types.any? %>
   <%= form_with model: [ @project, Relationship.new ], local: true, class: "row g-2 align-items-end" do |f| %>
     <%= f.hidden_field :from_entity_id, value: @entity.id %>
     <div class="col-auto">
+      <%= f.label :relationship_type_id, "Relationship", class: "form-label" %>
+      <%= f.collection_select :relationship_type_id, @project.relationship_types, :id, :name,
+                              { prompt: "Choose a kind" }, class: "form-select", required: true %>
+    </div>
+    <div class="col-auto">
       <%= f.label :to_entity_id, "Relate to", class: "form-label" %>
       <%= f.collection_select :to_entity_id, @candidates, :id, :label,
-                              { prompt: "Choose an entity" }, class: "form-select" %>
+                              { prompt: "Choose an entity" }, class: "form-select", required: true %>
     </div>
     <div class="col-auto">
       <%= f.submit "Add relationship", class: "btn btn-outline-primary" %>
     </div>
   <% end %>
+<% end %>
+
+<% if @candidates.any? && @project.relationship_types.none? %>
+  <p class="text-muted">
+    Define a <%= link_to "relationship type", project_relationship_types_path(@project) %>
+    before connecting entities — every edge says what kind it is.
+  </p>
 <% end %>

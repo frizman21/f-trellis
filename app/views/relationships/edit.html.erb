@@ -1,0 +1,60 @@
+<% content_for :title, "Edit Relationship" %>
+<%= render "projects/header", project: @project, side: :data %>
+
+<h1>Edit Relationship</h1>
+<p class="text-muted">
+  <%= link_to @relationship.from_entity.label, project_entity_path(@project, @relationship.from_entity) %>
+  →
+  <%= link_to @relationship.to_entity.label, project_entity_path(@project, @relationship.to_entity) %>
+  · <%= @relationship.relationship_type.name %>
+</p>
+
+<%= form_with model: [ @project, @relationship ], local: true do |f| %>
+  <% if @relationship.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% @relationship.errors.full_messages.each do |m| %>
+          <li><%= m %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :relationship_type_id, "Relationship type", class: "form-label" %>
+    <%= f.collection_select :relationship_type_id, @project.relationship_types, :id, :name,
+                            {}, class: "form-select", required: true %>
+  </div>
+
+  <% if @relationship.relationship_type_values.any? %>
+    <%= f.fields_for :relationship_type_values do |vf| %>
+      <% attribute = vf.object.relationship_type_attribute %>
+      <div class="mb-3">
+        <%= vf.label :value, attribute.name, class: "form-label" %>
+        <span class="text-muted small">(<%= attribute.value_type %>)</span>
+        <%= vf.hidden_field :relationship_type_attribute_id, value: attribute.id %>
+        <%# The input type follows the declared value type, so the browser
+            rejects the obvious mistakes before the model has to. %>
+        <% case attribute.value_type %>
+        <% when "int" %>
+          <%= vf.number_field :value, value: vf.object.value, step: 1, class: "form-control" %>
+        <% when "float" %>
+          <%= vf.number_field :value, value: vf.object.value, step: "any", class: "form-control" %>
+        <% when "datetime" %>
+          <%= vf.datetime_field :value, value: vf.object.value, class: "form-control" %>
+        <% else %>
+          <%= vf.text_field :value, value: vf.object.value, class: "form-control" %>
+        <% end %>
+      </div>
+    <% end %>
+  <% else %>
+    <p class="text-muted">
+      <%= link_to @relationship.relationship_type.name,
+                  project_relationship_type_path(@project, @relationship.relationship_type) %>
+      defines no attributes yet, so there is nothing to fill in.
+    </p>
+  <% end %>
+
+  <%= f.submit "Save relationship", class: "btn btn-primary" %>
+  <%= link_to "Cancel", project_entity_path(@project, @relationship.from_entity), class: "btn btn-outline-secondary" %>
+<% end %>

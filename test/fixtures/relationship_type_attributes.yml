@@ -1,0 +1,29 @@
+powers_engine_count:
+  project: apollo
+  relationship_type: powers
+  name: engine_count
+  value_type: int
+
+powers_stage:
+  project: apollo
+  relationship_type: powers
+  name: stage
+  value_type: string
+
+powers_certified_on:
+  project: apollo
+  relationship_type: powers
+  name: certified_on
+  value_type: datetime
+
+powers_thrust_share:
+  project: apollo
+  relationship_type: powers
+  name: thrust_share
+  value_type: float
+
+gemini_docks_port:
+  project: gemini
+  relationship_type: gemini_docks
+  name: port
+  value_type: string

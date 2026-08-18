@@ -13,8 +13,11 @@ Rails.application.routes.draw do
     resources :entity_types do
       resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy]
     end
+    resources :relationship_types do
+      resources :relationship_type_attributes, only: [:new, :create, :edit, :update, :destroy]
+    end
     resources :entities
-    resources :relationships, only: [:create, :destroy]
+    resources :relationships, only: [:create, :edit, :update, :destroy]
   end
 
   resources :sources, only: [:index, :show, :new, :create] do

@@ -11,7 +11,10 @@ class Project < ApplicationRecord
   # Declared child-first, because Rails runs dependent callbacks in declaration
   # order and EntityType restricts on its entities. Types first would hit that
   # restriction and abandon the destroy, leaving the project standing.
+  has_many :relationship_type_values, dependent: :destroy
   has_many :relationships, dependent: :destroy
+  has_many :relationship_type_attributes, dependent: :destroy
+  has_many :relationship_types, dependent: :destroy
   has_many :entity_attribute_values, dependent: :destroy
   has_many :entities, dependent: :destroy
   has_many :entity_type_attributes, dependent: :destroy

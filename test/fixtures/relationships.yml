@@ -1,4 +1,5 @@
 f1_powers_saturn_v:
   project: apollo
+  relationship_type: powers
   from_entity: f1
   to_entity: saturn_v

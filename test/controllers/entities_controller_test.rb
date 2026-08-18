@@ -14,6 +14,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "index shows the empty state when there are no entities" do
+    RelationshipTypeValue.delete_all
     Relationship.delete_all
     EntityAttributeValue.delete_all
     Entity.delete_all
@@ -263,5 +264,23 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", projects_path
     assert_select "a.nav-link.active[href=?]", project_entities_path(@project)
     assert_select "a.nav-link[href=?]", project_entity_types_path(@project)
+  end
+
+  test "the relationship table names the kind of each edge" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "td", text: "Powers"
+  end
+
+  test "the relationship picker offers only this project's relationship types" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "select[name=?] option", "relationship[relationship_type_id]" do |options|
+      offered = options.map { |o| o["value"] }.compact_blank.map(&:to_i)
+
+      assert_equal @project.relationship_types.pluck(:id).sort, offered.sort
+      assert_not_includes offered, relationship_types(:gemini_docks).id
+    end
   end
 end

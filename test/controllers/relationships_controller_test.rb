@@ -6,7 +6,8 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
   test "create adds an edge and returns to the entity it was added from" do
     assert_difference -> { Relationship.count }, 1 do
       post project_relationships_path(@project), params: {
-        relationship: { from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
+        relationship: { relationship_type_id: relationship_types(:powers).id,
+                      from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
       }
     end
 
@@ -16,7 +17,8 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
   test "create refuses an edge from an entity to itself and says why" do
     assert_no_difference -> { Relationship.count } do
       post project_relationships_path(@project), params: {
-        relationship: { from_entity_id: entities(:f1).id, to_entity_id: entities(:f1).id }
+        relationship: { relationship_type_id: relationship_types(:powers).id,
+                      from_entity_id: entities(:f1).id, to_entity_id: entities(:f1).id }
       }
     end
 
@@ -47,8 +49,8 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
   test "a relationship cannot be created across projects" do
     assert_no_difference -> { Relationship.count } do
       post project_relationships_path(@project), params: {
-        relationship: { from_entity_id: entities(:f1).id,
-                        to_entity_id: entities(:gemini_capsule).id }
+        relationship: { relationship_type_id: relationship_types(:powers).id,
+                        from_entity_id: entities(:f1).id, to_entity_id: entities(:gemini_capsule).id }
       }
     end
 
@@ -57,9 +59,101 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
 
   test "create assigns the project from the url" do
     post project_relationships_path(@project), params: {
-      relationship: { from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
+      relationship: { relationship_type_id: relationship_types(:powers).id,
+                      from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
     }
 
     assert_equal @project, Relationship.order(:id).last.project
+  end
+
+  # --- typing ----------------------------------------------------------------
+
+  test "an edge cannot be created without a kind" do
+    assert_no_difference -> { Relationship.count } do
+      post project_relationships_path(@project), params: {
+        relationship: { from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
+      }
+    end
+
+    assert flash[:alert].present?
+  end
+
+  test "create assigns the relationship type" do
+    post project_relationships_path(@project), params: {
+      relationship: { relationship_type_id: relationship_types(:powers).id,
+                      from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
+    }
+
+    assert_equal relationship_types(:powers), Relationship.order(:id).last.relationship_type
+  end
+
+  test "an edge cannot be typed by another project's relationship type" do
+    assert_no_difference -> { Relationship.count } do
+      post project_relationships_path(@project), params: {
+        relationship: { relationship_type_id: relationship_types(:gemini_docks).id,
+                        from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
+      }
+    end
+  end
+
+  # --- attribute values on an edge -------------------------------------------
+
+  test "edit renders a field for every attribute of the edge's type" do
+    get edit_project_relationship_path(@project, relationships(:f1_powers_saturn_v))
+
+    assert_response :success
+    assert_select "form input[name*=?]", "[value]", count: 4
+    assert_select "form label", text: "stage"
+  end
+
+  test "update records a value for an attribute that had none" do
+    relationship = relationships(:f1_powers_saturn_v)
+
+    patch project_relationship_path(@project, relationship), params: {
+      relationship: {
+        relationship_type_id: relationship.relationship_type_id,
+        relationship_type_values_attributes: {
+          "0" => { relationship_type_attribute_id: relationship_type_attributes(:powers_stage).id,
+                   value: "First" }
+        }
+      }
+    }
+
+    assert_redirected_to project_entity_path(@project, relationship.from_entity)
+    stage = relationship.reload.relationship_type_values
+                        .find_by(relationship_type_attribute: relationship_type_attributes(:powers_stage))
+    assert_equal "First", stage.value
+  end
+
+  test "update rejects a value that does not fit its declared type" do
+    relationship = relationships(:f1_powers_saturn_v)
+
+    patch project_relationship_path(@project, relationship), params: {
+      relationship: {
+        relationship_type_id: relationship.relationship_type_id,
+        relationship_type_values_attributes: {
+          "0" => { relationship_type_attribute_id: relationship_type_attributes(:powers_thrust_share).id,
+                   value: "not a number" }
+        }
+      }
+    }
+
+    assert_response :unprocessable_entity
+  end
+
+  test "a blank field for an unrecorded attribute records nothing" do
+    relationship = relationships(:f1_powers_saturn_v)
+
+    assert_no_difference -> { RelationshipTypeValue.count } do
+      patch project_relationship_path(@project, relationship), params: {
+        relationship: {
+          relationship_type_id: relationship.relationship_type_id,
+          relationship_type_values_attributes: {
+            "0" => { relationship_type_attribute_id: relationship_type_attributes(:powers_stage).id,
+                     value: "" }
+          }
+        }
+      }
+    end
   end
 end

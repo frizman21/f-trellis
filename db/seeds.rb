@@ -81,16 +81,38 @@ ontology.each do |type_name, spec|
   end
 end
 
-# Edges are untyped for now, so these say only "these two are connected".
+# Edges say what kind they are, and carry facts of their own.
+powers = seed_project.relationship_types.find_or_create_by!(name: "Powers") do |t|
+  t.description = "The engine provides thrust for the vehicle."
+end
 [
-  [ "Rocketdyne F-1", "Saturn V" ],
-  [ "Raptor 2",       "Starship" ]
-].each do |from_name, to_name|
+  { name: "engine_count", value_type: "int" },
+  { name: "stage",        value_type: "string" }
+].each do |attrs|
+  powers.relationship_type_attributes.find_or_create_by!(name: attrs[:name]) do |a|
+    a.value_type = attrs[:value_type]
+  end
+end
+
+[
+  [ "Rocketdyne F-1", "Saturn V", { "engine_count" => 5, "stage" => "First" } ],
+  [ "Raptor 2",       "Starship", { "engine_count" => 33, "stage" => "Booster" } ]
+].each do |from_name, to_name, values|
   from = seeded_entities[from_name]
   to   = seeded_entities[to_name]
   next if from.nil? || to.nil?
 
-  Relationship.find_or_create_by!(from_entity: from, to_entity: to)
+  relationship = Relationship.find_or_create_by!(from_entity: from, to_entity: to) do |r|
+    r.relationship_type = powers
+  end
+
+  values.each do |attr_name, raw|
+    attribute = powers.relationship_type_attributes.find_by!(name: attr_name)
+    record = RelationshipTypeValue.find_or_initialize_by(relationship: relationship,
+                                                         relationship_type_attribute: attribute)
+    record.value = raw
+    record.save!
+  end
 end
 
 skills = [
