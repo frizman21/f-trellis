@@ -12,11 +12,6 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
     assert_select "td", text: "float"
   end
 
-  test "show links the entities of the type" do
-    get project_entity_type_path(@project, entity_types(:rocket_engine))
-
-    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
-  end
 
   test "show renders empty states for a type with no attributes and no entities" do
     type = @project.entity_types.create!(name: "Lonely")
@@ -25,7 +20,6 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match(/No attributes defined/, response.body)
-    assert_match(/No entities of this type yet/, response.body)
   end
 
   test "create makes a type" do
@@ -117,5 +111,29 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
 
     get edit_project_entity_type_path(@project, entity_types(:rocket_engine))
     assert_match(/context for extracting entities of this type from source material/, response.body)
+  end
+
+  # The type's page says what the type is; what exists of it belongs on the list
+  # built for that, which is paginated and reached from the card and sidebar.
+  test "show renders no entity list" do
+    get project_entity_type_path(@project, entity_types(:rocket_engine))
+
+    assert_response :success
+    assert_select "h2", { text: "Entities", count: 0 }
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1)), count: 0
+  end
+
+  test "show still renders the type itself" do
+    get project_entity_type_path(@project, entity_types(:rocket_engine))
+
+    assert_select "h1", "Rocket Engine"
+    assert_select "td", text: "thrust_kn"
+  end
+
+  test "the type's entities are still reachable at their own address" do
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+
+    assert_response :success
+    assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
   end
 end

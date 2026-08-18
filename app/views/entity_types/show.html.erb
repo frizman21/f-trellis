@@ -46,14 +46,3 @@
 <% else %>
   <p class="text-muted">No attributes defined.</p>
 <% end %>
-
-<h2 class="h5 mt-4">Entities</h2>
-<% if @entity_type.entities.any? %>
-  <ul class="list-unstyled">
-    <% @entity_type.entities.each do |entity| %>
-      <li><%= link_to entity.label, project_entity_path(@project, entity) %></li>
-    <% end %>
-  </ul>
-<% else %>
-  <p class="text-muted">No entities of this type yet.</p>
-<% end %>
