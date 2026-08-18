@@ -88,18 +88,34 @@
   <p class="text-muted">No relationships yet.</p>
 <% end %>
 
-<% if @candidates.any? && @project.relationship_types.any? %>
-  <%= form_with model: [ @project, @new_relationship ], local: true, class: "row g-2 align-items-end" do |f| %>
+<% if @candidates.any? && @relationship_types.any? %>
+  <%= form_with model: [ @project, @new_relationship ], local: true,
+                class: "row g-2 align-items-end",
+                data: { controller: "relationship-form" } do |f| %>
     <%= f.hidden_field :from_entity_id, value: @entity.id %>
     <div class="col-auto">
       <%= f.label :relationship_type_id, "Relationship", class: "form-label" %>
-      <%= f.collection_select :relationship_type_id, @project.relationship_types, :id, :name,
-                              { prompt: "Choose a kind" }, class: "form-select", required: true %>
+      <%# Each option carries the entity type its far end must be, which is what
+          the narrowing controller reads. %>
+      <%= f.select :relationship_type_id,
+                   @relationship_types.map { |t|
+                     [ "#{t.name} (→ #{t.to_entity_type.name})", t.id,
+                       { data: { to_entity_type_id: t.to_entity_type_id } } ]
+                   },
+                   { prompt: "Choose a kind" },
+                   class: "form-select", required: true,
+                   data: { relationship_form_target: "type",
+                           action: "change->relationship-form#filter" } %>
     </div>
     <div class="col-auto">
       <%= f.label :to_entity_id, "Relate to", class: "form-label" %>
-      <%= f.collection_select :to_entity_id, @candidates, :id, :label,
-                              { prompt: "Choose an entity" }, class: "form-select", required: true %>
+      <%= f.select :to_entity_id,
+                   @candidates.map { |e|
+                     [ e.label, e.id, { data: { entity_type_id: e.entity_type_id } } ]
+                   },
+                   { prompt: "Choose an entity" },
+                   class: "form-select", required: true,
+                   data: { relationship_form_target: "entity" } %>
     </div>
     <div class="col-12">
       <%= f.fields_for :relationship_sources do |sf| %>
@@ -112,9 +128,9 @@
   <% end %>
 <% end %>
 
-<% if @candidates.any? && @project.relationship_types.none? %>
+<% if @candidates.any? && @relationship_types.none? %>
   <p class="text-muted">
-    Define a <%= link_to "relationship type", project_relationship_types_path(@project) %>
-    before connecting entities — every edge says what kind it is.
+    No <%= link_to "relationship type", project_relationship_types_path(@project) %>
+    starts at a <%= @entity.entity_type.name %>, so this entity cannot be connected yet.
   </p>
 <% end %>

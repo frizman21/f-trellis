@@ -82,8 +82,11 @@ ontology.each do |type_name, spec|
 end
 
 # Edges say what kind they are, and carry facts of their own.
+# A relationship type says what it connects, and in which direction.
 powers = seed_project.relationship_types.find_or_create_by!(name: "Powers") do |t|
   t.description = "The engine provides thrust for the vehicle."
+  t.from_entity_type = seed_project.entity_types.find_by!(name: "Rocket Engine")
+  t.to_entity_type   = seed_project.entity_types.find_by!(name: "Launch Vehicle")
 end
 [
   { name: "engine_count", value_type: "int" },

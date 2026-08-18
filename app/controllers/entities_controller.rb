@@ -20,6 +20,11 @@ class EntitiesController < ApplicationController
     @candidates = @project.entities
                           .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
                           .where.not(id: @entity.id)
+    # Only kinds of edge that can start at an entity of this type. Offering the
+    # rest would be offering a rejection.
+    @relationship_types = @project.relationship_types
+                                  .includes(:to_entity_type)
+                                  .where(from_entity_type_id: @entity.entity_type_id)
     @new_relationship = @project.relationships.new
     @new_relationship.relationship_sources.build
   end

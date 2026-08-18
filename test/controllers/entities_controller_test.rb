@@ -380,4 +380,39 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller=?]", "source-search"
     assert_select "input[name=?]", "entity[entity_sources_attributes][0][source_id]"
   end
+
+  # --- the relationship picker respects the declared ends --------------------
+
+  test "the picker offers only types that can start at this entity's type" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "select[name=?] option", "relationship[relationship_type_id]" do |options|
+      offered = options.map { |o| o["value"] }.compact_blank.map(&:to_i)
+      expected = @project.relationship_types
+                         .where(from_entity_type_id: entities(:f1).entity_type_id).pluck(:id)
+
+      assert_equal expected.sort, offered.sort
+    end
+  end
+
+  test "an entity no type can start at is told so rather than shown a dead picker" do
+    get project_entity_path(@project, entities(:saturn_v))
+
+    assert_response :success
+    assert_select "select[name=?]", "relationship[relationship_type_id]", count: 0
+    assert_match(/starts at a Launch Vehicle/, response.body)
+  end
+
+  # What the narrowing controller reads to hide entities that cannot be the far
+  # end of the chosen kind.
+  test "the picker carries the entity type ids the narrowing needs" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_select "select[name=?][data-relationship-form-target=?]",
+                  "relationship[relationship_type_id]", "type"
+    assert_select "select[name=?] option[data-entity-type-id=?]",
+                  "relationship[to_entity_id]", entities(:saturn_v).entity_type_id.to_s
+    assert_select "select[name=?] option[data-to-entity-type-id]",
+                  "relationship[relationship_type_id]"
+  end
 end

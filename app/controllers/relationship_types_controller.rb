@@ -65,6 +65,7 @@ class RelationshipTypesController < ApplicationController
   end
 
   def relationship_type_params
-    params.require(:relationship_type).permit(:name, :description)
+    params.require(:relationship_type).permit(:name, :description,
+                                             :from_entity_type_id, :to_entity_type_id)
   end
 end

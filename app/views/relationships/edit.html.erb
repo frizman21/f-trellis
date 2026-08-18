@@ -22,7 +22,9 @@
 
   <div class="mb-3">
     <%= f.label :relationship_type_id, "Relationship type", class: "form-label" %>
-    <%= f.collection_select :relationship_type_id, @project.relationship_types, :id, :name,
+    <%# Only kinds whose declared ends match the two entities this edge already
+        joins — anything else would be rejected on save. %>
+    <%= f.collection_select :relationship_type_id, @compatible_types, :id, :name,
                             {}, class: "form-select", required: true %>
   </div>
 

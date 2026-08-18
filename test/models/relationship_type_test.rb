@@ -11,11 +11,39 @@ class RelationshipTypeTest < ActiveSupport::TestCase
 
   # Two projects each recording a "Powers" edge is the normal case.
   test "a name used in another project is free in this one" do
-    assert RelationshipType.new(project: projects(:gemini), name: "Powers").valid?
+    assert RelationshipType.new(project: projects(:gemini), name: "Powers",
+                                from_entity_type: entity_types(:gemini_capsule),
+                                to_entity_type: entity_types(:gemini_capsule)).valid?
   end
 
   test "requires a project" do
     assert_not RelationshipType.new(name: "Orphan").valid?
+  end
+
+  # --- the two ends ----------------------------------------------------------
+
+  def build(**overrides)
+    RelationshipType.new({ project: projects(:apollo), name: "Feeds",
+                           from_entity_type: entity_types(:rocket_engine),
+                           to_entity_type: entity_types(:launch_vehicle) }.merge(overrides))
+  end
+
+  test "requires both ends" do
+    assert_not build(from_entity_type: nil).valid?
+    assert_not build(to_entity_type: nil).valid?
+  end
+
+  test "the same entity type on both ends is allowed" do
+    assert build(to_entity_type: entity_types(:rocket_engine)).valid?
+  end
+
+  test "an end from another project is rejected" do
+    assert_not build(from_entity_type: entity_types(:gemini_capsule)).valid?
+    assert_not build(to_entity_type: entity_types(:gemini_capsule)).valid?
+  end
+
+  test "shape states what the type connects" do
+    assert_equal "Rocket Engine → Launch Vehicle", relationship_types(:powers).shape
   end
 
   # Edges of a kind mean nothing once the kind is gone.

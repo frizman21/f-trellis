@@ -11,6 +11,7 @@
     <thead>
       <tr>
         <th>Name</th>
+        <th>Shape</th>
         <th>Description</th>
         <th>Attributes</th>
         <th>Relationships</th>
@@ -21,6 +22,7 @@
       <% @relationship_types.each do |relationship_type| %>
         <tr>
           <td><%= link_to relationship_type.name, project_relationship_type_path(@project, relationship_type) %></td>
+          <td class="text-nowrap"><%= relationship_type.shape %></td>
           <td><%= relationship_type.description %></td>
           <td><%= relationship_type.relationship_type_attributes.size %></td>
           <td><%= relationship_type.relationships.size %></td>

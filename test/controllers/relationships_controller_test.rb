@@ -6,7 +6,7 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
   test "create adds an edge and returns to the entity it was added from" do
     assert_difference -> { Relationship.count }, 1 do
       post project_relationships_path(@project), params: {
-        relationship: { relationship_type_id: relationship_types(:powers).id,
+        relationship: { relationship_type_id: relationship_types(:bare_relation).id,
                       from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
       }
     end
@@ -59,7 +59,7 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
 
   test "create assigns the project from the url" do
     post project_relationships_path(@project), params: {
-      relationship: { relationship_type_id: relationship_types(:powers).id,
+      relationship: { relationship_type_id: relationship_types(:bare_relation).id,
                       from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
     }
 
@@ -80,11 +80,11 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
 
   test "create assigns the relationship type" do
     post project_relationships_path(@project), params: {
-      relationship: { relationship_type_id: relationship_types(:powers).id,
+      relationship: { relationship_type_id: relationship_types(:bare_relation).id,
                       from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id }
     }
 
-    assert_equal relationship_types(:powers), Relationship.order(:id).last.relationship_type
+    assert_equal relationship_types(:bare_relation), Relationship.order(:id).last.relationship_type
   end
 
   test "an edge cannot be typed by another project's relationship type" do
@@ -162,7 +162,7 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
   test "create records a citation for the edge when a source is chosen" do
     assert_difference -> { RelationshipSource.count }, 1 do
       post project_relationships_path(@project), params: {
-        relationship: { relationship_type_id: relationship_types(:powers).id,
+        relationship: { relationship_type_id: relationship_types(:bare_relation).id,
                         from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id,
                         relationship_sources_attributes: {
                           "0" => { source_id: sources(:one).id, confidence: "75" }
@@ -180,7 +180,7 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
     assert_difference -> { Relationship.count }, 1 do
       assert_no_difference -> { RelationshipSource.count } do
         post project_relationships_path(@project), params: {
-          relationship: { relationship_type_id: relationship_types(:powers).id,
+          relationship: { relationship_type_id: relationship_types(:bare_relation).id,
                           from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id,
                           relationship_sources_attributes: { "0" => { source_id: "", confidence: "100" } } }
         }
