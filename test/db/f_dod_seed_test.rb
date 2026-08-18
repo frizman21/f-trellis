@@ -23,19 +23,18 @@ class FDodSeedTest < ActiveSupport::TestCase
                  @project.entity_types.pluck(:name).sort
   end
 
-  # Entity#label reads an attribute literally named `name`; without one every
-  # entity in the landscape would read as "Person #12".
-  test "every entity type declares a name attribute" do
+  # The name is a column (#28), so no type declares one as an attribute — that
+  # would be two places for one fact.
+  test "no entity type declares a name attribute" do
     @project.entity_types.each do |type|
-      assert_includes type.entity_type_attributes.pluck(:name), "name",
-                      "#{type.name} has no name attribute"
+      assert_not_includes type.entity_type_attributes.pluck(:name), "name",
+                          "#{type.name} still declares a name attribute"
     end
   end
 
-  test "no entity falls back to the type-and-id label" do
+  test "every entity in the landscape has a name" do
     @project.entities.each do |entity|
-      assert_no_match(/\A\w[\w ]* #\d+\z/, entity.label,
-                      "#{entity.id} rendered as a fallback label")
+      assert entity.name.present?, "entity #{entity.id} has no name"
     end
   end
 
@@ -44,7 +43,7 @@ class FDodSeedTest < ActiveSupport::TestCase
   test "every seeded relationship satisfies its type's declared ends" do
     invalid = @project.relationships.reject(&:valid?)
 
-    assert_empty invalid.map { |r| "#{r.from_entity.label} -> #{r.to_entity.label}" }
+    assert_empty invalid.map { |r| "#{r.from_entity.name} -> #{r.to_entity.name}" }
   end
 
   test "every relationship type declares both of its ends within this project" do
@@ -89,9 +88,7 @@ class FDodSeedTest < ActiveSupport::TestCase
   end
 
   test "a contract's dates and value round-trip as datetime and float" do
-    contract = @project.entities
-                       .joins(:entity_type).where(entity_types: { name: "Contract" })
-                       .detect { |e| e.value_for("name") == "Have Blue" }
+    contract = @project.entities.find_by!(name: "Have Blue")
 
     assert_equal 1976, contract.value_for("start_date").year
     assert_in_delta 43_000_000.0, contract.value_for("value_usd")

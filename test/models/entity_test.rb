@@ -1,21 +1,21 @@
 require "test_helper"
 
 class EntityTest < ActiveSupport::TestCase
-  test "label is the value of the name attribute when there is one" do
-    assert_equal "Rocketdyne F-1", entities(:f1).label
+  # The name is a column now (#28). What used to be #label deriving one from an
+  # attribute is gone, and a stale alias is exactly how two names for one thing
+  # survive a rename.
+  test "an entity has a name of its own and no derived label" do
+    assert_equal "Rocketdyne F-1", entities(:f1).name
+    assert_not entities(:f1).respond_to?(:label)
   end
 
-  test "label falls back to type and id when the name attribute has no value" do
-    entity = entities(:unnamed_engine)
-
-    assert_equal "Rocket Engine ##{entity.id}", entity.label
+  test "a name is required" do
+    assert_not Entity.new(project: projects(:apollo), entity_type: entity_types(:bare)).valid?
+    assert_not entities(:f1).tap { |e| e.name = "   " }.valid?
   end
 
-  test "label falls back when the type declares no name attribute at all" do
-    entity = entities(:saturn_v)
 
-    assert_equal "Launch Vehicle ##{entity.id}", entity.label
-  end
+
 
   test "attribute_rows covers every attribute of the type, valued or not" do
     rows = entities(:f1).attribute_rows
@@ -25,7 +25,7 @@ class EntityTest < ActiveSupport::TestCase
 
     by_name = rows.to_h { |attribute, value| [ attribute.name, value ] }
 
-    assert_equal "Rocketdyne F-1", by_name["name"].value
+    assert_equal "Rocketdyne", by_name["manufacturer"].value
     # Declared on the type, never recorded on this entity: present as a row,
     # empty as a value. The show page renders the shape of the type too.
     assert_nil by_name["chambers"]

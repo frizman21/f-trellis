@@ -30,7 +30,11 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Entity</th>
+          <th>
+            <%= sort_header_for_name current_attribute: @sort_attribute,
+                                     sorted_by_name: @sorted_by_name,
+                                     direction: @direction, query: @query %>
+          </th>
           <%# A column per attribute the type asks to show. %>
           <% @columns.each do |attribute| %>
             <th>
@@ -44,7 +48,7 @@
         <% @entities.each do |entity| %>
           <% values = entity.values_by_attribute_id %>
           <tr>
-            <td><%= link_to entity.label, project_entity_path(@project, entity) %></td>
+            <td><%= link_to entity.name, project_entity_path(@project, entity) %></td>
             <% @columns.each do |attribute| %>
               <%# Truncated in the cell, not in the data: a string attribute has
                   no length limit, and one long value would otherwise decide the

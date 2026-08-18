@@ -12,12 +12,12 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
     @merlin = build_engine(name: "Merlin", chambers: 1, thrust_kn: 845.0, first_flight: "2006-03-24")
     @rs25   = build_engine(name: "RS-25", chambers: 3, thrust_kn: 1860.0, first_flight: "1981-04-12")
     # Nothing recorded at all: the null case for every sort.
-    @blank = @project.entities.create!(entity_type: @type)
+    @blank = @project.entities.create!(entity_type: @type, name: "Nothing Recorded")
   end
 
   def build_engine(values)
-    entity = @project.entities.create!(entity_type: @type)
-    values.each do |name, raw|
+    entity = @project.entities.create!(entity_type: @type, name: values.fetch(:name))
+    values.except(:name).each do |name, raw|
       attribute = @type.entity_type_attributes.find_by!(name: name.to_s)
       record = entity.entity_attribute_values.build(entity_type_attribute: attribute)
       record.value = raw
@@ -32,7 +32,14 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
 
   # --- search ----------------------------------------------------------------
 
-  test "search matches a string value" do
+  test "search matches the name" do
+    get @path, params: { q: "Rocketdyne" }
+
+    assert_response :success
+    assert_equal [ "Rocketdyne F-1" ], labels
+  end
+
+  test "search matches a string attribute value as well as the name" do
     get @path, params: { q: "Merlin" }
 
     assert_response :success
@@ -45,17 +52,10 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
     assert_equal [ "Merlin" ], labels
   end
 
-  test "search matches a substring" do
-    get @path, params: { q: "ocketdyne" }
-
-    assert_equal [ "Rocketdyne F-1" ], labels
-  end
-
   # A join would return this entity once per matching value; an IN returns it once.
-  test "an entity matching on two attributes appears once" do
-    two_ways = build_engine(name: "Vulcan", chambers: 2)
-    other = @type.entity_type_attributes.find_by!(name: "name")
-    assert other
+  # Matching on both the name column and a value row must not double the row.
+  test "an entity matching on both its name and a value appears once" do
+    two_ways = build_engine(name: "Vulcan", manufacturer: "Vulcan Works")
 
     get @path, params: { q: "Vulcan" }
 
@@ -83,7 +83,7 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
   # Relative order of two unambiguous names rather than comparing against Ruby's
   # sort: Postgres orders by its collation, Ruby by bytes, and the two disagree
   # on mixed case. What matters is that the database reverses when asked.
-  test "sorting by a string attribute is alphabetical, both ways" do
+  test "sorting by name is alphabetical, both ways" do
     get @path, params: { sort: "name", dir: "asc" }
     ascending = labels.select { |l| [ "Merlin", "RS-25" ].include?(l) }
 
@@ -123,7 +123,7 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
   # Otherwise they bunch at whichever end nulls happen to fall, which changes
   # with the direction and looks like the sort is wrong.
   test "entities with no value sort last in both directions" do
-    blank_label = @blank.label
+    blank_label = @blank.name
 
     get @path, params: { sort: "chambers", dir: "asc" }
     assert_equal blank_label, labels.last
@@ -175,7 +175,7 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
   test "search and sort compose" do
     # "RS" rather than "R": search is case-insensitive, so "R" also matches the
     # r in Merlin.
-    get @path, params: { q: "S-", sort: "thrust_kn", dir: "desc" }
+    get @path, params: { q: "S-2", sort: "thrust_kn", dir: "desc" }
 
     assert_response :success
     assert_equal [ "RS-25" ], labels
@@ -185,5 +185,34 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
     get @path, params: { sort: "chambers", dir: "desc" }
 
     assert_select "form[action*=?]", "sort=chambers"
+  end
+
+  # --- name as a column ------------------------------------------------------
+
+  test "the list leads with a Name column linking each entity to its page" do
+    get @path
+
+    assert_response :success
+    assert_equal "Name", css_select("table th").first.text.strip.sub(/[ ↑↓]+\z/, "")
+    assert_select "tbody tr td:first-child a[href=?]",
+                  project_entity_path(@project, entities(:f1)), text: "Rocketdyne F-1"
+  end
+
+  # Name sorts by its own column rather than through the join the attributes
+  # use, so it is asserted directly.
+  test "sorting by name uses the column, both directions" do
+    get @path, params: { sort: "name", dir: "asc" }
+    ascending = labels
+
+    get @path, params: { sort: "name", dir: "desc" }
+
+    assert_equal ascending.reverse, labels
+  end
+
+  test "the Name header is a sort link that toggles" do
+    get @path, params: { sort: "name", dir: "asc" }
+
+    assert_select "th a.fw-bold", text: /Name ↑/
+    assert_select "th a[href*=?]", "dir=desc"
   end
 end

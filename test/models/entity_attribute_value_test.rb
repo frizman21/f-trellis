@@ -36,10 +36,10 @@ class EntityAttributeValueTest < ActiveSupport::TestCase
   end
 
   test "a string attribute round-trips through string_value alone" do
-    record = value_for(entity_type_attributes(:engine_name), "Merlin")
+    record = value_for(entity_type_attributes(:engine_manufacturer), "Aerojet")
 
     assert record.save
-    assert_equal "Merlin", record.reload.value
+    assert_equal "Aerojet", record.reload.value
     assert_only_column record, :string_value
   end
 
@@ -68,16 +68,16 @@ class EntityAttributeValueTest < ActiveSupport::TestCase
   test "rewriting a value clears the columns it no longer belongs in" do
     record = value_for(entity_type_attributes(:engine_chambers), "5")
     record.save!
-    record.entity_type_attribute = entity_type_attributes(:engine_name)
-    record.value = "Merlin"
+    record.entity_type_attribute = entity_type_attributes(:engine_manufacturer)
+    record.value = "Aerojet"
 
     assert_nil record.int_value
-    assert_equal "Merlin", record.string_value
+    assert_equal "Aerojet", record.string_value
   end
 
   test "one value per attribute per entity" do
     duplicate = EntityAttributeValue.new(entity: entities(:f1),
-                                         entity_type_attribute: entity_type_attributes(:engine_name))
+                                         entity_type_attribute: entity_type_attributes(:engine_manufacturer))
     duplicate.value = "Another name"
 
     assert_not duplicate.valid?

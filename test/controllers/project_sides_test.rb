@@ -409,7 +409,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     assert_response :success
     headers = css_select("table th").map { |th| th.text.strip }
 
-    assert_equal [ "Entity", "chambers", "first_flight", "name", "thrust_kn" ], headers
+    assert_equal [ "Name", "chambers", "first_flight", "manufacturer", "thrust_kn" ], headers
   end
 
   # Read as a list rather than cell by cell, so a column shift is caught.
@@ -422,7 +422,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     assert_equal "Rocketdyne F-1", cells[0]
     assert_equal "", cells[1]
     assert_equal "", cells[2]
-    assert_equal "Rocketdyne F-1", cells[3]
+    assert_equal "Rocketdyne", cells[3]
     assert_equal "6770.0", cells[4]
   end
 
@@ -450,7 +450,7 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
 
     assert_response :success
-    assert_equal [ "Entity" ], css_select("table th").map { |th| th.text.strip }
+    assert_equal [ "Name" ], css_select("table th").map { |th| th.text.strip }
     assert_select "a", text: "Rocketdyne F-1"
   end
 

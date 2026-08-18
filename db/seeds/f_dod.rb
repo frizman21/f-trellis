@@ -4,8 +4,8 @@
 # Written as data walked by a few lines of code rather than as hundreds of
 # find_or_create_by! calls, so the landscape can be read as a landscape.
 #
-# Every entity type declares a `name` attribute because Entity#label reads one;
-# without it every entity here would render as "Person #12".
+# Entity names are a column (#28), so no type declares a `name` attribute —
+# a type declaring one alongside the column would be two places for one fact.
 
 project = Project.find_or_create_by!(name: "F-DoD") do |p|
   p.name = "F-DoD"
@@ -20,27 +20,27 @@ end
 ENTITY_TYPES = {
   "Person" => {
     description: "A named individual.",
-    attributes: { "name" => "string", "first_name" => "string", "last_name" => "string" }
+    attributes: { "first_name" => "string", "last_name" => "string" }
   },
   "Organization" => {
     description: "A company, agency, laboratory or institution.",
-    attributes: { "name" => "string", "acronym" => "string" }
+    attributes: { "acronym" => "string" }
   },
   "Science" => {
     description: "A body of knowledge: a field, a principle, a law, an effect.",
-    attributes: { "name" => "string", "summary" => "string" }
+    attributes: { "summary" => "string" }
   },
   "Technology" => {
     description: "An engineered capability: a method, a process, a material.",
-    attributes: { "name" => "string", "summary" => "string" }
+    attributes: { "summary" => "string" }
   },
   "Part" => {
     description: "A concrete artefact — a built thing with specifications.",
-    attributes: { "name" => "string", "mass_kg" => "float" }
+    attributes: { "mass_kg" => "float" }
   },
   "Contract" => {
     description: "An award: who is paid, by whom, to do what.",
-    attributes: { "name" => "string", "identifier" => "string", "title" => "string",
+    attributes: { "identifier" => "string", "title" => "string",
                   "start_date" => "datetime", "end_date" => "datetime",
                   "value_usd" => "float" }
   }
@@ -233,20 +233,18 @@ relationship_types = RELATIONSHIP_TYPES.to_h do |spec|
   [ spec[:name], type ]
 end
 
-# An entity has no name column, so it is keyed on the value of its `name`
-# attribute — the same rule Entity#label uses to decide what to call it.
+# Keyed on the name column — every entity has one.
 entities = {}
 
 ENTITIES.each do |type_name, records|
   type = entity_types.fetch(type_name)
-  name_attribute = type.entity_type_attributes.find_by!(name: "name")
 
   records.each do |values|
-    existing = EntityAttributeValue.find_by(entity_type_attribute: name_attribute,
-                                            string_value: values.fetch("name"))
-    entity = existing&.entity || project.entities.create!(entity_type: type)
+    entity = project.entities.find_or_create_by!(name: values.fetch("name")) do |e|
+      e.entity_type = type
+    end
 
-    values.each do |attribute_name, raw|
+    values.except("name").each do |attribute_name, raw|
       attribute = type.entity_type_attributes.find_by!(name: attribute_name)
       record = EntityAttributeValue.find_or_initialize_by(entity: entity,
                                                           entity_type_attribute: attribute)

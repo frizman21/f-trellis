@@ -11,6 +11,7 @@ class EntitiesController < ApplicationController
     @columns = @entity_type.index_columns.to_a
     @query = params[:q].to_s.strip
     @sort_attribute = sort_attribute
+    @sorted_by_name = params[:sort] == "name"
     @direction = direction
 
     scope = @project.entities
@@ -101,7 +102,7 @@ class EntitiesController < ApplicationController
 
   def destroy
     @entity = find_entity
-    label = @entity.label
+    label = @entity.name
     @entity.destroy
 
     redirect_to project_path(@project), notice: "Entity \"#{label}\" deleted."
@@ -130,18 +131,22 @@ class EntitiesController < ApplicationController
   def search(scope)
     return scope if @query.blank?
 
+    pattern = "%#{sanitize_sql_like(@query)}%"
     matches = EntityAttributeValue
               .where(entity_id: scope.unscope(:includes).select(:id))
-              .where("string_value ILIKE ?", "%#{sanitize_sql_like(@query)}%")
+              .where("string_value ILIKE ?", pattern)
               .select(:entity_id)
 
-    scope.where(id: matches)
+    # The name is what people search for first, so it is matched alongside the
+    # recorded values rather than only through them.
+    scope.where("entities.name ILIKE ?", pattern).or(scope.where(id: matches))
   end
 
   # A LEFT JOIN to the values of exactly the sorted attribute. Left, not inner,
   # so entities with nothing recorded still appear; NULLS LAST so they sort last
   # in both directions rather than bunching at whichever end nulls fall.
   def sort(scope)
+    return scope.order(name: @direction.to_sym).order(:id) if @sorted_by_name
     return scope.order(:id) if @sort_attribute.nil?
 
     join = sanitize_sql_array([
@@ -203,7 +208,7 @@ class EntitiesController < ApplicationController
 
   def entity_params
     params.require(:entity).permit(
-      :entity_type_id,
+      :name, :entity_type_id,
       entity_sources_attributes: [ :id, :source_id, :confidence ],
       entity_attribute_values_attributes: [
         :id, :entity_type_attribute_id, :value,

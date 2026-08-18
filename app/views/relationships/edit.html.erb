@@ -3,9 +3,9 @@
 
 <h1>Edit Relationship</h1>
 <p class="text-muted">
-  <%= link_to @relationship.from_entity.label, project_entity_path(@project, @relationship.from_entity) %>
+  <%= link_to @relationship.from_entity.name, project_entity_path(@project, @relationship.from_entity) %>
   →
-  <%= link_to @relationship.to_entity.label, project_entity_path(@project, @relationship.to_entity) %>
+  <%= link_to @relationship.to_entity.name, project_entity_path(@project, @relationship.to_entity) %>
   · <%= type_with_attributes @relationship.relationship_type,
                              project_relationship_type_path(@project, @relationship.relationship_type) %>
 </p>

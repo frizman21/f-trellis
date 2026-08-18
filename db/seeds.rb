@@ -34,7 +34,7 @@ seed_project = Project.order(:id).first
 ontology = {
   "Rocket Engine" => {
     description: "A propulsion device, and the numbers that distinguish one from another.",
-    attributes: { "name" => "string", "thrust_kn" => "float", "first_flight" => "datetime",
+    attributes: { "thrust_kn" => "float", "first_flight" => "datetime",
                   "chambers" => "int" },
     entities: [
       { "name" => "Rocketdyne F-1", "thrust_kn" => 6770.0, "first_flight" => "1967-11-09", "chambers" => 1 },
@@ -43,7 +43,7 @@ ontology = {
   },
   "Launch Vehicle" => {
     description: "A rocket that carries something to orbit.",
-    attributes: { "name" => "string", "stages" => "int", "payload_kg_leo" => "float" },
+    attributes: { "stages" => "int", "payload_kg_leo" => "float" },
     entities: [
       { "name" => "Saturn V", "stages" => 3, "payload_kg_leo" => 140000.0 },
       { "name" => "Starship", "stages" => 2, "payload_kg_leo" => 100000.0 }
@@ -62,14 +62,13 @@ ontology.each do |type_name, spec|
     type.entity_type_attributes.find_or_create_by!(name: attr_name) { |a| a.value_type = value_type }
   end
 
-  name_attribute = type.entity_type_attributes.find_by!(name: "name")
-
   spec[:entities].each do |values|
-    existing = EntityAttributeValue.find_by(entity_type_attribute: name_attribute,
-                                            string_value: values["name"])
-    entity = existing&.entity || seed_project.entities.create!(entity_type: type)
+    # Keyed on the name column — every entity has one.
+    entity = seed_project.entities.find_or_create_by!(name: values.fetch("name")) do |e|
+      e.entity_type = type
+    end
 
-    values.each do |attr_name, raw|
+    values.except("name").each do |attr_name, raw|
       attribute = type.entity_type_attributes.find_by!(name: attr_name)
       record = EntityAttributeValue.find_or_initialize_by(entity: entity,
                                                           entity_type_attribute: attribute)

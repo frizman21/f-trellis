@@ -6,7 +6,7 @@ require "test_helper"
 class AttributeDisablingTest < ActiveSupport::TestCase
   def cases
     [
-      { used: entity_type_attributes(:engine_name),
+      { used: entity_type_attributes(:engine_manufacturer),
         unused: entity_types(:rocket_engine).entity_type_attributes.create!(name: "spare", value_type: "string"),
         values: -> { EntityAttributeValue.count } },
       { used: relationship_type_attributes(:powers_engine_count),
@@ -69,7 +69,7 @@ class AttributeDisablingTest < ActiveSupport::TestCase
   end
 
   test "disabling round-trips" do
-    attribute = entity_type_attributes(:engine_name)
+    attribute = entity_type_attributes(:engine_manufacturer)
 
     attribute.update!(is_disabled: true)
     assert_not attribute.reload.enabled?

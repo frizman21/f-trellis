@@ -1,10 +1,10 @@
-# One thing in the ontology: an identity and a type. It carries no name column —
-# anything nameable is an attribute value — so #label is the single place that
-# decides what an entity is called.
+# One thing in the ontology: a name, a type, and whatever its type says it
+# carries.
+#
+# The name is a column rather than an attribute (#28, reversing #21). Deriving it
+# from an attribute meant an entity whose type declared none rendered as
+# "Launch Vehicle #210187663", which is not a name.
 class Entity < ApplicationRecord
-  # The attribute whose value labels an entity, when its type declares one.
-  LABEL_ATTRIBUTE = "name".freeze
-
   belongs_to :project
   belongs_to :entity_type
 
@@ -26,22 +26,13 @@ class Entity < ApplicationRecord
   # Data in one project cannot be typed by another project's ontology. Without
   # this, a guessed entity_type_id would quietly pull a type across the boundary
   # the whole change exists to draw.
+  validates :name, presence: true
+
   validate do
     next if entity_type.nil? || project_id.nil?
     next if entity_type.project_id == project_id
 
     errors.add(:entity_type, "must belong to the same project as the entity")
-  end
-
-  # What to call this entity. The value of its `name` attribute when it has one,
-  # and "<type> #<id>" otherwise — a bare id tells a reader nothing, and the type
-  # is the one thing every entity has.
-  #
-  # One method rather than a helper, so the index, the show page and the
-  # relationship table cannot disagree about an entity's name.
-  def label
-    named = value_for(LABEL_ATTRIBUTE)
-    named.presence || "#{entity_type.name} ##{id}"
   end
 
   # Every relationship this entity is an end of, in either direction. Both ends

@@ -1,8 +1,8 @@
-<% content_for :title, @entity.label %>
+<% content_for :title, @entity.name %>
 <%= render "projects/back", project: @project, side: :data %>
 
 <div class="d-flex justify-content-between align-items-center mb-1">
-  <h1 class="mb-0"><%= @entity.label %></h1>
+  <h1 class="mb-0"><%= @entity.name %></h1>
   <div>
     <%= link_to "Edit", edit_project_entity_path(@project, @entity), class: "btn btn-sm btn-outline-primary" %>
     <%= button_to "Delete", project_entity_path(@project, @entity), method: :delete,
@@ -81,7 +81,7 @@
               Vehicle". Links to the far end, never back to the page it is on;
               the type links to its own list. %>
           <td>
-            <%= link_to other.label, project_entity_path(@project, other) %>
+            <%= link_to other.name, project_entity_path(@project, other) %>
             <span class="text-muted">:</span>
             <%= link_to other.entity_type.name,
                         project_typed_entities_path(@project, other.entity_type.slug),
