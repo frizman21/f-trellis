@@ -18,6 +18,7 @@ Rails.application.routes.draw do
     # address.
     member do
       get :structure
+      get :ai_configuration
     end
 
     # Index actions live at :ontology and :data above; these carry the records.

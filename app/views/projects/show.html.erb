@@ -1,5 +1,10 @@
 <% content_for :title, @project.name %>
 
+<div class="d-flex justify-content-end mb-3">
+  <%= link_to "AI Configuration", ai_configuration_project_path(@project),
+              class: "btn btn-sm btn-outline-secondary" %>
+</div>
+
 <%# A card per kind of thing. The first question anyone has of a project's data
     is "show me the people" or "show me the contracts", and a card to click is a
     better answer than a type column to scan. %>

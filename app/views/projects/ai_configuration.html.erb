@@ -1,0 +1,23 @@
+<% content_for :title, "#{@project.name} — AI Configuration" %>
+<p class="mb-3">
+  <%= link_to "← #{@project.name}", project_path(@project), class: "text-decoration-none" %>
+</p>
+
+<h1 class="mb-1">AI Configuration</h1>
+<p class="text-muted">
+  The instructions used to extract information from a source for this project.
+  <%# Generated, so there is nothing here to edit: change the structure and this
+      changes with it. %>
+  Generated from its <%= link_to "structure", structure_project_path(@project) %> —
+  define a type and this changes with it.
+</p>
+
+<% if @prompt.empty? %>
+  <p class="text-muted">
+    This project defines no entity or relationship types yet, so there is nothing
+    to extract. Define one in its
+    <%= link_to "structure", structure_project_path(@project) %>.
+  </p>
+<% else %>
+  <pre class="bg-light border rounded p-3 small" style="white-space: pre-wrap;"><%= @prompt.to_s %></pre>
+<% end %>

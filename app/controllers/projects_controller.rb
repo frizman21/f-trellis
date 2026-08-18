@@ -27,6 +27,13 @@ class ProjectsController < ApplicationController
     @counts = @project.entities.group(:entity_type_id).count
   end
 
+  # Generated from the project's structure rather than stored, so it cannot
+  # drift from the structure it describes.
+  def ai_configuration
+    @project = Project.find(params[:id])
+    @prompt = ExtractionPrompt.new(@project)
+  end
+
   def new
     @project = Project.new
   end
