@@ -103,18 +103,18 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   test "the listing links each project to both of its sides" do
     get projects_path
 
-    assert_select "a[href=?]", project_entity_types_path(projects(:apollo))
-    assert_select "a[href=?]", project_entities_path(projects(:apollo))
-    assert_select "a[href=?]", project_entity_types_path(projects(:gemini))
-    assert_select "a[href=?]", project_entities_path(projects(:gemini))
+    assert_select "a[href=?]", ontology_project_path(projects(:apollo))
+    assert_select "a[href=?]", data_project_path(projects(:apollo))
+    assert_select "a[href=?]", ontology_project_path(projects(:gemini))
+    assert_select "a[href=?]", data_project_path(projects(:gemini))
   end
 
   test "the listing counts what each project holds on each side" do
     get projects_path
 
-    assert_select "a[href=?]", project_entity_types_path(projects(:apollo)),
+    assert_select "a[href=?]", ontology_project_path(projects(:apollo)),
                   text: /Ontology\s+#{projects(:apollo).entity_types.count}/
-    assert_select "a[href=?]", project_entities_path(projects(:gemini)),
+    assert_select "a[href=?]", data_project_path(projects(:gemini)),
                   text: /Data\s+#{projects(:gemini).entities.count}/
   end
 

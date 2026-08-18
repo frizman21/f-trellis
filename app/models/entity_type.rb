@@ -14,5 +14,9 @@ class EntityType < ApplicationRecord
   validates :name, presence: true,
                    uniqueness: { scope: :project_id, case_sensitive: false }
 
+  # What this type carries, for anywhere that lists it — the popover asks this
+  # of an entity type and a relationship type alike.
+  def declared_attributes = entity_type_attributes
+
   default_scope { order(:name) }
 end

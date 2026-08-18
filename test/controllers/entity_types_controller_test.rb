@@ -3,13 +3,6 @@ require "test_helper"
 class EntityTypesControllerTest < ActionDispatch::IntegrationTest
   setup { @project = projects(:apollo) }
 
-  test "index renders and lists each type with its counts" do
-    get project_entity_types_path(@project)
-
-    assert_response :success
-    assert_select "h1", "Entity Types"
-    assert_select "a", text: "Rocket Engine"
-  end
 
   test "show lists the type's attributes and their value types" do
     get project_entity_type_path(@project, entity_types(:rocket_engine))
@@ -76,7 +69,7 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
       delete project_entity_type_path(@project, type)
     end
 
-    assert_redirected_to project_entity_types_path(@project)
+    assert_redirected_to ontology_project_path(@project)
   end
 
   # A type with instances is not something to cascade away on a button press.
@@ -93,14 +86,6 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
 
   # --- scoping ---------------------------------------------------------------
 
-  test "index shows only this project's entity types" do
-    get project_entity_types_path(@project)
-
-    assert_response :success
-    assert_select "a", text: "Rocket Engine"
-    assert_select "a", text: "Capsule", count: 0
-    assert_select "tbody tr", @project.entity_types.count
-  end
 
   test "another project's entity type is not found under this project" do
     get project_entity_type_path(@project, entity_types(:gemini_capsule))
@@ -122,11 +107,4 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the ontology side renders the project header" do
-    get project_entity_types_path(@project)
-
-    assert_select "a[href=?]", projects_path
-    assert_select "a.nav-link.active[href=?]", project_entity_types_path(@project)
-    assert_select "a.nav-link[href=?]", project_entities_path(@project)
-  end
 end

@@ -5,6 +5,24 @@ class ProjectsController < ApplicationController
     @projects = Project.includes(:entity_types, :entities).order(:name)
   end
 
+  # A project's ontology is its entity types and the relationship types between
+  # them — one idea, so one page. Reading either alone was never enough.
+  def ontology
+    @project = Project.find(params[:id])
+    @entity_types = @project.entity_types.includes(:entity_type_attributes, :entities)
+    @relationship_types = @project.relationship_types
+                                  .includes(:relationship_type_attributes, :relationships,
+                                            :from_entity_type, :to_entity_type)
+  end
+
+  def data
+    @project = Project.find(params[:id])
+    @entities = @project.entities
+                        .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
+                        .order(:id)
+                        .page(params[:page]).per(25)
+  end
+
   def new
     @project = Project.new
   end

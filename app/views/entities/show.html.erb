@@ -11,7 +11,8 @@
   </div>
 </div>
 <p class="text-muted">
-  <%= link_to @entity.entity_type.name, project_entity_type_path(@project, @entity.entity_type) %>
+  <%= type_with_attributes @entity.entity_type,
+                           project_entity_type_path(@project, @entity.entity_type) %>
 </p>
 
 <h2 class="h5 mt-4">Attributes</h2>
@@ -130,7 +131,7 @@
 
 <% if @candidates.any? && @relationship_types.none? %>
   <p class="text-muted">
-    No <%= link_to "relationship type", project_relationship_types_path(@project) %>
+    No <%= link_to "relationship type", ontology_project_path(@project) %>
     starts at a <%= @entity.entity_type.name %>, so this entity cannot be connected yet.
   </p>
 <% end %>

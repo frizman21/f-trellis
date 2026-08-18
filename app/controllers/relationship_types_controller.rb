@@ -2,10 +2,6 @@
 class RelationshipTypesController < ApplicationController
   before_action :set_project
 
-  def index
-    @relationship_types = @project.relationship_types
-  end
-
   def show
     @relationship_type = find_relationship_type
   end
@@ -44,7 +40,7 @@ class RelationshipTypesController < ApplicationController
     @relationship_type = find_relationship_type
 
     if @relationship_type.destroy
-      redirect_to project_relationship_types_path(@project),
+      redirect_to ontology_project_path(@project),
                   notice: "Relationship type \"#{@relationship_type.name}\" deleted."
     else
       # restrict_with_error: edges of this kind still exist, and deleting the

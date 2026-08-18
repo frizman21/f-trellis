@@ -29,7 +29,14 @@
   <body>
     <nav class="navbar navbar-dark bg-dark">
       <div class="container-fluid">
-        <a class="navbar-brand" href="/">Trellis</a>
+        <div class="d-flex align-items-center">
+          <a class="navbar-brand me-0" href="/">Trellis</a>
+          <% if current_project %>
+            <span class="text-white-50 mx-2">/</span>
+            <%= link_to current_project.name, projects_path,
+                        class: "navbar-brand mb-0 text-white text-decoration-none" %>
+          <% end %>
+        </div>
         <div class="d-flex align-items-center">
           <%# Which commit is running. Pushes to main deploy themselves, so this
               is how you tell whether yours has landed yet. %>

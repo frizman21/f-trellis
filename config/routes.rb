@@ -10,13 +10,21 @@ Rails.application.routes.draw do
   # recorded against it. Both live under the project — with everything scoped, a
   # top-level ontology screen would have no project to show.
   resources :projects, only: [:index, :new, :create, :edit, :update] do
-    resources :entity_types do
+    # The two sides of a project, addressed by what they are rather than by the
+    # first resource each happens to list.
+    member do
+      get :ontology
+      get :data
+    end
+
+    # Index actions live at :ontology and :data above; these carry the records.
+    resources :entity_types, except: [:index] do
       resources :entity_type_attributes, only: [:new, :create, :edit, :update, :destroy]
     end
-    resources :relationship_types do
+    resources :relationship_types, except: [:index] do
       resources :relationship_type_attributes, only: [:new, :create, :edit, :update, :destroy]
     end
-    resources :entities
+    resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]
   end
 

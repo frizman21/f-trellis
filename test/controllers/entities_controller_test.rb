@@ -5,25 +5,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   # --- index -----------------------------------------------------------------
 
-  test "index renders and labels each entity" do
-    get project_entities_path(@project)
 
-    assert_response :success
-    assert_select "h1", "Entities"
-    assert_select "a", text: "Rocketdyne F-1"
-  end
-
-  test "index shows the empty state when there are no entities" do
-    RelationshipTypeValue.delete_all
-    Relationship.delete_all
-    EntityAttributeValue.delete_all
-    Entity.delete_all
-
-    get project_entities_path(@project)
-
-    assert_response :success
-    assert_match(/No entities yet/, response.body)
-  end
 
   # --- show: the attributes table -------------------------------------------
 
@@ -192,7 +174,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
       delete project_entity_path(@project, entities(:bare))
     end
 
-    assert_redirected_to project_entities_path(@project)
+    assert_redirected_to data_project_path(@project)
   end
 
   # --- scoping ---------------------------------------------------------------
@@ -200,14 +182,6 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   # Asserted as isolation rather than as "the page rendered". A scoped screen
   # that still shows another project's rows renders perfectly well.
 
-  test "index shows only this project's entities" do
-    get project_entities_path(@project)
-
-    assert_response :success
-    assert_select "a", text: "Rocketdyne F-1"
-    assert_select "a[href=?]", project_entity_path(projects(:gemini), entities(:gemini_capsule)), count: 0
-    assert_select "tbody tr", @project.entities.count
-  end
 
   test "another project's entity is not found under this project" do
     get project_entity_path(@project, entities(:gemini_capsule))
@@ -258,13 +232,6 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   # --- the project header ----------------------------------------------------
 
-  test "the data side renders the project header with the way back to the listing" do
-    get project_entities_path(@project)
-
-    assert_select "a[href=?]", projects_path
-    assert_select "a.nav-link.active[href=?]", project_entities_path(@project)
-    assert_select "a.nav-link[href=?]", project_entity_types_path(@project)
-  end
 
   test "the relationship table names the kind of each edge" do
     get project_entity_path(@project, entities(:f1))

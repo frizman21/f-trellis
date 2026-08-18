@@ -3,20 +3,7 @@ require "test_helper"
 class RelationshipTypesControllerTest < ActionDispatch::IntegrationTest
   setup { @project = projects(:apollo) }
 
-  test "index renders and lists this project's relationship types" do
-    get project_relationship_types_path(@project)
 
-    assert_response :success
-    assert_select "h1", "Relationship Types"
-    assert_select "a", text: "Powers"
-  end
-
-  test "index shows only this project's types" do
-    get project_relationship_types_path(@project)
-
-    assert_select "a", text: "Docks With", count: 0
-    assert_select "tbody tr", @project.relationship_types.count
-  end
 
   test "another project's type is not found under this project" do
     get project_relationship_type_path(@project, relationship_types(:gemini_docks))
@@ -75,12 +62,6 @@ class RelationshipTypesControllerTest < ActionDispatch::IntegrationTest
     assert flash[:alert].present?
   end
 
-  test "the ontology header offers both halves, with this one active" do
-    get project_relationship_types_path(@project)
-
-    assert_select "a.nav-link.active[href=?]", project_relationship_types_path(@project)
-    assert_select "a.nav-link[href=?]", project_entity_types_path(@project)
-  end
 
   # --- the two ends ----------------------------------------------------------
 
@@ -106,11 +87,6 @@ class RelationshipTypesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "index states the shape of each type" do
-    get project_relationship_types_path(@project)
-
-    assert_select "td", text: "Rocket Engine → Launch Vehicle"
-  end
 
   test "show states the shape" do
     get project_relationship_type_path(@project, relationship_types(:powers))

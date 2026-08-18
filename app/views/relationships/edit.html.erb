@@ -6,7 +6,8 @@
   <%= link_to @relationship.from_entity.label, project_entity_path(@project, @relationship.from_entity) %>
   →
   <%= link_to @relationship.to_entity.label, project_entity_path(@project, @relationship.to_entity) %>
-  · <%= @relationship.relationship_type.name %>
+  · <%= type_with_attributes @relationship.relationship_type,
+                             project_relationship_type_path(@project, @relationship.relationship_type) %>
 </p>
 
 <%= form_with model: [ @project, @relationship ], local: true do |f| %>

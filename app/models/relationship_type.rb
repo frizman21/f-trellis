@@ -18,6 +18,8 @@ class RelationshipType < ApplicationRecord
 
   validate :ends_are_in_this_project
 
+  def declared_attributes = relationship_type_attributes
+
   # The shape this type permits, for anywhere that states it in one line.
   def shape = "#{from_entity_type.name} → #{to_entity_type.name}"
 

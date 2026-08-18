@@ -2,10 +2,6 @@
 class EntityTypesController < ApplicationController
   before_action :set_project
 
-  def index
-    @entity_types = @project.entity_types
-  end
-
   def show
     @entity_type = find_entity_type
   end
@@ -44,7 +40,7 @@ class EntityTypesController < ApplicationController
     @entity_type = find_entity_type
 
     if @entity_type.destroy
-      redirect_to project_entity_types_path(@project),
+      redirect_to ontology_project_path(@project),
                   notice: "Entity type \"#{@entity_type.name}\" deleted."
     else
       # restrict_with_error: a type with entities of it still in the project is

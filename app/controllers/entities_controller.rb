@@ -2,13 +2,6 @@
 class EntitiesController < ApplicationController
   before_action :set_project
 
-  def index
-    @entities = @project.entities
-                        .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
-                        .order(:id)
-                        .page(params[:page]).per(25)
-  end
-
   def show
     @entity = find_entity
     @rows = @entity.attribute_rows
@@ -74,7 +67,7 @@ class EntitiesController < ApplicationController
     label = @entity.label
     @entity.destroy
 
-    redirect_to project_entities_path(@project), notice: "Entity \"#{label}\" deleted."
+    redirect_to data_project_path(@project), notice: "Entity \"#{label}\" deleted."
   end
 
   private
