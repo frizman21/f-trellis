@@ -101,10 +101,10 @@ class ExtractionPromptTest < ActiveSupport::TestCase
 
   # A source that does not state a value should produce no value rather than an
   # invented one.
-  test "an entity requires a name and a type and no attribute" do
+  test "an entity requires an id, a name and a type, and no attribute" do
     entity = schema.dig("properties", "entities", "items")
 
-    assert_equal %w[name type], entity["required"]
+    assert_equal %w[id name type], entity["required"]
     assert_nil entity.dig("properties", "attributes", "required")
   end
 
@@ -115,12 +115,30 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     assert_not_includes types, entity_types(:gemini_capsule).name
   end
 
-  # The model is reading a page and has no ids.
-  test "relationships reference entities by name" do
+  # Names repeat and vary between sentences; an id the model assigned does not.
+  test "relationships reference entities by the ids the model assigned" do
     relationship = schema.dig("properties", "relationships", "items")
 
     assert_equal %w[type from to], relationship["required"]
-    assert_equal "string", relationship.dig("properties", "from", "type")
+    %w[from to].each do |end_name|
+      description = relationship.dig("properties", end_name, "description")
+
+      assert_match(/id of the entity/, description)
+      assert_no_match(/name of the entity/, description)
+    end
+  end
+
+  test "the instructions tell the model to mint ids and reference them" do
+    text = @prompt.instructions
+
+    assert_match(/short id of your own/i, text)
+    assert_match(/unique within this response/i, text)
+    assert_match(/Refer to entities in relationships by those ids/i, text)
+  end
+
+  # The old rule contradicting the new one is the specific failure mode here.
+  test "the instructions no longer say to repeat the name" do
+    assert_no_match(/by the same name you gave them/i, @prompt.instructions)
   end
 
   # The schema carries the same rule the database enforces (#11).
@@ -155,5 +173,72 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     projects(:gemini).entity_types.destroy_all
 
     assert_predicate ExtractionPrompt.new(projects(:gemini).reload), :empty?
+  end
+
+  # --- the worked example ----------------------------------------------------
+  #
+  # A schema says what shape is allowed; an example shows what a right answer
+  # looks like.
+
+  def example = JSON.parse(@prompt.example_json)
+
+  # An invalid example is worse than none, so it is held to the same standard as
+  # the schema: parsed, not pattern-matched.
+  test "the example is valid JSON with two entities and one relationship" do
+    assert_equal 2, example["entities"].size
+    assert_equal 1, example["relationships"].size
+  end
+
+  # The thing the example exists to demonstrate, and the thing that would
+  # silently rot if the id scheme changed again.
+  test "the relationship's ends are the ids of the two entities" do
+    ids = example["entities"].map { |e| e["id"] }
+    edge = example["relationships"].first
+
+    assert_equal ids.first, edge["from"]
+    assert_equal ids.last, edge["to"]
+    assert_not_equal edge["from"], edge["to"]
+  end
+
+  test "the example uses types the relationship type actually joins, in order" do
+    type = @project.relationship_types.first
+    edge = example["relationships"].first
+
+    assert_equal type.name, edge["type"]
+    assert_equal type.from_entity_type.name, example["entities"].first["type"]
+    assert_equal type.to_entity_type.name, example["entities"].last["type"]
+  end
+
+  test "the example's attribute keys are real attributes of those types" do
+    example["entities"].each do |entity|
+      type = @project.entity_types.find_by!(name: entity["type"])
+      declared = type.entity_type_attributes.active.pluck(:name)
+
+      entity.fetch("attributes", {}).each_key do |key|
+        assert_includes declared, key, "#{key} is not an attribute of #{type.name}"
+      end
+    end
+  end
+
+  test "attributes in the example are a flat bag, not nested objects" do
+    example["entities"].each do |entity|
+      entity.fetch("attributes", {}).each_value do |value|
+        assert_not value.is_a?(Hash), "#{value.inspect} is nested; the bag is flat"
+      end
+    end
+  end
+
+  test "the prompt ends with the example" do
+    assert_includes @prompt.to_s, @prompt.example_json
+    assert @prompt.to_s.strip.end_with?(@prompt.example_json)
+  end
+
+  test "a project with no relationship types shows an entity-only example" do
+    projects(:gemini).relationship_types.each { |t| t.relationships.destroy_all; t.destroy }
+
+    example = JSON.parse(ExtractionPrompt.new(projects(:gemini).reload).example_json)
+
+    assert_equal 1, example["entities"].size
+    assert_empty example["relationships"]
   end
 end
