@@ -4,7 +4,7 @@
 # usually serve several model ids, and rotating either should be one edit rather
 # than one per model.
 class ModelEndpointsController < ApplicationController
-  before_action :set_endpoint, only: [ :show, :edit, :update, :destroy, :check ]
+  before_action :set_endpoint, only: [ :show, :edit, :update, :destroy, :check, :try ]
 
   def index
     @endpoints = ModelEndpoint.includes(:models).order(:name)
@@ -58,6 +58,29 @@ class ModelEndpointsController < ApplicationController
     result = EndpointCheck.call(@endpoint)
 
     redirect_to @endpoint, (result.ok? ? :notice : :alert) => result.message
+  end
+
+  # One question, in the foreground, with a short timeout. Check proves the
+  # address and the credential; this proves the endpoint can actually finish a
+  # chat, which a gateway that lists models and refuses completions cannot.
+  def try
+    @models = @endpoint.models.order(:model_id)
+    @model = @endpoint.models.new
+    # Found through the endpoint, so a model id from another one is refused
+    # rather than run against this endpoint's address.
+    trial_model = @endpoint.models.find_by(id: params[:trial_model_id])
+    @prompt = params[:prompt].to_s
+
+    if trial_model.nil?
+      flash.now[:alert] = "Choose one of this endpoint's models."
+    elsif @prompt.strip.blank?
+      flash.now[:alert] = "Type a prompt to send."
+    else
+      @trial_model = trial_model
+      @trial = EndpointTrial.call(model: trial_model, prompt: @prompt)
+    end
+
+    render :show, status: @trial&.ok? == false ? :unprocessable_entity : :ok
   end
 
   private

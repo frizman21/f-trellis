@@ -109,7 +109,10 @@ Rails.application.routes.draw do
   # Adding one is done on its endpoint, which is what holds the address and
   # names the credential; there is nowhere else a custom model could be entered.
   resources :model_endpoints do
-    member { post :check }
+    member do
+      post :check
+      post :try
+    end
     resources :models, only: [:create], module: :model_endpoints
   end
   resources :source_processing_reports, only: [:index, :new, :create]
