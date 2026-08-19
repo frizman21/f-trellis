@@ -15,7 +15,7 @@ class EntitiesController < ApplicationController
     @direction = direction
     @per_page = per_page
 
-    scope = @project.entities
+    scope = @project.entities.kept
                     .where(entity_type_id: @entity_type.id)
                     .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
 
@@ -28,7 +28,7 @@ class EntitiesController < ApplicationController
   def show
     @entity = find_entity
     @rows = @entity.attribute_rows
-    @relationships = @entity.relationships
+    @relationships = @entity.relationships.kept
                             .includes(:relationship_type, :relationship_type_values,
                                       from_entity: :entity_type, to_entity: :entity_type)
                             .order(:id)
@@ -103,10 +103,11 @@ class EntitiesController < ApplicationController
 
   def destroy
     @entity = find_entity
-    label = @entity.name
-    @entity.destroy
+    # Soft: the row stays, and so do its values, its citations, and everything
+    # that cited it. Its edges go with it — see Entity#discard_with_relationships.
+    @entity.discard_with_relationships
 
-    redirect_to project_path(@project), notice: "Entity \"#{label}\" deleted."
+    redirect_to project_path(@project), notice: "Entity \"#{@entity.name}\" deleted."
   end
 
   private
@@ -207,7 +208,9 @@ class EntitiesController < ApplicationController
   # Always through the project. An id from another project is then a 404 by
   # construction rather than by a check someone has to remember to write.
   def find_entity
-    @project.entities.includes(entity_attribute_values: :entity_type_attribute).find(params[:id])
+    @project.entities.kept
+            .includes(entity_attribute_values: :entity_type_attribute)
+            .find(params[:id])
   end
 
   # A blank citation row per value, so every attribute can be given a source

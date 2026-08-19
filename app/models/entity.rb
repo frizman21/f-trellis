@@ -5,6 +5,13 @@
 # from an attribute meant an entity whose type declared none rendered as
 # "Launch Vehicle #210187663", which is not a name.
 class Entity < ApplicationRecord
+  # Soft delete. No default scope: one that hides rows is invisible at the call
+  # site and surprises every query written later, including the ones that
+  # legitimately need to see deleted rows. The reads that should not see them ask
+  # for `kept` explicitly, and each of those is tested.
+  include Discard::Model
+  self.discard_column = :deleted_at
+
   belongs_to :project
   belongs_to :entity_type
 
@@ -39,6 +46,17 @@ class Entity < ApplicationRecord
   # are always in this entity's project, so no further scoping is needed here.
   def relationships
     Relationship.where(from_entity_id: id).or(Relationship.where(to_entity_id: id))
+  end
+
+  # Deleting an entity takes its edges with it: an edge to something no longer
+  # there is not a fact, and leaving it live would put a dangling row in the
+  # other end's table. Values and citations are deliberately kept — soft delete
+  # keeps things, and cascading here would defeat the point.
+  def discard_with_relationships
+    transaction do
+      relationships.kept.find_each(&:discard)
+      discard
+    end
   end
 
   # This entity's values keyed by attribute id, for a table that reads many

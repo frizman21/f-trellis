@@ -29,7 +29,7 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
   test "destroy removes the edge and returns to the end it was removed from" do
     relationship = relationships(:f1_powers_saturn_v)
 
-    assert_difference -> { Relationship.count }, -1 do
+    assert_difference -> { Relationship.kept.count }, -1 do
       # Removed from the `to` end, so it must come back here and not to the
       # `from` end the record happens to name first.
       delete project_relationship_path(@project, relationship, entity_id: entities(:saturn_v).id)

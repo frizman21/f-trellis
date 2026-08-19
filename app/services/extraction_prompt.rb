@@ -8,15 +8,6 @@
 # Nothing is stored. The prompt is what the project's structure currently
 # implies, so it cannot drift from that structure the way a saved copy would.
 class ExtractionPrompt
-  # JSON has no date type, so a datetime is a string the model is told the shape
-  # of. The rest map straight across.
-  JSON_TYPES = {
-    "int" => { "type" => "integer" },
-    "float" => { "type" => "number" },
-    "string" => { "type" => "string" },
-    "datetime" => { "type" => "string", "format" => "date-time" }
-  }.freeze
-
   def initialize(project)
     @project = project
     # Active only: the prompt asks for what the project tracks now.
@@ -141,18 +132,26 @@ class ExtractionPrompt
       "properties" => {
         "name" => { "type" => "string", "description" => "What the source calls this thing." },
         "type" => { "type" => "string", "enum" => entity_types.map(&:name) },
-        "attributes" => {
-          "type" => "object",
-          "properties" => entity_attribute_properties
-        }
+        "attributes" => attribute_bag("entity")
       }
     }
   end
 
-  def entity_attribute_properties
-    entity_types.flat_map { |type| type.entity_type_attributes.active }
-                .uniq(&:name)
-                .to_h { |attribute| [ attribute.name, JSON_TYPES.fetch(attribute.value_type) ] }
+  # A plain name/value bag rather than a declared property per attribute. The
+  # definitions above already say each attribute's name and value type in prose;
+  # declaring them again in JSON Schema said nothing new and made the schema as
+  # long as the ontology.
+  #
+  # It was also quietly wrong: flattening every type's attributes into one
+  # properties map collides when two types share an attribute name with different
+  # value types, and the first one written wins. A bag makes no such claim.
+  def attribute_bag(subject)
+    {
+      "type" => "object",
+      "description" => "The attributes this #{subject} has, as name and value. " \
+                       "Use the attribute names given in the definitions above, and " \
+                       "include only the ones the source states."
+    }
   end
 
   # Entities are referenced by name: the model is reading a page and has no ids.
@@ -171,17 +170,8 @@ class ExtractionPrompt
             [ type.name, { "from" => type.from_entity_type.name, "to" => type.to_entity_type.name } ]
           }
         },
-        "attributes" => {
-          "type" => "object",
-          "properties" => relationship_attribute_properties
-        }
+        "attributes" => attribute_bag("relationship")
       }
     }
-  end
-
-  def relationship_attribute_properties
-    relationship_types.flat_map { |type| type.relationship_type_attributes.active }
-                      .uniq(&:name)
-                      .to_h { |attribute| [ attribute.name, JSON_TYPES.fetch(attribute.value_type) ] }
   end
 end

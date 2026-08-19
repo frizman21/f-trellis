@@ -117,6 +117,8 @@ GEM
       railties (>= 7.0)
       responders
       warden (~> 1.2.3)
+    discard (1.4.0)
+      activerecord (>= 4.2, < 9.0)
     dotenv (3.2.0)
     drb (2.2.3)
     ed25519 (1.4.0)
@@ -468,6 +470,7 @@ DEPENDENCIES
   capybara
   debug
   devise
+  discard (~> 1.4)
   faker
   image_processing (~> 2.0)
   importmap-rails

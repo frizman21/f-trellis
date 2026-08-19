@@ -25,6 +25,8 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     assert_includes @prompt.to_s, relationship_types(:powers).description
   end
 
+  # With the schema no longer declaring them, the definitions are the only place
+  # a value type is stated.
   test "lists each attribute with its declared value type" do
     assert_includes @prompt.to_s, "thrust_kn (float)"
     assert_includes @prompt.to_s, "chambers (int)"
@@ -73,15 +75,29 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     assert_equal "array", schema.dig("properties", "relationships", "type")
   end
 
-  # Each mapping is separate, so each is asserted.
-  test "the four value types map to their JSON schema types" do
-    properties = schema.dig("properties", "entities", "items", "properties", "attributes", "properties")
+  # A plain bag: the definitions already say each attribute's name and value type
+  # in prose, and declaring them again in JSON Schema said nothing new.
+  test "attributes are a name/value bag, not declared properties" do
+    %w[entities relationships].each do |collection|
+      attributes = schema.dig("properties", collection, "items", "properties", "attributes")
 
-    assert_equal({ "type" => "integer" }, properties["chambers"])
-    assert_equal({ "type" => "number" }, properties["thrust_kn"])
-    assert_equal({ "type" => "string" }, properties["manufacturer"])
-    assert_equal({ "type" => "string", "format" => "date-time" }, properties["first_flight"])
+      assert_equal "object", attributes["type"]
+      assert_nil attributes["properties"], "#{collection} still declares per-attribute properties"
+      assert attributes["description"].present?
+    end
   end
+
+  # Walked rather than string-matched, so a nested declaration cannot hide.
+  test "no value type is declared anywhere under attributes" do
+    %w[entities relationships].each do |collection|
+      attributes = schema.dig("properties", collection, "items", "properties", "attributes")
+
+      assert_equal %w[description type], attributes.keys.sort,
+                   "#{collection} attributes carry more than a type and a description"
+      assert_equal "object", attributes["type"]
+    end
+  end
+
 
   # A source that does not state a value should produce no value rather than an
   # invented one.

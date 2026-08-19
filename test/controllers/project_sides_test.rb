@@ -502,4 +502,56 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", edit_project_relationship_type_path(@project, relationship_types(:powers)), count: 0
     assert_select "a[href=?]", project_entity_type_path(@project, entity_types(:rocket_engine))
   end
+
+  # --- soft-deleted rows are invisible ---------------------------------------
+
+  test "a deleted entity is absent from its type's list and the card's count" do
+    entities(:f1).discard_with_relationships
+
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+    assert_select "a", text: "Rocketdyne F-1", count: 0
+
+    get project_path(@project)
+    assert_select ".card", text: /Rocket Engines.*1 entity/m
+  end
+
+  test "a deleted entity is absent from search results" do
+    entities(:f1).discard_with_relationships
+
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug),
+        params: { q: "Rocketdyne" }
+
+    assert_select "a", text: "Rocketdyne F-1", count: 0
+  end
+
+  test "a deleted relationship is absent from both its ends" do
+    relationships(:f1_powers_saturn_v).discard
+
+    get project_entity_path(@project, entities(:f1))
+    assert_select "td", { text: "Powers", count: 0 }
+
+    get project_entity_path(@project, entities(:saturn_v))
+    assert_select "td", { text: "Powers", count: 0 }
+  end
+
+  test "a deleted entity's page is not found" do
+    entities(:f1).discard
+
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :not_found
+  end
+
+  # The ontology is about what can be recorded, not about what is.
+  test "the structure page and the prompt are unaffected by deleted rows" do
+    entities(:f1).discard_with_relationships
+
+    get structure_project_path(@project)
+    assert_response :success
+    assert_select "a", text: "Rocket Engine"
+
+    get ai_configuration_project_path(@project)
+    assert_response :success
+    assert_match(/Rocket Engine/, response.body)
+  end
 end

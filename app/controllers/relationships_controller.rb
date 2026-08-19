@@ -40,7 +40,7 @@ class RelationshipsController < ApplicationController
     @relationship = find_relationship
     # Back to whichever end the reader came from, not always the `from` end.
     origin = params[:entity_id].presence || @relationship.from_entity_id
-    @relationship.destroy
+    @relationship.discard
 
     redirect_to project_entity_path(@project, origin), notice: "Relationship removed."
   end
@@ -52,7 +52,7 @@ class RelationshipsController < ApplicationController
   end
 
   def find_relationship
-    @project.relationships.find(params[:id])
+    @project.relationships.kept.find(params[:id])
   end
 
   # Retyping an edge is only possible to a kind whose declared ends match the

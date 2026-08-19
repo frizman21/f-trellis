@@ -60,6 +60,12 @@ gem "pdf-reader", "~> 2.14"
 # Pagination for index views.
 gem "kaminari"
 
+# Soft delete for entities and relationships. discard rather than paranoia:
+# paranoia overrides destroy so that a method whose name says "delete" does not,
+# which makes every call site ambiguous. discard adds discard/undiscard and
+# leaves destroy meaning what it says.
+gem "discard", "~> 1.4"
+
 # Random name/company/job generators for synthetic seed data.
 gem "faker"
 

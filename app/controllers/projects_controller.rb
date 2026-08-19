@@ -14,7 +14,7 @@ class ProjectsController < ApplicationController
     @project = Project.find(params[:id])
     @entity_types = @project.entity_types.includes(:entity_type_attributes, :entities)
     @relationship_types = @project.relationship_types
-                                  .includes(:relationship_type_attributes, :relationships,
+                                  .includes(:relationship_type_attributes,
                                             :from_entity_type, :to_entity_type)
   end
 
@@ -24,7 +24,7 @@ class ProjectsController < ApplicationController
   def show
     @project = Project.find(params[:id])
     @entity_types = @project.entity_types.includes(:entity_type_attributes)
-    @counts = @project.entities.group(:entity_type_id).count
+    @counts = @project.entities.kept.group(:entity_type_id).count
   end
 
   # Generated from the project's structure rather than stored, so it cannot

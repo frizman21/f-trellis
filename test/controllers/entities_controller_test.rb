@@ -170,12 +170,16 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   # --- destroy ---------------------------------------------------------------
 
-  test "destroy removes the entity" do
-    assert_difference -> { Entity.count }, -1 do
-      delete project_entity_path(@project, entities(:bare))
+  # Soft: the row stays and the list stops showing it.
+  test "destroy soft-deletes the entity" do
+    assert_no_difference -> { Entity.count } do
+      assert_difference -> { Entity.kept.count }, -1 do
+        delete project_entity_path(@project, entities(:bare))
+      end
     end
 
     assert_redirected_to project_path(@project)
+    assert_predicate entities(:bare).reload, :discarded?
   end
 
   # --- scoping ---------------------------------------------------------------

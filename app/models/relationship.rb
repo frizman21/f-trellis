@@ -1,6 +1,9 @@
 # An edge between two entities, of a kind the project defines, carrying whatever
 # attributes that kind declares.
 class Relationship < ApplicationRecord
+  include Discard::Model
+  self.discard_column = :deleted_at
+
   include ScopedToProject
 
   belongs_to :relationship_type
