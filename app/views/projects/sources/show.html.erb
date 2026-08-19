@@ -33,6 +33,60 @@
   <% end %>
 </dl>
 
+<h2 class="h5 mt-4">Extraction</h2>
+<p class="text-muted small">
+  Runs this project's
+  <%= link_to "AI configuration", ai_configuration_project_path(@project) %>
+  over this page's text with
+  <%= @project.default_model ? @project.default_model.model_id : "the project's model" %>,
+  and shows the JSON that comes back.
+  <%# Stated on the page, not just in the change request: reading this and
+      expecting new entities afterwards would be a reasonable mistake. %>
+  What it finds is recorded in the project and cited to this page.
+</p>
+
+<div class="mb-3">
+  <% if @readiness.runnable? %>
+    <%= button_to "Extract with #{@project.default_model.model_id}",
+                  extract_project_source_path(@project, @source),
+                  method: :post, class: "btn btn-primary" %>
+  <% else %>
+    <%# Disabled with the reason rather than enabled and failing. %>
+    <button class="btn btn-primary" disabled>Extract</button>
+    <div class="form-text"><%= @readiness.reason %></div>
+  <% end %>
+</div>
+
+<% if @runs.any? %>
+  <% @runs.each do |run| %>
+    <div class="border rounded p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span>
+          <span class="badge text-bg-<%= run.complete? ? "success" : run.failed? ? "danger" : "secondary" %>">
+            <%= run.status %>
+          </span>
+          <span class="text-muted small ms-2"><%= run.model.model_id %></span>
+        </span>
+        <span class="text-muted small"><%= run.created_at.to_fs(:long) %></span>
+      </div>
+
+      <% if run.failed? %>
+        <p class="text-danger small mb-0"><%= run.error %></p>
+      <% elsif run.complete? %>
+        <%= render "projects/sources/run_summary", run: run %>
+        <% unless run.parsed? %>
+          <%# A model wrapping its answer in prose is ordinary, so the raw reply
+              is shown rather than an error. %>
+          <p class="text-warning small mb-1">The reply was not valid JSON. Showing it as it came back.</p>
+        <% end %>
+        <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= run.pretty_response %></pre>
+      <% else %>
+        <p class="text-muted small mb-0">Waiting for the model…</p>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
 <div class="d-flex gap-2">
   <%# The crawling side is a separate concern with its own screens: fetched
       content, the link graph and processing history are the same page whichever

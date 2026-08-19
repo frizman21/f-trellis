@@ -20,6 +20,13 @@ class Project < ApplicationRecord
   has_many :entity_type_attributes, dependent: :destroy
   has_many :entity_types, dependent: :destroy
 
+  # The model that reads this project's sources. Optional: a project can exist
+  # before the registry has been refreshed, and the extract button explains
+  # itself rather than the form refusing to save.
+  belongs_to :default_model, class_name: "Model", optional: true
+
+  has_many :extraction_runs, dependent: :destroy
+
   # The pages this project cares about. The joins go with the project; the
   # sources do not — they are pages on the internet, another project may be
   # using them, and a cited source cannot be deleted anyway.

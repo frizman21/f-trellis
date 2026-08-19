@@ -14,6 +14,17 @@
     <%= f.text_field :name, class: "form-control", required: true %>
   </div>
 
+  <div class="mb-3">
+    <%= f.label :default_model_id, "Default model", class: "form-label" %>
+    <%# Only models the registry says are usable and pickable — the same set the
+        skill form offers. %>
+    <%= f.collection_select :default_model_id, Model.selectable, :id, :model_id,
+                            { include_blank: "None yet" }, class: "form-select" %>
+    <div class="form-text">
+      Used to read this project's sources. Extraction is unavailable until one is chosen.
+    </div>
+  </div>
+
   <%= f.submit submit_label, class: "btn btn-primary" %>
   <%= link_to "Cancel", projects_path, class: "btn btn-outline-secondary" %>
 <% end %>

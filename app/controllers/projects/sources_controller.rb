@@ -20,6 +20,29 @@ module Projects
       @source = @project.sources.includes(:domain).find(params[:id])
       @latest = @source.source_data.order(:created_at).last
       @other_projects = @source.projects.where.not(id: @project.id).order(:name)
+      # Scoped to this project: another project reading the same page has its own
+      # runs, with its own structure behind them.
+      @runs = @project.extraction_runs.where(source: @source).includes(:model).recent.limit(10)
+      @readiness = ExtractionReadiness.new(@project, @source)
+    end
+
+    # Enqueues a run of the project's extraction prompt over this page. The
+    # reasons it might not be runnable are checked here so the button can explain
+    # itself rather than being enabled and failing.
+    def extract
+      @source = @project.sources.find(params[:id])
+      reason = ExtractionReadiness.new(@project, @source).reason
+
+      if reason
+        return redirect_to project_source_path(@project, @source), alert: reason
+      end
+
+      run = ExtractionRun.create!(project: @project, source: @source,
+                                  model: @project.default_model)
+      ExtractionJob.perform_later(run)
+
+      redirect_to project_source_path(@project, @source),
+                  notice: "Extraction queued with #{@project.default_model.model_id}."
     end
 
     def new
