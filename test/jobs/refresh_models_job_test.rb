@@ -21,6 +21,22 @@ class RefreshModelsJobTest < ActiveSupport::TestCase
     assert_not_includes Model.current, retired
   end
 
+  # A custom model is never stamped, because no provider is asked about it. It is
+  # current because somebody entered it, and a refresh must not age it out of
+  # every dropdown in the application.
+  test "a refresh leaves a custom endpoint's models in circulation" do
+    endpoint = ModelEndpoint.create!(name: "Acme internal", base_url: "https://acme.internal/v1")
+    custom = endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large",
+                                     name: "Acme Large")
+    Model.create!(provider: "anthropic", model_id: "kept", name: "kept", last_seen_at: 1.day.ago)
+
+    RefreshModelsJob.stamp_last_seen([ModelInfo.new("anthropic", "kept")])
+
+    assert_nil custom.reload.last_seen_at, "nothing should have stamped it"
+    assert_includes Model.current, custom
+    assert_includes Model.selectable, custom
+  end
+
   test "models across providers share one timestamp so current returns all of them" do
     anthropic = Model.create!(provider: "anthropic", model_id: "a", name: "a", last_seen_at: 1.day.ago)
     openai    = Model.create!(provider: "openai",    model_id: "o", name: "o", last_seen_at: 1.day.ago)

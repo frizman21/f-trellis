@@ -98,6 +98,13 @@ Rails.application.routes.draw do
       post :refresh
     end
   end
+  # Models the provider refreshes never discovered, and where to reach them.
+  # Adding one is done on its endpoint, which is what holds the address and
+  # names the credential; there is nowhere else a custom model could be entered.
+  resources :model_endpoints do
+    member { post :check }
+    resources :models, only: [:create], module: :model_endpoints
+  end
   resources :source_processing_reports, only: [:index, :new, :create]
   get "source_data/:id/download", to: "source_data#download", as: :download_source_datum
   post "source_data/:id/extract_links", to: "source_data#extract_links", as: :extract_links_source_datum

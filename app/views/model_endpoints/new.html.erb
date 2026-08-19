@@ -1,0 +1,7 @@
+<% content_for :title, "Add a model endpoint" %>
+<p class="mb-3">
+  <%= link_to "← Model Endpoints", model_endpoints_path, class: "text-decoration-none" %>
+</p>
+
+<h1 class="h4 mb-3">Add a model endpoint</h1>
+<%= render "form", endpoint: @endpoint %>

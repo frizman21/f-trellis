@@ -32,8 +32,8 @@ class ProcessReportJobTest < ActiveJob::TestCase
   end
 
   def with_fake_chat(chat_class = FakeChat)
-    original = Chat.method(:create!)
-    Chat.define_singleton_method(:create!) { |*, **| chat_class.new }
+    original = Chat.method(:for_model)
+    Chat.define_singleton_method(:for_model) { |*| chat_class.new }
     # The job assigns the chat to the report; skip that write for the fake.
     SourceProcessingReport.class_eval do
       alias_method :update_without_chat_stub!, :update!
@@ -44,7 +44,7 @@ class ProcessReportJobTest < ActiveJob::TestCase
     end
     yield
   ensure
-    Chat.define_singleton_method(:create!, original)
+    Chat.define_singleton_method(:for_model, original)
     SourceProcessingReport.class_eval do
       remove_method :update!
       alias_method :update!, :update_without_chat_stub!

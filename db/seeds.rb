@@ -817,3 +817,20 @@ current_hash = link_sample_source.latest_datum&.content_hash
   report.assign_attributes(status: "failed", facts: [], error: attrs[:error])
   report.save!
 end
+
+# A worked example of a model served from somewhere the provider refreshes never
+# look, so the Model Endpoints screens render on a fresh database.
+#
+# Its model is seeded disabled on purpose. A custom model is offered wherever a
+# model is picked, and an endpoint that does not exist has no business appearing
+# in the project default-model select — the row is here to show the screens, not
+# to be run.
+example_endpoint = ModelEndpoint.find_or_create_by!(name: "Example internal endpoint") do |endpoint|
+  endpoint.base_url = "https://models.example.internal/v1"
+  endpoint.api_key_env_var = "EXAMPLE_ENDPOINT_PAT"
+end
+
+unless example_endpoint.models.exists?(model_id: "example-large")
+  example_endpoint.models.create!(provider: "custom_endpoint", model_id: "example-large",
+                                  name: "Example Large", is_disabled: true)
+end

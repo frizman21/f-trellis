@@ -146,7 +146,7 @@ class SkillTriage
   end
 
   def ask(excerpt)
-    chat = Chat.create!(model: triage_model)
+    chat = Chat.for_model(triage_model)
     chat.with_instructions(instructions)
     chat.with_schema(response_schema)
     chat.ask(prompt_for(excerpt)).content

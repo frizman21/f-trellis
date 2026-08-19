@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_19_035151) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_19_165204) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -211,6 +211,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_035151) do
     t.index ["tool_call_id"], name: "index_messages_on_tool_call_id"
   end
 
+  create_table "model_endpoints", force: :cascade do |t|
+    t.string "api_key_env_var"
+    t.string "base_url", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_model_endpoints_on_name", unique: true
+  end
+
   create_table "models", force: :cascade do |t|
     t.jsonb "capabilities", default: []
     t.integer "context_window"
@@ -224,6 +233,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_035151) do
     t.jsonb "metadata", default: {}
     t.jsonb "modalities", default: {}
     t.datetime "model_created_at"
+    t.bigint "model_endpoint_id"
     t.string "model_id", null: false
     t.string "name", null: false
     t.jsonb "pricing", default: {}
@@ -234,6 +244,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_035151) do
     t.index ["is_deprecated", "is_disabled"], name: "index_models_on_is_deprecated_and_is_disabled"
     t.index ["last_seen_at"], name: "index_models_on_last_seen_at"
     t.index ["modalities"], name: "index_models_on_modalities", using: :gin
+    t.index ["model_endpoint_id"], name: "index_models_on_model_endpoint_id"
     t.index ["provider", "model_id"], name: "index_models_on_provider_and_model_id", unique: true
     t.index ["provider"], name: "index_models_on_provider"
   end
@@ -569,6 +580,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_035151) do
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "models"
   add_foreign_key "messages", "tool_calls"
+  add_foreign_key "models", "model_endpoints"
   add_foreign_key "project_sources", "projects"
   add_foreign_key "project_sources", "sources"
   add_foreign_key "projects", "models", column: "default_model_id"

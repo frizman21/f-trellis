@@ -1,0 +1,7 @@
+<% content_for :title, "Edit #{@endpoint.name}" %>
+<p class="mb-3">
+  <%= link_to "← #{@endpoint.name}", @endpoint, class: "text-decoration-none" %>
+</p>
+
+<h1 class="h4 mb-3">Edit <%= @endpoint.name %></h1>
+<%= render "form", endpoint: @endpoint %>
