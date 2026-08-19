@@ -18,11 +18,22 @@
 
   <dt class="col-sm-3">Content</dt>
   <dd class="col-sm-9">
-    <% if @latest %>
-      Fetched <%= @latest.created_at.to_fs(:long) %>
-    <% else %>
-      <span class="text-muted">Nothing fetched yet.</span>
-    <% end %>
+    <%# The page already says that nothing is fetched, and that extraction is
+        disabled because of it. The button that fixes it belongs beside the
+        sentence rather than two navigations away on the crawler's own screen. %>
+    <div class="d-flex align-items-center gap-2">
+      <span>
+        <% if @latest %>
+          Fetched <%= @latest.created_at.to_fs(:long) %>
+        <% else %>
+          <span class="text-muted">Nothing fetched yet.</span>
+        <% end %>
+      </span>
+      <%= button_to @latest ? "Re-fetch content" : "Fetch content",
+                    fetch_project_source_path(@project, @source),
+                    method: :post, form_class: "m-0",
+                    class: "btn btn-sm btn-outline-primary" %>
+    </div>
   </dd>
 
   <%# A page can matter to several projects at once; that is why the join table
@@ -47,9 +58,22 @@
 
 <div class="mb-3">
   <% if @readiness.runnable? %>
-    <%= button_to "Extract with #{@project.default_model.model_id}",
-                  extract_project_source_path(@project, @source),
-                  method: :post, class: "btn btn-primary" %>
+    <%# The project's default is the preselection, not the only answer: reading
+        one page with a cheaper or a stronger model should not mean changing the
+        project's default and changing it back. %>
+    <%= form_with url: extract_project_source_path(@project, @source), method: :post,
+                  local: true, class: "d-flex gap-2 align-items-end" do |f| %>
+      <div>
+        <%= f.label :model_id, "Model", class: "form-label" %>
+        <%# Sized to the control, not to the row: the ids it holds are short, and
+            a select stretched to the width of the page reads as the page's
+            subject rather than as one setting on a button. %>
+        <%= f.collection_select :model_id, @models, :id, :model_id,
+                                { selected: @project.default_model_id },
+                                class: "form-select form-select-sm", style: "width: auto;" %>
+      </div>
+      <%= f.submit "Extract", class: "btn btn-primary" %>
+    <% end %>
   <% else %>
     <%# Disabled with the reason rather than enabled and failing. %>
     <button class="btn btn-primary" disabled>Extract</button>
@@ -57,34 +81,104 @@
   <% end %>
 </div>
 
-<% if @runs.any? %>
-  <% @runs.each do |run| %>
-    <div class="border rounded p-3 mb-3">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <span>
-          <span class="badge text-bg-<%= run.complete? ? "success" : run.failed? ? "danger" : "secondary" %>">
-            <%= run.status %>
-          </span>
-          <span class="text-muted small ms-2"><%= run.model.model_id %></span>
-        </span>
-        <span class="text-muted small"><%= run.created_at.to_fs(:long) %></span>
-      </div>
+<h2 class="h5 mt-4">Crawl from this source</h2>
+<p class="text-muted small">
+  Walks out from this page and fetches what it finds. Everything it fetches
+  joins <strong><%= @project.name %></strong>, so a site pulled in from here does
+  not have to be re-entered URL by URL.
+</p>
 
-      <% if run.failed? %>
-        <p class="text-danger small mb-0"><%= run.error %></p>
-      <% elsif run.complete? %>
-        <%= render "projects/sources/run_summary", run: run %>
-        <% unless run.parsed? %>
-          <%# A model wrapping its answer in prose is ordinary, so the raw reply
-              is shown rather than an error. %>
-          <p class="text-warning small mb-1">The reply was not valid JSON. Showing it as it came back.</p>
-        <% end %>
-        <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= run.pretty_response %></pre>
-      <% else %>
-        <p class="text-muted small mb-0">Waiting for the model…</p>
+<%= form_with url: crawl_project_source_path(@project, @source), method: :post,
+              local: true, class: "mb-4" do |f| %>
+  <div class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <%= f.label :crawl_type, "Crawl type", class: "form-label" %>
+      <%= f.select :crawl_type,
+                   [["Stay in domain", "stay_in_domain"],
+                    ["Follow external links", "follow_external_links"],
+                    ["From the site's sitemap", "from_sitemap"]],
+                   {},
+                   class: "form-select" %>
+    </div>
+    <div class="col-md-2">
+      <%= f.label :max_depth, "Depth", class: "form-label" %>
+      <%= f.number_field :max_depth, value: 1, min: 0, max: 10, step: 1, class: "form-control" %>
+    </div>
+    <div class="col-md-3">
+      <%= f.label :max_pages, "Max pages", class: "form-label" %>
+      <%= f.number_field :max_pages, value: CrawlJob::DEFAULT_MAX_PAGES, min: 1,
+                         max: CrawlJob::MAX_MAX_PAGES, step: 1, class: "form-control" %>
+    </div>
+    <div class="col-md-3">
+      <%# Just the crawl: extracting every page it fetches is its own button,
+          with its own cost to show first. See change request #49. %>
+      <%= f.submit "Just Crawl", class: "btn btn-primary" %>
+    </div>
+  </div>
+  <div class="form-text">
+    Depth 0 only fetches this page. Stay-in-domain follows links only on
+    <code><%= @source.domain&.host %></code>. Already-known URLs are skipped.
+    From-the-sitemap starts with every page the site lists rather than this one,
+    then follows links within the domain from there.
+  </div>
+  <div class="form-text">
+    <% delay = CrawlJob.delay_for(@source.domain) %>
+    The crawler waits <%= pluralize(delay, "second") %> between requests to
+    <code><%= @source.domain&.host %></code><%
+      %><% if @source.domain&.min_crawl_delay_seconds.blank? %> (the default)<% end %>,
+    so a full <%= CrawlJob::DEFAULT_MAX_PAGES %>-page crawl of this site takes at
+    least <%= distance_of_time_in_words(delay * CrawlJob::DEFAULT_MAX_PAGES) %>.
+    <%= link_to "Change it", edit_domain_path(@source.domain) if @source.domain %>
+  </div>
+<% end %>
+
+<%# The runs are history, not the control: the two things you came here to
+    press are above, and the replies — which are long — are opened when
+    somebody wants to read one. Closed by default, and a <details> rather
+    than a scripted toggle so it needs nothing from Turbo. %>
+<% if @runs.any? %>
+  <details class="mb-4">
+    <summary class="h5 mb-0">
+      Extraction output
+      <span class="text-muted fw-normal small">
+        — <%= pluralize(@runs.size, "run") %>, most recent first
+      </span>
+    </summary>
+    <div class="mt-3">
+      <% @runs.each do |run| %>
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>
+              <span class="badge text-bg-<%= run.complete? ? "success" : run.failed? ? "danger" : "secondary" %>">
+                <%= run.status %>
+              </span>
+              <span class="text-muted small ms-2"><%= run.model.model_id %></span>
+              <%# The conversation behind the reply — what was asked, what it cost.
+                  A run that never reached the model has none. %>
+              <% if run.chat %>
+                <%= link_to "Chat ##{run.chat.id}", chat_path(run.chat), class: "small ms-2" %>
+              <% end %>
+            </span>
+            <span class="text-muted small"><%= run.created_at.to_fs(:long) %></span>
+          </div>
+
+          <% if run.failed? %>
+            <p class="text-danger small mb-0"><%= run.error %></p>
+          <% elsif run.complete? %>
+            <%= render "projects/sources/run_summary", run: run %>
+            <% unless run.parsed? %>
+              <%# A model wrapping its answer in prose is ordinary, so the raw reply
+                  is shown rather than an error. %>
+              <p class="text-warning small mb-1">The reply was not valid JSON. Showing it as it came back.</p>
+            <% end %>
+            <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= run.pretty_response %></pre>
+          <% else %>
+            <p class="text-muted small mb-0">Waiting for the model…</p>
+          <% end %>
+        </div>
       <% end %>
     </div>
-  <% end %>
+  </details>
 <% end %>
 
 <div class="d-flex gap-2">

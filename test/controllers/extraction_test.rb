@@ -110,6 +110,33 @@ class ExtractionTest < ActionDispatch::IntegrationTest
 
   # --- showing the result ----------------------------------------------------
 
+  # The runs are history; the buttons are what the page is for. A reply runs to
+  # hundreds of lines, and three of them push the crawl and extract controls off
+  # the screen entirely.
+  test "the extraction output is collapsed until it is asked for" do
+    run_record(status: "complete", response: '{"entities":[]}')
+
+    get project_source_path(@project, @source)
+
+    assert_select "details:not([open]) summary", /Extraction output/
+  end
+
+  test "no runs means no output section at all" do
+    get project_source_path(@project, @source)
+
+    assert_select "summary", { text: /Extraction output/, count: 0 }
+  end
+
+  # Both controls sit above the history they produce.
+  test "the crawl and extract controls come before the output" do
+    run_record(status: "complete", response: "{}")
+
+    get project_source_path(@project, @source)
+
+    assert_operator response.body.index("Just Crawl"), :<, response.body.index("Extraction output")
+    assert_operator response.body.index("Extract"), :<, response.body.index("Just Crawl")
+  end
+
   test "a completed run shows its JSON, pretty-printed" do
     run_record(status: "complete", response: '{"entities":[],"relationships":[]}')
 
@@ -230,5 +257,76 @@ class ExtractionTest < ActionDispatch::IntegrationTest
 
     assert_equal "Renamed", @project.reload.name
     assert_nil @project.default_model
+  end
+
+  # --- choosing the model for one run ----------------------------------------
+  #
+  # The project's default is the preselection, not the only answer: reading one
+  # page with a cheaper or a stronger model should not mean changing the
+  # project's default and changing it back.
+
+  # Stamped with the setup model's own last_seen_at: `Model.current` keeps only
+  # the rows from the most recent refresh, so a later timestamp here would push
+  # the project's default out of the registry the page offers.
+  def other_model
+    @other_model ||= Model.create!(provider: "openai", model_id: "gpt-test",
+                                   name: "GPT Test", last_seen_at: @model.last_seen_at)
+  end
+
+  test "the page offers a model select preselected to the project default" do
+    other_model
+
+    get project_source_path(@project, @source)
+
+    assert_response :success
+    assert_select "select[name=?]", "model_id" do
+      assert_select "option[value=?][selected]", @model.id.to_s
+      assert_select "option[value=?]", other_model.id.to_s
+    end
+  end
+
+  test "the chosen model is the one the run uses" do
+    post extract_project_source_path(@project, @source), params: { model_id: other_model.id }
+
+    assert_equal other_model, ExtractionRun.last.model
+    assert_match(/gpt-test/, flash[:notice])
+  end
+
+  test "no model chosen falls back to the project default" do
+    post extract_project_source_path(@project, @source)
+
+    assert_equal @model, ExtractionRun.last.model
+  end
+
+  # Resolved against the registry rather than trusted, so a stale form or a
+  # hand-made request cannot bill a model nothing should spend money on.
+  test "an unknown or deprecated model falls back to the project default" do
+    retired = Model.create!(provider: "anthropic", model_id: "claude-retired",
+                            name: "Retired", last_seen_at: @model.last_seen_at, is_deprecated: true)
+
+    post extract_project_source_path(@project, @source), params: { model_id: retired.id }
+    assert_equal @model, ExtractionRun.last.model
+
+    post extract_project_source_path(@project, @source), params: { model_id: 0 }
+    assert_equal @model, ExtractionRun.last.model
+  end
+
+  # --- the conversation behind a run -----------------------------------------
+
+  test "a run that reached the model links to its chat" do
+    chat = Chat.create!(model: @model)
+    run_record(status: "complete", response: "{}", chat: chat)
+
+    get project_source_path(@project, @source)
+
+    assert_select "a[href=?]", chat_path(chat)
+  end
+
+  test "a run that never reached the model shows no chat link" do
+    run_record(status: "failed", error: "RubyLLM::Error: upstream said no")
+
+    get project_source_path(@project, @source)
+
+    assert_select "a[href^=?]", "/chats/", count: 0
   end
 end
