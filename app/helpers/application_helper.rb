@@ -1,3 +1,5 @@
+require "uri"
+
 module ApplicationHelper
   EXTERNAL_LINK_ICON = <<~SVG.html_safe.freeze
     <svg xmlns="http://www.w3.org/2000/svg" width="0.85em" height="0.85em"
@@ -17,6 +19,37 @@ module ApplicationHelper
       rel: [ options[:rel], "noopener", "noreferrer" ].compact.join(" ")
     )
     link_to(url, **options) { safe_join([ text.to_s, EXTERNAL_LINK_ICON ]) }
+  end
+
+  # An attribute value that is a web address, rendered as a link; anything else
+  # rendered as text.
+  #
+  # Read off the value rather than declared on the attribute: the ontology has
+  # no URL type, and asking whoever defines an entity type to classify each
+  # string as prose or address is a decision they would get wrong and would have
+  # to revisit every time an extraction recorded something new.
+  #
+  # Truncating happens here rather than in the view, because a shortened href is
+  # a broken one: what is shown is cut, what is linked is whole.
+  # `truncate: nil` shows the value whole — what an entity's own page does, where
+  # there is one value per row and no column width to protect.
+  def value_as_link(raw, truncate: 60)
+    text = raw.to_s.strip
+    shown = truncate ? text.truncate(truncate) : text
+    return shown unless web_address?(text)
+
+    external_link_to(shown, text)
+  end
+
+  # Deliberately narrow. http and https with a host, and nothing else: a bare
+  # `acme.example` is far more often a part number, a filename or a version than
+  # an address somebody meant to be clickable. Being wrong this way costs a
+  # click; being wrong the other way puts a broken link in front of a reader.
+  def web_address?(text)
+    uri = URI.parse(text.to_s.strip)
+    uri.is_a?(URI::HTTP) && uri.host.present?
+  rescue URI::InvalidURIError
+    false
   end
 
   # The commit the running process was built from, for the navbar.

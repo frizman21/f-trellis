@@ -35,7 +35,9 @@
               <span class="badge text-bg-light">disabled</span>
             <% end %>
           </td>
-          <td><%= value&.display_value %></td>
+          <%# Whole, not truncated: one value to a row here, and no column width
+              to protect. A web address is linked. %>
+          <td><%= value_as_link value&.display_value, truncate: nil %></td>
           <td>
             <%= render "shared/citations",
                        citations: value ? value.entity_attribute_value_sources.includes(:source) : [] %>
@@ -86,7 +88,7 @@
           </td>
           <% values = relationship.values_by_attribute_id %>
           <% @relationship_columns.each do |attribute| %>
-            <td><%= values[attribute.id]&.display_value.to_s.truncate(40) %></td>
+            <td><%= value_as_link values[attribute.id]&.display_value, truncate: 40 %></td>
           <% end %>
           <td class="text-nowrap">
             <%= link_to "Edit", edit_project_relationship_path(@project, relationship),
