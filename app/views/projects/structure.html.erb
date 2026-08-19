@@ -15,17 +15,17 @@
         <th>Description</th>
         <th>Attributes</th>
         <th>Entities</th>
-        <th></th>
       </tr>
     </thead>
     <tbody>
       <% @entity_types.each do |entity_type| %>
         <tr>
           <td><%= type_with_attributes entity_type, project_entity_type_path(@project, entity_type) %></td>
-          <td><%= entity_type.description %></td>
+          <%# Truncated: these are full extraction definitions, and this is a
+              list. The whole one is on the type's own page. %>
+          <td><%= entity_type.description.to_s.truncate(100) %></td>
           <td><%= entity_type.entity_type_attributes.size %></td>
-          <td><%= entity_type.entities.size %></td>
-          <td><%= link_to "Edit", edit_project_entity_type_path(@project, entity_type), class: "btn btn-sm btn-outline-primary" %></td>
+          <td><%= entity_type.entities.kept.count %></td>
         </tr>
       <% end %>
     </tbody>
@@ -51,7 +51,6 @@
         <th>Description</th>
         <th>Attributes</th>
         <th>Relationships</th>
-        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -64,10 +63,9 @@
           <td><%= type_with_attributes relationship_type.to_entity_type,
                                        project_entity_type_path(@project, relationship_type.to_entity_type),
                                        css_class: "text-muted" %></td>
-          <td><%= relationship_type.description %></td>
+          <td><%= relationship_type.description.to_s.truncate(100) %></td>
           <td><%= relationship_type.relationship_type_attributes.size %></td>
-          <td><%= relationship_type.relationships.size %></td>
-          <td><%= link_to "Edit", edit_project_relationship_type_path(@project, relationship_type), class: "btn btn-sm btn-outline-primary" %></td>
+          <td><%= relationship_type.relationships.kept.count %></td>
         </tr>
       <% end %>
     </tbody>

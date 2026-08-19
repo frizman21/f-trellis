@@ -25,7 +25,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
       cells = rows.map { |row| row.css("td").map { |td| td.text.strip } }
       by_name = cells.to_h { |name, value| [ name.split.first, value ] }
 
-      assert_equal "Rocketdyne F-1", by_name["name"]
+      assert_equal "Rocketdyne", by_name["manufacturer"]
       assert_equal "6770.0", by_name["thrust_kn"]
       # Declared on the type, never recorded: a blank row rather than a missing
       # one, so the page shows the shape of the type as well as the content.
@@ -85,7 +85,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   test "create makes an entity and sends you on to fill in its attributes" do
     assert_difference -> { Entity.count }, 1 do
-      post project_entities_path(@project), params: { entity: { entity_type_id: entity_types(:rocket_engine).id } }
+      post project_entities_path(@project), params: { entity: { name: "New Engine", entity_type_id: entity_types(:rocket_engine).id } }
     end
 
     assert_redirected_to edit_project_entity_path(@project, Entity.order(:id).last)
@@ -93,7 +93,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   test "create without a type creates nothing" do
     assert_no_difference -> { Entity.count } do
-      post project_entities_path(@project), params: { entity: { entity_type_id: nil } }
+      post project_entities_path(@project), params: { entity: { name: "Nameless", entity_type_id: nil } }
     end
 
     assert_response :unprocessable_entity
@@ -128,16 +128,17 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   test "update changes a value that already existed" do
     entity = entities(:f1)
-    existing = entity_attribute_values(:f1_name)
+    existing = entity_attribute_values(:f1_manufacturer)
 
     patch project_entity_path(@project, entity), params: {
-      entity: { entity_attribute_values_attributes: {
-        "0" => { id: existing.id, entity_type_attribute_id: existing.entity_type_attribute_id,
-                 value: "Rocketdyne F-1A" }
-      } }
+      entity: { name: entity.name,
+                entity_attribute_values_attributes: {
+                  "0" => { id: existing.id, entity_type_attribute_id: existing.entity_type_attribute_id,
+                           value: "Aerojet Rocketdyne" }
+                } }
     }
 
-    assert_equal "Rocketdyne F-1A", entity.reload.value_for("name")
+    assert_equal "Aerojet Rocketdyne", entity.reload.value_for("manufacturer")
   end
 
   test "update rejects a value that does not fit its declared type" do
@@ -169,12 +170,16 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   # --- destroy ---------------------------------------------------------------
 
-  test "destroy removes the entity" do
-    assert_difference -> { Entity.count }, -1 do
-      delete project_entity_path(@project, entities(:bare))
+  # Soft: the row stays and the list stops showing it.
+  test "destroy soft-deletes the entity" do
+    assert_no_difference -> { Entity.count } do
+      assert_difference -> { Entity.kept.count }, -1 do
+        delete project_entity_path(@project, entities(:bare))
+      end
     end
 
     assert_redirected_to project_path(@project)
+    assert_predicate entities(:bare).reload, :discarded?
   end
 
   # --- scoping ---------------------------------------------------------------
@@ -205,7 +210,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
   test "create assigns the project from the url" do
     post project_entities_path(@project),
-         params: { entity: { entity_type_id: entity_types(:rocket_engine).id } }
+         params: { entity: { name: "New Engine", entity_type_id: entity_types(:rocket_engine).id } }
 
     assert_equal @project, Entity.order(:id).last.project
   end
@@ -224,7 +229,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   test "an entity cannot be typed by another project's ontology" do
     assert_no_difference -> { Entity.count } do
       post project_entities_path(@project),
-           params: { entity: { entity_type_id: entity_types(:gemini_capsule).id } }
+           params: { entity: { name: "Wrong Project", entity_type_id: entity_types(:gemini_capsule).id } }
     end
 
     assert_response :unprocessable_entity
@@ -246,7 +251,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   test "create records a citation for the entity when a source is chosen" do
     assert_difference -> { EntitySource.count }, 1 do
       post project_entities_path(@project), params: {
-        entity: { entity_type_id: entity_types(:rocket_engine).id,
+        entity: { name: "Cited Engine", entity_type_id: entity_types(:rocket_engine).id,
                   entity_sources_attributes: { "0" => { source_id: sources(:one).id, confidence: "80" } } }
       }
     end
@@ -262,7 +267,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_difference -> { Entity.count }, 1 do
       assert_no_difference -> { EntitySource.count } do
         post project_entities_path(@project), params: {
-          entity: { entity_type_id: entity_types(:rocket_engine).id,
+          entity: { name: "Uncited Engine", entity_type_id: entity_types(:rocket_engine).id,
                     entity_sources_attributes: { "0" => { source_id: "", confidence: "100" } } }
         }
       end
@@ -272,7 +277,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   test "create rejects a confidence outside 1..100 and records nothing" do
     assert_no_difference [ -> { Entity.count }, -> { EntitySource.count } ] do
       post project_entities_path(@project), params: {
-        entity: { entity_type_id: entity_types(:rocket_engine).id,
+        entity: { name: "Cited Engine", entity_type_id: entity_types(:rocket_engine).id,
                   entity_sources_attributes: { "0" => { source_id: sources(:one).id, confidence: "101" } } }
       }
     end
@@ -321,7 +326,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "show displays what each fact is cited from, with its confidence" do
-    EntityAttributeValueSource.create!(entity_attribute_value: entity_attribute_values(:f1_name),
+    EntityAttributeValueSource.create!(entity_attribute_value: entity_attribute_values(:f1_manufacturer),
                                        source: sources(:one), confidence: 42)
 
     get project_entity_path(@project, entities(:f1))
@@ -369,9 +374,8 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal "Powers", cells[0]
     assert_equal "→ to", cells[1]
-    # The launch_vehicle fixture type declares no `name` attribute, so the label
-    # is the type-and-id fallback. Name and type share the cell.
-    assert_match(/#{Regexp.escape(entities(:saturn_v).label)}/, cells[2])
+    # Name and type share the cell.
+    assert_match(/#{Regexp.escape(entities(:saturn_v).name)}/, cells[2])
     assert_match(/Launch Vehicle/, cells[2])
   end
 
@@ -416,12 +420,12 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   # Dropping a recorded fact from the screen because its attribute was retired
   # would be losing data from the page, so the value stays and is marked.
   test "show still displays a value recorded against a disabled attribute, marked" do
-    entity_type_attributes(:engine_name).update!(is_disabled: true)
+    entity_type_attributes(:engine_manufacturer).update!(is_disabled: true)
 
     get project_entity_path(@project, entities(:f1))
 
     assert_response :success
-    assert_select "td", text: /Rocketdyne F-1/
+    assert_select "td", text: /Rocketdyne/
     assert_select ".badge", text: "disabled"
   end
 
@@ -433,17 +437,6 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_select "td", { text: /chambers/, count: 0 }
   end
 
-  # The popover states what the type tracks now.
-  test "a disabled attribute is not listed in the type popover" do
-    entity_type_attributes(:engine_chambers).update!(is_disabled: true)
-
-    get project_entity_path(@project, entities(:f1))
-
-    assert_select "a[data-bs-title=?]", "Rocket Engine" do |links|
-      assert_no_match(/chambers/, links.first["data-bs-content"])
-      assert_match(/thrust_kn/, links.first["data-bs-content"])
-    end
-  end
 
   # --- the far end's cell ----------------------------------------------------
 
@@ -478,5 +471,46 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
     headers = css_select("table").last.css("th").map { |th| th.text.strip }
     assert_not_includes headers, "engine_count"
+  end
+
+  # --- the name ---------------------------------------------------------------
+
+  test "create records the name" do
+    post project_entities_path(@project),
+         params: { entity: { name: "F-1A", entity_type_id: entity_types(:rocket_engine).id } }
+
+    assert_equal "F-1A", Entity.order(:id).last.name
+  end
+
+  test "create without a name creates nothing" do
+    assert_no_difference -> { Entity.count } do
+      post project_entities_path(@project),
+           params: { entity: { name: "", entity_type_id: entity_types(:rocket_engine).id } }
+    end
+
+    assert_response :unprocessable_entity
+  end
+
+  test "update changes the name" do
+    patch project_entity_path(@project, entities(:f1)), params: { entity: { name: "F-1B" } }
+
+    assert_equal "F-1B", entities(:f1).reload.name
+  end
+
+  test "the forms ask for a name" do
+    get new_project_entity_path(@project)
+    assert_select "input[name=?]", "entity[name]"
+
+    get edit_project_entity_path(@project, entities(:f1))
+    assert_select "input[name=?][value=?]", "entity[name]", "Rocketdyne F-1"
+  end
+
+  # The type is what this entity is, not somewhere else to go.
+  test "the entity page names its type without linking it" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "p.text-muted", text: "Rocket Engine"
+    assert_select "a[href=?]", project_entity_type_path(@project, entity_types(:rocket_engine)), count: 0
   end
 end

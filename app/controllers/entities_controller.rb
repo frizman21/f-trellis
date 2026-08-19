@@ -11,22 +11,24 @@ class EntitiesController < ApplicationController
     @columns = @entity_type.index_columns.to_a
     @query = params[:q].to_s.strip
     @sort_attribute = sort_attribute
+    @sorted_by_name = params[:sort] == "name"
     @direction = direction
+    @per_page = per_page
 
-    scope = @project.entities
+    scope = @project.entities.kept
                     .where(entity_type_id: @entity_type.id)
                     .includes(:entity_type, entity_attribute_values: :entity_type_attribute)
 
     scope = search(scope)
     scope = sort(scope)
 
-    @entities = scope.page(params[:page]).per(25)
+    @entities = scope.page(params[:page]).per(@per_page)
   end
 
   def show
     @entity = find_entity
     @rows = @entity.attribute_rows
-    @relationships = @entity.relationships
+    @relationships = @entity.relationships.kept
                             .includes(:relationship_type, :relationship_type_values,
                                       from_entity: :entity_type, to_entity: :entity_type)
                             .order(:id)
@@ -101,10 +103,11 @@ class EntitiesController < ApplicationController
 
   def destroy
     @entity = find_entity
-    label = @entity.label
-    @entity.destroy
+    # Soft: the row stays, and so do its values, its citations, and everything
+    # that cited it. Its edges go with it — see Entity#discard_with_relationships.
+    @entity.discard_with_relationships
 
-    redirect_to project_path(@project), notice: "Entity \"#{label}\" deleted."
+    redirect_to project_path(@project), notice: "Entity \"#{@entity.name}\" deleted."
   end
 
   private
@@ -121,6 +124,17 @@ class EntitiesController < ApplicationController
 
   DIRECTIONS = %w[asc desc].freeze
 
+  # Chosen from a list rather than taken as a number: an arbitrary ?per= is a
+  # denial of service on your own database, and per=100000 is a valid integer.
+  # Anything else falls back rather than erroring, so a stale URL still works.
+  PAGE_SIZES = [ 10, 25, 50, 100, 250 ].freeze
+  DEFAULT_PAGE_SIZE = 25
+
+  def per_page
+    requested = params[:per].to_i
+    PAGE_SIZES.include?(requested) ? requested : DEFAULT_PAGE_SIZE
+  end
+
   # An IN against matching value rows rather than a join: an entity matching on
   # two attributes should appear once, and a join would need a DISTINCT that then
   # fights the sort.
@@ -130,18 +144,22 @@ class EntitiesController < ApplicationController
   def search(scope)
     return scope if @query.blank?
 
+    pattern = "%#{sanitize_sql_like(@query)}%"
     matches = EntityAttributeValue
               .where(entity_id: scope.unscope(:includes).select(:id))
-              .where("string_value ILIKE ?", "%#{sanitize_sql_like(@query)}%")
+              .where("string_value ILIKE ?", pattern)
               .select(:entity_id)
 
-    scope.where(id: matches)
+    # The name is what people search for first, so it is matched alongside the
+    # recorded values rather than only through them.
+    scope.where("entities.name ILIKE ?", pattern).or(scope.where(id: matches))
   end
 
   # A LEFT JOIN to the values of exactly the sorted attribute. Left, not inner,
   # so entities with nothing recorded still appear; NULLS LAST so they sort last
   # in both directions rather than bunching at whichever end nulls fall.
   def sort(scope)
+    return scope.order(name: @direction.to_sym).order(:id) if @sorted_by_name
     return scope.order(:id) if @sort_attribute.nil?
 
     join = sanitize_sql_array([
@@ -190,7 +208,9 @@ class EntitiesController < ApplicationController
   # Always through the project. An id from another project is then a 404 by
   # construction rather than by a check someone has to remember to write.
   def find_entity
-    @project.entities.includes(entity_attribute_values: :entity_type_attribute).find(params[:id])
+    @project.entities.kept
+            .includes(entity_attribute_values: :entity_type_attribute)
+            .find(params[:id])
   end
 
   # A blank citation row per value, so every attribute can be given a source
@@ -203,7 +223,7 @@ class EntitiesController < ApplicationController
 
   def entity_params
     params.require(:entity).permit(
-      :entity_type_id,
+      :name, :entity_type_id,
       entity_sources_attributes: [ :id, :source_id, :confidence ],
       entity_attribute_values_attributes: [
         :id, :entity_type_attribute_id, :value,

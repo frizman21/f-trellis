@@ -9,7 +9,7 @@ class SourceCitationTest < ActiveSupport::TestCase
     {
       EntitySource                => { entity: entities(:f1) },
       RelationshipSource          => { relationship: relationships(:f1_powers_saturn_v) },
-      EntityAttributeValueSource  => { entity_attribute_value: entity_attribute_values(:f1_name) },
+      EntityAttributeValueSource  => { entity_attribute_value: entity_attribute_values(:f1_manufacturer) },
       RelationshipTypeValueSource => {
         relationship_type_value: relationship_type_values(:f1_powers_saturn_v_engine_count)
       }

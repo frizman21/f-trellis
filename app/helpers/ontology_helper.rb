@@ -38,4 +38,16 @@ module OntologyHelper
             url_for(sort: attribute.name, dir: next_direction, q: query.presence),
             class: "text-decoration-none#{' fw-bold' if active}"
   end
+
+  # The Name column's header. Name is a column on entities rather than an
+  # attribute, so it sorts by its own rule and needs its own header.
+  def sort_header_for_name(current_attribute:, sorted_by_name:, direction:, query:)
+    active = sorted_by_name && current_attribute.nil?
+    next_direction = active && direction == "asc" ? "desc" : "asc"
+    arrow = active ? (direction == "asc" ? " ↑" : " ↓") : ""
+
+    link_to safe_join([ "Name", arrow ]),
+            url_for(sort: "name", dir: next_direction, q: query.presence),
+            class: "text-decoration-none#{' fw-bold' if active}"
+  end
 end

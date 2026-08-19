@@ -12,12 +12,12 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
     @merlin = build_engine(name: "Merlin", chambers: 1, thrust_kn: 845.0, first_flight: "2006-03-24")
     @rs25   = build_engine(name: "RS-25", chambers: 3, thrust_kn: 1860.0, first_flight: "1981-04-12")
     # Nothing recorded at all: the null case for every sort.
-    @blank = @project.entities.create!(entity_type: @type)
+    @blank = @project.entities.create!(entity_type: @type, name: "Nothing Recorded")
   end
 
   def build_engine(values)
-    entity = @project.entities.create!(entity_type: @type)
-    values.each do |name, raw|
+    entity = @project.entities.create!(entity_type: @type, name: values.fetch(:name))
+    values.except(:name).each do |name, raw|
       attribute = @type.entity_type_attributes.find_by!(name: name.to_s)
       record = entity.entity_attribute_values.build(entity_type_attribute: attribute)
       record.value = raw
@@ -32,7 +32,14 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
 
   # --- search ----------------------------------------------------------------
 
-  test "search matches a string value" do
+  test "search matches the name" do
+    get @path, params: { q: "Rocketdyne" }
+
+    assert_response :success
+    assert_equal [ "Rocketdyne F-1" ], labels
+  end
+
+  test "search matches a string attribute value as well as the name" do
     get @path, params: { q: "Merlin" }
 
     assert_response :success
@@ -45,17 +52,10 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
     assert_equal [ "Merlin" ], labels
   end
 
-  test "search matches a substring" do
-    get @path, params: { q: "ocketdyne" }
-
-    assert_equal [ "Rocketdyne F-1" ], labels
-  end
-
   # A join would return this entity once per matching value; an IN returns it once.
-  test "an entity matching on two attributes appears once" do
-    two_ways = build_engine(name: "Vulcan", chambers: 2)
-    other = @type.entity_type_attributes.find_by!(name: "name")
-    assert other
+  # Matching on both the name column and a value row must not double the row.
+  test "an entity matching on both its name and a value appears once" do
+    two_ways = build_engine(name: "Vulcan", manufacturer: "Vulcan Works")
 
     get @path, params: { q: "Vulcan" }
 
@@ -83,7 +83,7 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
   # Relative order of two unambiguous names rather than comparing against Ruby's
   # sort: Postgres orders by its collation, Ruby by bytes, and the two disagree
   # on mixed case. What matters is that the database reverses when asked.
-  test "sorting by a string attribute is alphabetical, both ways" do
+  test "sorting by name is alphabetical, both ways" do
     get @path, params: { sort: "name", dir: "asc" }
     ascending = labels.select { |l| [ "Merlin", "RS-25" ].include?(l) }
 
@@ -123,7 +123,7 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
   # Otherwise they bunch at whichever end nulls happen to fall, which changes
   # with the direction and looks like the sort is wrong.
   test "entities with no value sort last in both directions" do
-    blank_label = @blank.label
+    blank_label = @blank.name
 
     get @path, params: { sort: "chambers", dir: "asc" }
     assert_equal blank_label, labels.last
@@ -175,15 +175,132 @@ class EntityListSearchSortTest < ActionDispatch::IntegrationTest
   test "search and sort compose" do
     # "RS" rather than "R": search is case-insensitive, so "R" also matches the
     # r in Merlin.
-    get @path, params: { q: "S-", sort: "thrust_kn", dir: "desc" }
+    get @path, params: { q: "S-2", sort: "thrust_kn", dir: "desc" }
 
     assert_response :success
     assert_equal [ "RS-25" ], labels
   end
 
+  # The sort rides in the form as a hidden field rather than in its action, so
+  # searching from a sorted list keeps the sort.
   test "the search form keeps the current sort" do
     get @path, params: { sort: "chambers", dir: "desc" }
 
-    assert_select "form[action*=?]", "sort=chambers"
+    assert_select "form input[type=hidden][name=?][value=?]", "sort", "chambers"
+    assert_select "form input[type=hidden][name=?][value=?]", "dir", "desc"
+  end
+
+  # --- name as a column ------------------------------------------------------
+
+  test "the list leads with a Name column linking each entity to its page" do
+    get @path
+
+    assert_response :success
+    assert_equal "Name", css_select("table th").first.text.strip.sub(/[ ↑↓]+\z/, "")
+    assert_select "tbody tr td:first-child a[href=?]",
+                  project_entity_path(@project, entities(:f1)), text: "Rocketdyne F-1"
+  end
+
+  # Name sorts by its own column rather than through the join the attributes
+  # use, so it is asserted directly.
+  test "sorting by name uses the column, both directions" do
+    get @path, params: { sort: "name", dir: "asc" }
+    ascending = labels
+
+    get @path, params: { sort: "name", dir: "desc" }
+
+    assert_equal ascending.reverse, labels
+  end
+
+  test "the Name header is a sort link that toggles" do
+    get @path, params: { sort: "name", dir: "asc" }
+
+    assert_select "th a.fw-bold", text: /Name ↑/
+    assert_select "th a[href*=?]", "dir=desc"
+  end
+
+  # --- page size -------------------------------------------------------------
+
+  def make_engines(count)
+    count.times { |i| build_engine(name: format("Engine %03d", i), chambers: i) }
+  end
+
+  test "the default page size is 25" do
+    make_engines(30)
+
+    get @path
+
+    assert_equal 25, labels.size
+  end
+
+  test "a chosen size is honoured" do
+    make_engines(30)
+
+    get @path, params: { per: 10 }
+
+    assert_equal 10, labels.size
+  end
+
+  # The two ways it arrives wrong. An arbitrary size is a denial of service on
+  # your own database, and per=100000 is a valid integer.
+  test "a size outside the offered list falls back to the default" do
+    make_engines(30)
+
+    get @path, params: { per: 100_000 }
+    assert_equal 25, labels.size
+
+    get @path, params: { per: "lots" }
+    assert_equal 25, labels.size
+  end
+
+  test "the size select shows the current size" do
+    get @path, params: { per: 50 }
+
+    assert_select "select[name=?] option[selected][value=?]", "per", "50"
+  end
+
+  test "page two shows the next rows" do
+    make_engines(30)
+
+    get @path, params: { per: 10, sort: "name", dir: "asc" }
+    first_page = labels
+
+    get @path, params: { per: 10, sort: "name", dir: "asc", page: 2 }
+
+    assert_equal 10, labels.size
+    assert_empty(first_page & labels)
+  end
+
+  # Read from the rendered link, so the parameters are checked where they are
+  # actually used rather than where they were set.
+  test "page links carry the search, the sort and the size" do
+    make_engines(30)
+
+    get @path, params: { q: "Engine", per: 10, sort: "chambers", dir: "desc" }
+    href = css_select("nav.pagination a, .pagination a").first["href"]
+
+    assert_includes href, "q=Engine"
+    assert_includes href, "per=10"
+    assert_includes href, "sort=chambers"
+    assert_includes href, "dir=desc"
+  end
+
+  test "sorting and paging compose" do
+    make_engines(30)
+
+    get @path, params: { per: 5, sort: "chambers", dir: "desc" }
+    top = labels
+
+    get @path, params: { per: 5, sort: "chambers", dir: "desc", page: 2 }
+
+    assert_empty(top & labels)
+  end
+
+  test "the list states what it is showing" do
+    make_engines(30)
+
+    get @path, params: { per: 10 }
+
+    assert_match(/1.*10.*3[0-9]/m, css_select("p.text-muted.small").map(&:text).join)
   end
 end

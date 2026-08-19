@@ -6,6 +6,10 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Devise owns /users/sign_in and friends and is declared above, so it matches
+  # first; this adds only the index beside it.
+  resources :users, only: [:index]
+
   # A project has two sides: the ontology it describes things with, and the data
   # recorded against it. Both live under the project — with everything scoped, a
   # top-level ontology screen would have no project to show.
@@ -14,6 +18,7 @@ Rails.application.routes.draw do
     # address.
     member do
       get :structure
+      get :ai_configuration
     end
 
     # Index actions live at :ontology and :data above; these carry the records.

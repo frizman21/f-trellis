@@ -83,7 +83,7 @@ class TypeAttributeEditingTest < ActionDispatch::IntegrationTest
   test "a used attribute offers a disable checkbox and no delete" do
     get edit_project_entity_type_path(@project, @type)
 
-    used = entity_type_attributes(:engine_name)
+    used = entity_type_attributes(:engine_manufacturer)
     assert used.used?
 
     # One control per row, chosen by whether the attribute has been used: the two
@@ -97,7 +97,7 @@ class TypeAttributeEditingTest < ActionDispatch::IntegrationTest
   end
 
   test "disabling an attribute from the form works and keeps its values" do
-    attribute = entity_type_attributes(:engine_name)
+    attribute = entity_type_attributes(:engine_manufacturer)
 
     assert_no_difference -> { EntityAttributeValue.count } do
       patch project_entity_type_path(@project, @type), params: {

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_18_231028) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_19_000708) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -63,9 +63,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_231028) do
 
   create_table "entities", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.datetime "deleted_at"
     t.bigint "entity_type_id", null: false
+    t.string "name", null: false
     t.bigint "project_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["deleted_at"], name: "index_entities_on_kept", where: "(deleted_at IS NULL)"
     t.index ["entity_type_id"], name: "index_entities_on_entity_type_id"
     t.index ["project_id"], name: "index_entities_on_project_id"
   end
@@ -288,11 +291,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_18_231028) do
 
   create_table "relationships", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.datetime "deleted_at"
     t.bigint "from_entity_id", null: false
     t.bigint "project_id", null: false
     t.bigint "relationship_type_id", null: false
     t.bigint "to_entity_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["deleted_at"], name: "index_relationships_on_kept", where: "(deleted_at IS NULL)"
     t.index ["from_entity_id"], name: "index_relationships_on_from_entity_id"
     t.index ["project_id"], name: "index_relationships_on_project_id"
     t.index ["relationship_type_id"], name: "index_relationships_on_relationship_type_id"

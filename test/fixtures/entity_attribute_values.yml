@@ -1,8 +1,8 @@
-f1_name:
+f1_manufacturer:
   project: apollo
   entity: f1
-  entity_type_attribute: engine_name
-  string_value: Rocketdyne F-1
+  entity_type_attribute: engine_manufacturer
+  string_value: Rocketdyne
 
 f1_thrust:
   project: apollo

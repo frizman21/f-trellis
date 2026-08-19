@@ -23,19 +23,18 @@ class FDodSeedTest < ActiveSupport::TestCase
                  @project.entity_types.pluck(:name).sort
   end
 
-  # Entity#label reads an attribute literally named `name`; without one every
-  # entity in the landscape would read as "Person #12".
-  test "every entity type declares a name attribute" do
+  # The name is a column (#28), so no type declares one as an attribute — that
+  # would be two places for one fact.
+  test "no entity type declares a name attribute" do
     @project.entity_types.each do |type|
-      assert_includes type.entity_type_attributes.pluck(:name), "name",
-                      "#{type.name} has no name attribute"
+      assert_not_includes type.entity_type_attributes.pluck(:name), "name",
+                          "#{type.name} still declares a name attribute"
     end
   end
 
-  test "no entity falls back to the type-and-id label" do
+  test "every entity in the landscape has a name" do
     @project.entities.each do |entity|
-      assert_no_match(/\A\w[\w ]* #\d+\z/, entity.label,
-                      "#{entity.id} rendered as a fallback label")
+      assert entity.name.present?, "entity #{entity.id} has no name"
     end
   end
 
@@ -44,7 +43,7 @@ class FDodSeedTest < ActiveSupport::TestCase
   test "every seeded relationship satisfies its type's declared ends" do
     invalid = @project.relationships.reject(&:valid?)
 
-    assert_empty invalid.map { |r| "#{r.from_entity.label} -> #{r.to_entity.label}" }
+    assert_empty invalid.map { |r| "#{r.from_entity.name} -> #{r.to_entity.name}" }
   end
 
   test "every relationship type declares both of its ends within this project" do
@@ -89,9 +88,7 @@ class FDodSeedTest < ActiveSupport::TestCase
   end
 
   test "a contract's dates and value round-trip as datetime and float" do
-    contract = @project.entities
-                       .joins(:entity_type).where(entity_types: { name: "Contract" })
-                       .detect { |e| e.value_for("name") == "Have Blue" }
+    contract = @project.entities.find_by!(name: "Have Blue")
 
     assert_equal 1976, contract.value_for("start_date").year
     assert_in_delta 43_000_000.0, contract.value_for("value_usd")
@@ -108,5 +105,50 @@ class FDodSeedTest < ActiveSupport::TestCase
     capture_io { load_seed }
 
     assert_equal before, counts.call
+  end
+
+  # --- descriptions as extraction context ------------------------------------
+  #
+  # #31 renders these into the extraction prompt, so their job is to tell a model
+  # what counts as one of each thing. Asserted by shape rather than by wording:
+  # the wording is editorial and will change, but "a definition, not a label"
+  # should not.
+
+  def all_types = @project.entity_types.to_a + @project.relationship_types.to_a
+
+  test "every type has a description" do
+    all_types.each do |type|
+      assert type.description.present?, "#{type.class} #{type.name} has no description"
+    end
+  end
+
+  # A label is one clause. The shape these need — what it is, what to record,
+  # what not to — cannot be said in one sentence.
+  test "no description is a bare label" do
+    all_types.each do |type|
+      sentences = type.description.split(/(?<=[.?!])\s+/).reject(&:blank?)
+
+      assert_operator sentences.size, :>=, 2,
+                      "#{type.name}: #{type.description.inspect} is a label, not a definition"
+    end
+  end
+
+  test "every description reads as prose" do
+    all_types.each do |type|
+      assert type.description.strip.end_with?("."),
+             "#{type.name} does not end in a full stop"
+      assert_no_match(/\s{2,}/, type.description,
+                      "#{type.name} has collapsed whitespace left in it")
+    end
+  end
+
+  # The actual contract between this seed and the prompt.
+  test "the generated prompt carries every type's description" do
+    prompt = ExtractionPrompt.new(@project).to_s
+
+    all_types.each do |type|
+      assert_includes prompt, type.description,
+                      "#{type.name}'s definition is missing from the prompt"
+    end
   end
 end

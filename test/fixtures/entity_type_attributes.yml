@@ -1,7 +1,7 @@
-engine_name:
+engine_manufacturer:
   project: apollo
   entity_type: rocket_engine
-  name: name
+  name: manufacturer
   value_type: string
 
 engine_thrust:
