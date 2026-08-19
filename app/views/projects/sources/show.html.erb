@@ -149,8 +149,10 @@
         <div class="border rounded p-3 mb-3">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <span>
-              <span class="badge text-bg-<%= run.complete? ? "success" : run.failed? ? "danger" : "secondary" %>">
-                <%= run.status %>
+              <%# A stalled run is still stored as `running`; the badge says what
+                  is true rather than what the column says. %>
+              <span class="badge text-bg-<%= run.complete? ? "success" : run.failed? ? "danger" : run.stalled? ? "warning" : "secondary" %>">
+                <%= run.stalled? ? "stalled" : run.status %>
               </span>
               <span class="text-muted small ms-2"><%= run.model.model_id %></span>
               <%# The conversation behind the reply — what was asked, what it cost.
@@ -172,8 +174,25 @@
               <p class="text-warning small mb-1">The reply was not valid JSON. Showing it as it came back.</p>
             <% end %>
             <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= run.pretty_response %></pre>
+          <% elsif run.stalled? %>
+            <%# Nothing can still be open past the point RubyLLM gives up, so a
+                run older than that is not slow — its worker is gone. It has
+                already stopped blocking the Extract button; this is only how
+                the row itself is put right. %>
+            <p class="text-warning small mb-1">
+              No answer in <%= pluralize((run.elapsed / 60).round, "minute") %>, past the
+              <%= (ExtractionRun.gives_up_after / 60).round %> minutes a call can take.
+              The worker was most likely restarted.
+            </p>
+            <%= button_to "Mark as failed",
+                          abandon_project_extraction_run_path(@project, run),
+                          method: :post, form_class: "m-0",
+                          class: "btn btn-sm btn-outline-secondary" %>
           <% else %>
-            <p class="text-muted small mb-0">Waiting for the model…</p>
+            <p class="text-muted small mb-0">
+              Waiting for the model… <%= pluralize((run.elapsed / 60).round, "minute") %> elapsed.
+              Gives up after <%= (ExtractionRun.gives_up_after / 60).round %> minutes.
+            </p>
           <% end %>
         </div>
       <% end %>
