@@ -1,0 +1,39 @@
+<%# What one trial came back with. Its own partial because the Turbo Stream and
+    the ordinary page render must be the same thing: two definitions of "the
+    result" would drift, and the one that drifted would be the one nobody sees
+    until a trial fails to render. %>
+<%# A refusal is a result too, and the stream replaces only this region — a
+    flash rendered in the layout would never arrive. %>
+<% if alert.present? %>
+  <div class="alert alert-warning py-2 small"><%= alert %></div>
+<% end %>
+
+<% if trial %>
+  <div class="border rounded p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span>
+        <span class="badge text-bg-<%= trial.ok? ? "success" : "danger" %>">
+          <%= trial.ok? ? "answered" : "failed" %>
+        </span>
+        <span class="text-muted small ms-2"><%= trial_model.model_id %></span>
+      </span>
+      <span class="text-muted small">
+        <%# The number this panel exists for as much as the reply: which model is
+            worth running over hundreds of pages is decided here. %>
+        <%= trial.seconds %>s
+        <% if trial.tokens? %>
+          · <%= trial.input_tokens || "?" %> in / <%= trial.output_tokens || "?" %> out
+        <% end %>
+        <% if trial.priced? %>
+          · <%= number_to_currency(trial.cost, precision: 5) %>
+        <% end %>
+      </span>
+    </div>
+
+    <% if trial.ok? %>
+      <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= trial.reply %></pre>
+    <% else %>
+      <p class="text-danger small mb-0"><%= trial.error %></p>
+    <% end %>
+  </div>
+<% end %>

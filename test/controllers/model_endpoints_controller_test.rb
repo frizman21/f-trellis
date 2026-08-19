@@ -226,29 +226,71 @@ class ModelEndpointsControllerTest < ActionDispatch::IntegrationTest
   end
 
   # The elapsed time is what the panel exists for as much as the reply.
-  test "asking renders the reply, the timing and the token counts" do
+  # Turbo Drive drops a plain 200 from a form submission, so what the server
+  # renders is not what reaches the page. These assert the *stream*, which is
+  # the part a full-page render fails — the shape of the original bug, #60.
+  TURBO = { "Accept" => "text/vnd.turbo-stream.html" }.freeze
+
+  def ask(model, prompt: "hello", headers: TURBO)
+    post try_model_endpoint_path(@endpoint),
+         params: { trial_model_id: model&.id, prompt: prompt }, headers: headers
+  end
+
+  test "asking replaces the result region with the reply, timing and counts" do
     model = @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
 
-    with_trial(answered) do
-      post try_model_endpoint_path(@endpoint), params: { trial_model_id: model.id, prompt: "hello" }
-    end
+    with_trial(answered) { ask(model) }
 
     assert_response :success
+    assert_equal "text/vnd.turbo-stream.html", response.media_type
+    assert_select "turbo-stream[action=?][target=?]", "replace", "trial_result"
     assert_match(/ready/, response.body)
     assert_match(/1\.4s/, response.body)
     assert_match(/18 in \/ 6 out/, response.body)
   end
 
-  test "a failed trial shows the reason" do
+  # The failure path used to be the only one that rendered, because 422 is a
+  # status Turbo does display. Both are ordinary results now.
+  test "a failed trial streams its reason, and is not an error response" do
     model = @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
     failed = EndpointTrial::Result.new(ok: false, seconds: 30.0, error: "No answer within 30s.")
 
-    with_trial(failed) do
-      post try_model_endpoint_path(@endpoint), params: { trial_model_id: model.id, prompt: "hello" }
-    end
+    with_trial(failed) { ask(model) }
 
-    assert_response :unprocessable_entity
+    assert_response :success
+    assert_select "turbo-stream[target=?]", "trial_result"
     assert_match(/No answer within 30s/, response.body)
+  end
+
+  # Still works with Turbo switched off, and a direct request is not a dead end.
+  test "asking without turbo renders the whole page" do
+    model = @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
+
+    with_trial(answered) { ask(model, headers: { "Accept" => "text/html" }) }
+
+    assert_response :success
+    assert_match(/ready/, response.body)
+    assert_select "form[action=?]", try_model_endpoint_path(@endpoint)
+  end
+
+  # The stream replaces one region, so a flash rendered in the layout would
+  # never arrive. A refusal has to travel in the same place a result does.
+  test "a refusal travels in the replaced region rather than a flash" do
+    @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
+
+    with_trial(answered) { ask(nil) }
+
+    assert_select "turbo-stream[target=?]", "trial_result"
+    assert_match(/Choose one of this endpoint/, response.body)
+  end
+
+  # Otherwise the very first Ask has nothing to replace.
+  test "the page renders the result region before anything has run" do
+    @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
+
+    get model_endpoint_path(@endpoint)
+
+    assert_select "#trial_result"
   end
 
   test "an empty prompt asks nothing" do
@@ -262,11 +304,15 @@ class ModelEndpointsControllerTest < ActionDispatch::IntegrationTest
 
     assert_not called
     assert_match(/Type a prompt/, response.body)
+    assert_select "#trial_result"
   end
 
   # Found through the endpoint, so a model belonging to another one cannot be
   # run against this endpoint's address.
   test "a model from another endpoint is refused rather than run" do
+    # This endpoint has a model of its own, so the panel — and the region the
+    # refusal is streamed into — is actually on the page.
+    @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
     other = ModelEndpoint.create!(name: "Other", base_url: "https://other.test/v1")
     foreign = other.models.create!(provider: "custom_endpoint", model_id: "other-large", name: "Other Large")
     called = false
@@ -275,7 +321,8 @@ class ModelEndpointsControllerTest < ActionDispatch::IntegrationTest
       alias_method :call_without_stub, :call
       define_method(:call) { |**| called = true; nil }
     end
-    post try_model_endpoint_path(@endpoint), params: { trial_model_id: foreign.id, prompt: "hello" }
+    post try_model_endpoint_path(@endpoint),
+         params: { trial_model_id: foreign.id, prompt: "hello" }, headers: TURBO
 
     assert_not called
     assert_match(/Choose one of this endpoint/, response.body)
