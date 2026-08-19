@@ -9,6 +9,7 @@
         <th>ID</th>
         <th>Model</th>
         <th>Messages</th>
+        <th class="text-end">Est. cost</th>
         <th>Created</th>
         <th></th>
       </tr>
@@ -18,7 +19,12 @@
         <tr>
           <td><%= chat.id %></td>
           <td><%= chat.model&.model_id || "—" %></td>
-          <td><%= chat.messages.count %></td>
+          <td><%= chat.messages.size %></td>
+          <%# A dash rather than 0 where there is no pricing: zero is a claim. %>
+          <td class="text-end">
+            <% total = @costs[chat.id].total %>
+            <%= total ? "$#{format('%.4f', total)}" : "—" %>
+          </td>
           <td><%= chat.created_at %></td>
           <td><%= link_to "Inspect", chat_path(chat) %></td>
         </tr>
@@ -26,9 +32,20 @@
     </tbody>
   </table>
 
+  <%# Labelled for the page it is on: the table is paginated, and a total that
+      silently means "this page" while looking like "everything" is worse than
+      no total at all. %>
+  <% page_total = @costs.values.filter_map(&:total).sum %>
+  <p class="fw-bold">
+    Estimated cost of the <%= @chats.size %> chats on this page:
+    $<%= format("%.4f", page_total) %>
+  </p>
+
   <%= paginate @chats %>
   <p class="text-muted small">
     Showing <%= @chats.size %> of <%= @chats.total_count %>.
+    Costs are estimates — the recorded input token count is wrong, so the input
+    side is derived from the characters sent.
   </p>
 <% else %>
   <p>No chats yet.</p>
