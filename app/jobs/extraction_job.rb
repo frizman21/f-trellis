@@ -25,7 +25,7 @@ class ExtractionJob < ApplicationJob
     content = run.source.latest_text
     raise NotRunnable, "this source has no fetched content" if content.blank?
 
-    chat = Chat.create!(model: run.model)
+    chat = Chat.for_model(run.model)
     run.update!(chat: chat)
     chat.with_instructions(instructions)
     reply = chat.ask(content)

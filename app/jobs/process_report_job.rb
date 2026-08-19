@@ -14,7 +14,7 @@ class ProcessReportJob < ApplicationJob
     source_text = source_text_for(report.source)
     raise ReportNotProcessable, "source has no fetched data" if source_text.blank?
 
-    chat = Chat.create!(model: report.model)
+    chat = Chat.for_model(report.model)
     report.update!(chat: chat)
     chat.with_instructions(skill_content)
     # No tools. The knowledge graph these reports used to write into is gone, so

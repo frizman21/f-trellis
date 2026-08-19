@@ -21,7 +21,7 @@ class RunSkillEvaluationJob < ApplicationJob
     source_text = result.source.latest_text
     raise NotRunnable, "source has no fetched data" if source_text.blank?
 
-    chat = Chat.create!(model: result.model)
+    chat = Chat.for_model(result.model)
     result.update!(chat: chat)
     chat.with_instructions(instructions)
     reply = chat.ask(source_text)

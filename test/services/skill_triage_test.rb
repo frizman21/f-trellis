@@ -47,11 +47,11 @@ class SkillTriageTest < ActiveSupport::TestCase
 
   def with_fake_chat(response: nil, raise_with: nil)
     FakeChat.reset(response: response, raise_with: raise_with)
-    original = Chat.method(:create!)
-    Chat.define_singleton_method(:create!) { |*, **kwargs| FakeChat.new(model: kwargs[:model]) }
+    original = Chat.method(:for_model)
+    Chat.define_singleton_method(:for_model) { |model| FakeChat.new(model: model) }
     yield
   ensure
-    Chat.define_singleton_method(:create!, original)
+    Chat.define_singleton_method(:for_model, original)
   end
 
   setup do

@@ -1,0 +1,39 @@
+<% content_for :title, "Model Endpoints" %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Model Endpoints</h1>
+  <%= link_to "Add endpoint", new_model_endpoint_path, class: "btn btn-primary" %>
+</div>
+
+<p class="text-muted">
+  Models served by something other than the providers the registry refreshes — a
+  self-hosted model, an inference vendor behind a gateway, a colleague's endpoint.
+  Each one speaks the OpenAI-compatible protocol at an address you give it, and
+  its models are then offered wherever a model is picked, beside
+  <%= link_to "the registered ones", models_path %>.
+</p>
+
+<% if @endpoints.any? %>
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Base URL</th>
+        <th>Token</th>
+        <th>Models</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @endpoints.each do |endpoint| %>
+        <tr>
+          <td><%= link_to endpoint.name, endpoint %></td>
+          <td class="text-muted small"><code><%= endpoint.base_url %></code></td>
+          <td><%= render "model_endpoints/token_state", endpoint: endpoint %></td>
+          <td class="text-muted"><%= endpoint.models.size %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>No custom endpoints yet.</p>
+<% end %>

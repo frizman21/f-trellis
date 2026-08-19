@@ -1,0 +1,11 @@
+<%# Whether the variable this endpoint names is set — never what it is set to.
+    The value is not in the database and does not belong on a page. %>
+<% if !endpoint.expects_token? %>
+  <span class="text-muted small">none — unauthenticated</span>
+<% elsif endpoint.token_resolves? %>
+  <span class="text-success small"><code><%= endpoint.api_key_env_var %></code> is set</span>
+<% else %>
+  <span class="text-danger small" title="Set it in this environment and restart.">
+    <code><%= endpoint.api_key_env_var %></code> is not set
+  </span>
+<% end %>

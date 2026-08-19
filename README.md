@@ -213,6 +213,31 @@ never falsely marked retired.
   Until this is fixed upstream, a provider's models can only be refreshed by
   configuring that provider's API key.
 
+### Models served from a custom endpoint
+
+A model the refresh never discovers — self-hosted, an inference vendor behind a
+gateway, a colleague's endpoint — is registered by hand under **Model Endpoints**
+in the sidebar. An endpoint carries a name, an OpenAI-compatible base URL, and
+the **name of the environment variable** holding its token; the token itself
+stays in the environment, beside `OPENAI_API_KEY`, and is never written to the
+database or shown on a page.
+
+```sh
+# in .env, alongside the provider keys. The name is yours to choose — it only
+# has to match what the endpoint's "Token variable" field says.
+ACME_PAT=...
+```
+
+Then add the endpoint (`https://acme.internal/v1`, token variable `ACME_PAT`)
+and press **Check**: one GET to `{base_url}/models` that costs nothing and
+confirms the address and the token together, rather than discovering either is
+wrong hours later in a failed run. The model ids you add to it become ordinary
+rows in the registry under the `custom_endpoint` provider, offered wherever a
+model is picked.
+
+They are exempt from the staleness sweep above: nothing refreshes them, because
+no provider is asked about them, so they stay in circulation until disabled.
+
 ## Running the test suite
 
 ```sh
@@ -328,7 +353,11 @@ documented in the example file.
 
 `app` and `worker` load this whole file via `env_file:`, so runtime settings
 the app reads from `ENV` — `CRAWLER_USER_AGENT`, `CRAWLER_CONTACT_URL`,
-`OPENAI_API_KEY`, `ANTHROPIC_API_KEY` — take effect by being present in it.
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and any custom model endpoint tokens —
+take effect by being present in it. That both services load it matters for the
+endpoint tokens in particular: the worker is what runs extractions, reports and
+evaluations, so a token only `app` could see would pass Check on the endpoint's
+page and then fail every actual run.
 Note that `--env-file` on its own does **not** do this: that flag only feeds
 `${...}` interpolation inside the compose file and puts nothing in the
 container.
