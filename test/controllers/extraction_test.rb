@@ -110,6 +110,33 @@ class ExtractionTest < ActionDispatch::IntegrationTest
 
   # --- showing the result ----------------------------------------------------
 
+  # The runs are history; the buttons are what the page is for. A reply runs to
+  # hundreds of lines, and three of them push the crawl and extract controls off
+  # the screen entirely.
+  test "the extraction output is collapsed until it is asked for" do
+    run_record(status: "complete", response: '{"entities":[]}')
+
+    get project_source_path(@project, @source)
+
+    assert_select "details:not([open]) summary", /Extraction output/
+  end
+
+  test "no runs means no output section at all" do
+    get project_source_path(@project, @source)
+
+    assert_select "summary", { text: /Extraction output/, count: 0 }
+  end
+
+  # Both controls sit above the history they produce.
+  test "the crawl and extract controls come before the output" do
+    run_record(status: "complete", response: "{}")
+
+    get project_source_path(@project, @source)
+
+    assert_operator response.body.index("Just Crawl"), :<, response.body.index("Extraction output")
+    assert_operator response.body.index("Extract"), :<, response.body.index("Just Crawl")
+  end
+
   test "a completed run shows its JSON, pretty-printed" do
     run_record(status: "complete", response: '{"entities":[],"relationships":[]}')
 

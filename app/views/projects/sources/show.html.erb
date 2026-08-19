@@ -70,41 +70,6 @@
   <% end %>
 </div>
 
-<% if @runs.any? %>
-  <% @runs.each do |run| %>
-    <div class="border rounded p-3 mb-3">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <span>
-          <span class="badge text-bg-<%= run.complete? ? "success" : run.failed? ? "danger" : "secondary" %>">
-            <%= run.status %>
-          </span>
-          <span class="text-muted small ms-2"><%= run.model.model_id %></span>
-          <%# The conversation behind the reply — what was asked, what it cost.
-              A run that never reached the model has none. %>
-          <% if run.chat %>
-            <%= link_to "Chat ##{run.chat.id}", chat_path(run.chat), class: "small ms-2" %>
-          <% end %>
-        </span>
-        <span class="text-muted small"><%= run.created_at.to_fs(:long) %></span>
-      </div>
-
-      <% if run.failed? %>
-        <p class="text-danger small mb-0"><%= run.error %></p>
-      <% elsif run.complete? %>
-        <%= render "projects/sources/run_summary", run: run %>
-        <% unless run.parsed? %>
-          <%# A model wrapping its answer in prose is ordinary, so the raw reply
-              is shown rather than an error. %>
-          <p class="text-warning small mb-1">The reply was not valid JSON. Showing it as it came back.</p>
-        <% end %>
-        <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= run.pretty_response %></pre>
-      <% else %>
-        <p class="text-muted small mb-0">Waiting for the model…</p>
-      <% end %>
-    </div>
-  <% end %>
-<% end %>
-
 <h2 class="h5 mt-4">Crawl from this source</h2>
 <p class="text-muted small">
   Walks out from this page and fetches what it finds. Everything it fetches
@@ -154,6 +119,55 @@
     least <%= distance_of_time_in_words(delay * CrawlJob::DEFAULT_MAX_PAGES) %>.
     <%= link_to "Change it", edit_domain_path(@source.domain) if @source.domain %>
   </div>
+<% end %>
+
+<%# The runs are history, not the control: the two things you came here to
+    press are above, and the replies — which are long — are opened when
+    somebody wants to read one. Closed by default, and a <details> rather
+    than a scripted toggle so it needs nothing from Turbo. %>
+<% if @runs.any? %>
+  <details class="mb-4">
+    <summary class="h5 mb-0">
+      Extraction output
+      <span class="text-muted fw-normal small">
+        — <%= pluralize(@runs.size, "run") %>, most recent first
+      </span>
+    </summary>
+    <div class="mt-3">
+      <% @runs.each do |run| %>
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>
+              <span class="badge text-bg-<%= run.complete? ? "success" : run.failed? ? "danger" : "secondary" %>">
+                <%= run.status %>
+              </span>
+              <span class="text-muted small ms-2"><%= run.model.model_id %></span>
+              <%# The conversation behind the reply — what was asked, what it cost.
+                  A run that never reached the model has none. %>
+              <% if run.chat %>
+                <%= link_to "Chat ##{run.chat.id}", chat_path(run.chat), class: "small ms-2" %>
+              <% end %>
+            </span>
+            <span class="text-muted small"><%= run.created_at.to_fs(:long) %></span>
+          </div>
+
+          <% if run.failed? %>
+            <p class="text-danger small mb-0"><%= run.error %></p>
+          <% elsif run.complete? %>
+            <%= render "projects/sources/run_summary", run: run %>
+            <% unless run.parsed? %>
+              <%# A model wrapping its answer in prose is ordinary, so the raw reply
+                  is shown rather than an error. %>
+              <p class="text-warning small mb-1">The reply was not valid JSON. Showing it as it came back.</p>
+            <% end %>
+            <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= run.pretty_response %></pre>
+          <% else %>
+            <p class="text-muted small mb-0">Waiting for the model…</p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </details>
 <% end %>
 
 <div class="d-flex gap-2">
