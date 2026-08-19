@@ -1,0 +1,9 @@
+<%# Turbo Drive drops a plain 200 from a form submission — only a redirect, or a
+    stream like this one, reaches the page. Rendering :show and returning 200 is
+    what made a successful trial vanish; see #60. %>
+<%= turbo_stream.replace "trial_result" do %>
+  <div id="trial_result">
+    <%= render "model_endpoints/trial_result", trial: @trial, trial_model: @trial_model,
+               alert: @refusal %>
+  </div>
+<% end %>

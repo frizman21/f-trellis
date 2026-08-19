@@ -72,15 +72,26 @@ class ModelEndpointsController < ApplicationController
     @prompt = params[:prompt].to_s
 
     if trial_model.nil?
-      flash.now[:alert] = "Choose one of this endpoint's models."
+      @refusal = "Choose one of this endpoint's models."
     elsif @prompt.strip.blank?
-      flash.now[:alert] = "Type a prompt to send."
+      @refusal = "Type a prompt to send."
     else
       @trial_model = trial_model
       @trial = EndpointTrial.call(model: trial_model, prompt: @prompt)
     end
 
-    render :show, status: @trial&.ok? == false ? :unprocessable_entity : :ok
+    # A Turbo Stream, not a re-render. Turbo Drive drops a plain 200 from a form
+    # submission — only a redirect or a stream reaches the page — and this
+    # action cannot redirect, because the result is deliberately not stored
+    # anywhere to redirect to. Rendering :show and returning 200 is what made a
+    # successful trial vanish while a failed one displayed; see #60.
+    #
+    # The html format keeps working, so the panel still functions with Turbo
+    # switched off and a direct request is not a dead end.
+    respond_to do |format|
+      format.turbo_stream
+      format.html { render :show }
+    end
   end
 
   private

@@ -41,35 +41,12 @@
 <h2 class="h5 mt-4">Try it</h2>
 
 <% if @models.any? %>
-  <% if @trial %>
-    <div class="border rounded p-3 mb-3">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <span>
-          <span class="badge text-bg-<%= @trial.ok? ? "success" : "danger" %>">
-            <%= @trial.ok? ? "answered" : "failed" %>
-          </span>
-          <span class="text-muted small ms-2"><%= @trial_model.model_id %></span>
-        </span>
-        <span class="text-muted small">
-          <%# The number this panel exists for as much as the reply: which model
-              is worth running over hundreds of pages is decided here. %>
-          <%= @trial.seconds %>s
-          <% if @trial.tokens? %>
-            · <%= @trial.input_tokens || "?" %> in / <%= @trial.output_tokens || "?" %> out
-          <% end %>
-          <% if @trial.priced? %>
-            · <%= number_to_currency(@trial.cost, precision: 5) %>
-          <% end %>
-        </span>
-      </div>
-
-      <% if @trial.ok? %>
-        <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= @trial.reply %></pre>
-      <% else %>
-        <p class="text-danger small mb-0"><%= @trial.error %></p>
-      <% end %>
-    </div>
-  <% end %>
+  <%# The Turbo Stream's target. Rendered even before anything has run, so the
+      first Ask has something to replace. %>
+  <div id="trial_result">
+    <%= render "model_endpoints/trial_result", trial: @trial, trial_model: @trial_model,
+               alert: @refusal %>
+  </div>
 
   <%= form_with url: try_model_endpoint_path(@endpoint), method: :post, local: true, class: "mb-2" do |f| %>
     <div class="row g-3">
