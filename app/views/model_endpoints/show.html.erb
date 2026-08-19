@@ -35,6 +35,71 @@
   up here rather than in a failed run hours later.
 </p>
 
+<%# Check proves the address and the credential. This proves the endpoint can
+    finish a chat — a different question, and the one a gateway that lists
+    models and refuses completions gets wrong. %>
+<h2 class="h5 mt-4">Try it</h2>
+
+<% if @models.any? %>
+  <% if @trial %>
+    <div class="border rounded p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span>
+          <span class="badge text-bg-<%= @trial.ok? ? "success" : "danger" %>">
+            <%= @trial.ok? ? "answered" : "failed" %>
+          </span>
+          <span class="text-muted small ms-2"><%= @trial_model.model_id %></span>
+        </span>
+        <span class="text-muted small">
+          <%# The number this panel exists for as much as the reply: which model
+              is worth running over hundreds of pages is decided here. %>
+          <%= @trial.seconds %>s
+          <% if @trial.tokens? %>
+            · <%= @trial.input_tokens || "?" %> in / <%= @trial.output_tokens || "?" %> out
+          <% end %>
+          <% if @trial.priced? %>
+            · <%= number_to_currency(@trial.cost, precision: 5) %>
+          <% end %>
+        </span>
+      </div>
+
+      <% if @trial.ok? %>
+        <pre class="bg-light border rounded p-2 small mb-0" style="white-space: pre-wrap;"><%= @trial.reply %></pre>
+      <% else %>
+        <p class="text-danger small mb-0"><%= @trial.error %></p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= form_with url: try_model_endpoint_path(@endpoint), method: :post, local: true, class: "mb-2" do |f| %>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <%= f.label :trial_model_id, "Model", class: "form-label" %>
+        <%= f.collection_select :trial_model_id, @models, :id, :model_id,
+                                { selected: @trial_model&.id },
+                                class: "form-select form-select-sm", style: "width: auto;" %>
+      </div>
+      <div class="col-md-8">
+        <%= f.label :prompt, "Prompt", class: "form-label" %>
+        <%= f.text_area :prompt, rows: 2, class: "form-control",
+                        value: @prompt.presence || "Reply with one word: ready" %>
+      </div>
+    </div>
+    <div class="mt-3">
+      <%= f.submit "Ask", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+  <div class="form-text">
+    Runs now rather than on the queue, with a <%= EndpointTrial::TIMEOUT_SECONDS %>-second
+    timeout and no retries, so a dead endpoint answers in seconds. A real run is
+    far more patient — up to <%= RubyLLM.config.request_timeout %> seconds, retried —
+    so a timeout here means slow, not necessarily broken. Nothing is saved: this
+    leaves no chat behind.
+  </div>
+<% else %>
+  <p class="text-muted">Add a model below before asking this endpoint anything.</p>
+<% end %>
+
 <h2 class="h5 mt-4">Models</h2>
 <p class="text-muted small">
   The ids this endpoint serves, exactly as it names them. Each becomes an ordinary

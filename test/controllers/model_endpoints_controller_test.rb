@@ -186,6 +186,116 @@ class ModelEndpointsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # --- Try it ----------------------------------------------------------------
+
+  # Stubs the model call at the service, so the routing, the params and the
+  # rendering are the real ones.
+  def with_trial(result)
+    EndpointTrial.singleton_class.class_eval do
+      alias_method :call_without_stub, :call
+      define_method(:call) { |**| result }
+    end
+    yield
+  ensure
+    EndpointTrial.singleton_class.class_eval do
+      remove_method :call
+      alias_method :call, :call_without_stub
+      remove_method :call_without_stub
+    end
+  end
+
+  def answered(**overrides)
+    EndpointTrial::Result.new({ ok: true, reply: "ready", seconds: 1.4,
+                                input_tokens: 18, output_tokens: 6 }.merge(overrides))
+  end
+
+  test "the panel offers this endpoint's models" do
+    model = @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
+
+    get model_endpoint_path(@endpoint)
+
+    assert_select "form[action=?]", try_model_endpoint_path(@endpoint)
+    assert_select "select[name=?] option[value=?]", "trial_model_id", model.id.to_s
+  end
+
+  test "an endpoint with no models says to add one first" do
+    get model_endpoint_path(@endpoint)
+
+    assert_match(/Add a model below before asking/, response.body)
+    assert_select "form[action=?]", try_model_endpoint_path(@endpoint), count: 0
+  end
+
+  # The elapsed time is what the panel exists for as much as the reply.
+  test "asking renders the reply, the timing and the token counts" do
+    model = @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
+
+    with_trial(answered) do
+      post try_model_endpoint_path(@endpoint), params: { trial_model_id: model.id, prompt: "hello" }
+    end
+
+    assert_response :success
+    assert_match(/ready/, response.body)
+    assert_match(/1\.4s/, response.body)
+    assert_match(/18 in \/ 6 out/, response.body)
+  end
+
+  test "a failed trial shows the reason" do
+    model = @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
+    failed = EndpointTrial::Result.new(ok: false, seconds: 30.0, error: "No answer within 30s.")
+
+    with_trial(failed) do
+      post try_model_endpoint_path(@endpoint), params: { trial_model_id: model.id, prompt: "hello" }
+    end
+
+    assert_response :unprocessable_entity
+    assert_match(/No answer within 30s/, response.body)
+  end
+
+  test "an empty prompt asks nothing" do
+    model = @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
+    called = false
+
+    with_trial(answered) do
+      EndpointTrial.singleton_class.define_method(:call) { |**| called = true; nil }
+      post try_model_endpoint_path(@endpoint), params: { trial_model_id: model.id, prompt: "   " }
+    end
+
+    assert_not called
+    assert_match(/Type a prompt/, response.body)
+  end
+
+  # Found through the endpoint, so a model belonging to another one cannot be
+  # run against this endpoint's address.
+  test "a model from another endpoint is refused rather than run" do
+    other = ModelEndpoint.create!(name: "Other", base_url: "https://other.test/v1")
+    foreign = other.models.create!(provider: "custom_endpoint", model_id: "other-large", name: "Other Large")
+    called = false
+
+    EndpointTrial.singleton_class.class_eval do
+      alias_method :call_without_stub, :call
+      define_method(:call) { |**| called = true; nil }
+    end
+    post try_model_endpoint_path(@endpoint), params: { trial_model_id: foreign.id, prompt: "hello" }
+
+    assert_not called
+    assert_match(/Choose one of this endpoint/, response.body)
+  ensure
+    EndpointTrial.singleton_class.class_eval do
+      remove_method :call
+      alias_method :call, :call_without_stub
+      remove_method :call_without_stub
+    end
+  end
+
+  test "a read-only account cannot ask" do
+    model = @endpoint.models.create!(provider: "custom_endpoint", model_id: "acme-large", name: "Acme Large")
+    sign_in User.create!(email: "reader-try@example.com", password: "password", read_only: true)
+
+    post try_model_endpoint_path(@endpoint), params: { trial_model_id: model.id, prompt: "hello" }
+
+    assert_response :forbidden
+  end
+
   # --- read-only accounts ----------------------------------------------------
 
   test "a read-only account cannot add an endpoint" do
