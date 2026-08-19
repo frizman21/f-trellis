@@ -51,12 +51,15 @@
         one page with a cheaper or a stronger model should not mean changing the
         project's default and changing it back. %>
     <%= form_with url: extract_project_source_path(@project, @source), method: :post,
-                  local: true, class: "d-flex gap-2 align-items-end", style: "max-width: 32rem;" do |f| %>
-      <div class="flex-grow-1">
+                  local: true, class: "d-flex gap-2 align-items-end" do |f| %>
+      <div>
         <%= f.label :model_id, "Model", class: "form-label" %>
+        <%# Sized to the control, not to the row: the ids it holds are short, and
+            a select stretched to the width of the page reads as the page's
+            subject rather than as one setting on a button. %>
         <%= f.collection_select :model_id, @models, :id, :model_id,
                                 { selected: @project.default_model_id },
-                                class: "form-select" %>
+                                class: "form-select form-select-sm", style: "width: auto;" %>
       </div>
       <%= f.submit "Extract", class: "btn btn-primary" %>
     <% end %>
