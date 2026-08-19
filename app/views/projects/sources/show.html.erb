@@ -18,11 +18,22 @@
 
   <dt class="col-sm-3">Content</dt>
   <dd class="col-sm-9">
-    <% if @latest %>
-      Fetched <%= @latest.created_at.to_fs(:long) %>
-    <% else %>
-      <span class="text-muted">Nothing fetched yet.</span>
-    <% end %>
+    <%# The page already says that nothing is fetched, and that extraction is
+        disabled because of it. The button that fixes it belongs beside the
+        sentence rather than two navigations away on the crawler's own screen. %>
+    <div class="d-flex align-items-center gap-2">
+      <span>
+        <% if @latest %>
+          Fetched <%= @latest.created_at.to_fs(:long) %>
+        <% else %>
+          <span class="text-muted">Nothing fetched yet.</span>
+        <% end %>
+      </span>
+      <%= button_to @latest ? "Re-fetch content" : "Fetch content",
+                    fetch_project_source_path(@project, @source),
+                    method: :post, form_class: "m-0",
+                    class: "btn btn-sm btn-outline-primary" %>
+    </div>
   </dd>
 
   <%# A page can matter to several projects at once; that is why the join table

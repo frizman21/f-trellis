@@ -35,6 +35,7 @@ Rails.application.routes.draw do
       member do
         post :extract
         post :crawl
+        post :fetch
       end
     end
 

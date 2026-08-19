@@ -206,6 +206,83 @@ class ProjectSourcesTest < ActionDispatch::IntegrationTest
     assert_match(/#{@other.name}/, response.body)
   end
 
+  # --- fetching from inside the project --------------------------------------
+  #
+  # The page already says nothing is fetched, and that extraction is disabled
+  # because of it. The button that fixes it belongs on the same page.
+
+  test "a source with no content offers a fetch button" do
+    ProjectSource.create!(project: @project, source: sources(:one))
+
+    get project_source_path(@project, sources(:one))
+
+    assert_response :success
+    assert_select "form[action=?] button", fetch_project_source_path(@project, sources(:one)),
+                  { text: "Fetch content", count: 1 }
+  end
+
+  test "a source that already has content offers a re-fetch" do
+    source = sources(:one)
+    ProjectSource.create!(project: @project, source: source)
+    source.source_data.create!(data: "irrelevant", content_type: "text/html")
+
+    get project_source_path(@project, source)
+
+    assert_select "form[action=?] button", fetch_project_source_path(@project, source),
+                  { text: "Re-fetch content", count: 1 }
+  end
+
+  test "fetching queues one job and comes back to the project's page" do
+    ProjectSource.create!(project: @project, source: sources(:one))
+
+    assert_enqueued_with(job: FetchSourceJob) do
+      post fetch_project_source_path(@project, sources(:one))
+    end
+
+    assert_redirected_to project_source_path(@project, sources(:one))
+    assert_match(/Fetch queued/, flash[:notice])
+  end
+
+  # Unforced, FetchSourceJob returns early unless the status is still `new`, so
+  # a re-fetch of a finished page would queue a job that quietly does nothing.
+  test "the fetch is forced, so a completed source can be pulled again" do
+    source = sources(:one)
+    source.update!(status: "complete")
+    ProjectSource.create!(project: @project, source: source)
+    source.source_data.create!(data: "irrelevant", content_type: "text/html")
+
+    post fetch_project_source_path(@project, source)
+
+    job = enqueued_jobs.find { |enqueued| enqueued["job_class"] == "FetchSourceJob" }
+    arguments = ActiveJob::Arguments.deserialize(job["arguments"])
+
+    assert_equal source, arguments.first
+    assert arguments.last[:force]
+    assert_equal "manual", arguments.last[:trigger]
+    assert_match(/Re-fetch queued \(was complete\)/, flash[:notice])
+  end
+
+  test "fetching a source another project holds is not found" do
+    ProjectSource.create!(project: @other, source: sources(:two))
+
+    assert_no_enqueued_jobs only: FetchSourceJob do
+      post fetch_project_source_path(@project, sources(:two))
+    end
+
+    assert_response :not_found
+  end
+
+  test "a read-only account cannot queue a fetch" do
+    ProjectSource.create!(project: @project, source: sources(:one))
+    sign_in User.create!(email: "reader-fetch@example.com", password: "password", read_only: true)
+
+    assert_no_enqueued_jobs only: FetchSourceJob do
+      post fetch_project_source_path(@project, sources(:one))
+    end
+
+    assert_response :forbidden
+  end
+
   # --- crawling from inside the project --------------------------------------
 
   def crawl(params = {})

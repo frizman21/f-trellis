@@ -76,6 +76,25 @@ module Projects
                           "What it fetches joins this project."
     end
 
+    # Grabs this one page's content. A second entry point to FetchSourceJob, not
+    # a second way of fetching: the project page is where the operator is when
+    # they find the page has nothing on it, and the crawler's own screen for the
+    # same source is two navigations away.
+    #
+    # Forced, like SourcesController#fetch: an operator asking for one page
+    # explicitly is a different act from a crawl, and the unforced path returns
+    # early unless the status is still `new` — which would make Re-fetch quietly
+    # do nothing.
+    def fetch
+      @source = @project.sources.find(params[:id])
+      had_content = @source.source_data.exists?
+
+      FetchSourceJob.perform_later(@source, force: true, trigger: "manual")
+
+      redirect_to project_source_path(@project, @source),
+                  notice: had_content ? "Re-fetch queued (was #{@source.status})." : "Fetch queued."
+    end
+
     def new
       @source = Source.new
     end
