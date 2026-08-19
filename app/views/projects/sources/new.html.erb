@@ -1,0 +1,38 @@
+<% content_for :title, "Add a source to #{@project.name}" %>
+<p class="mb-3">
+  <%= link_to "← Sources", project_sources_path(@project), class: "text-decoration-none" %>
+</p>
+
+<h1 class="mb-1">Add a source</h1>
+<p class="text-muted">
+  <%# A page already known to the crawler is attached rather than fetched again. %>
+  To <%= @project.name %>. If this page is already known, it is added to this
+  project rather than downloaded a second time.
+</p>
+
+<%= form_with model: @source, url: project_sources_path(@project), local: true do |f| %>
+  <% if @source.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% @source.errors.full_messages.each do |m| %>
+          <li><%= m %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <%= f.label :url, "URL", class: "form-label" %>
+    <%= f.text_field :url, class: "form-control", required: true,
+                     placeholder: "https://example.com/a-page" %>
+  </div>
+
+  <div class="mb-3">
+    <%= f.label :description, class: "form-label" %>
+    <%= f.text_area :description, class: "form-control", rows: 2 %>
+    <div class="form-text">Optional. Kept only if the page does not already have one.</div>
+  </div>
+
+  <%= f.submit "Add source", class: "btn btn-primary" %>
+  <%= link_to "Cancel", project_sources_path(@project), class: "btn btn-outline-secondary" %>
+<% end %>

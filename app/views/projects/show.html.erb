@@ -1,6 +1,7 @@
 <% content_for :title, @project.name %>
 
-<div class="d-flex justify-content-end mb-3">
+<div class="d-flex justify-content-end gap-2 mb-3">
+  <%= link_to "Sources", project_sources_path(@project), class: "btn btn-sm btn-outline-secondary" %>
   <%= link_to "AI Configuration", ai_configuration_project_path(@project),
               class: "btn btn-sm btn-outline-secondary" %>
 </div>

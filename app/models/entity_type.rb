@@ -17,7 +17,8 @@ class EntityType < ApplicationRecord
   # Slugs that already name a route under a project. A type slugging to one of
   # these would save happily and then be unreachable, because the named route
   # wins the match.
-  RESERVED_SLUGS = %w[edit structure entities entity_types relationship_types relationships].freeze
+  RESERVED_SLUGS = %w[edit structure entities entity_types relationship_types relationships
+                      sources project_sources ai_configuration].freeze
 
   # The type's address within its project: "Rocket Engine" -> "rocket-engines".
   #

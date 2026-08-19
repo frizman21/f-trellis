@@ -26,6 +26,10 @@ Rails.application.routes.draw do
     # their own — two places to add an attribute is how the two drift.
     resources :entity_types, except: [:index]
     resources :relationship_types, except: [:index]
+    # Declared before the ":type_slug" catch-all below, which would otherwise
+    # swallow it. destroy removes the join, not the page — see the controller.
+    resources :sources, only: [:index, :show, :new, :create, :destroy], module: :projects
+
     resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]
 

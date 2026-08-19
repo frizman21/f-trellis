@@ -1,0 +1,44 @@
+<% content_for :title, "#{@source.url.truncate(40)} — #{@project.name}" %>
+<p class="mb-3">
+  <%= link_to "← Sources", project_sources_path(@project), class: "text-decoration-none" %>
+</p>
+
+<h1 class="h4 mb-1"><%= @source.url.truncate(90) %></h1>
+<p class="text-muted"><%= @source.description.presence %></p>
+
+<dl class="row">
+  <dt class="col-sm-3">Address</dt>
+  <dd class="col-sm-9"><%= external_link_to @source.url, @source.url %></dd>
+
+  <dt class="col-sm-3">Domain</dt>
+  <dd class="col-sm-9"><%= @source.domain&.host || "—" %></dd>
+
+  <dt class="col-sm-3">Status</dt>
+  <dd class="col-sm-9"><%= @source.status %></dd>
+
+  <dt class="col-sm-3">Content</dt>
+  <dd class="col-sm-9">
+    <% if @latest %>
+      Fetched <%= @latest.created_at.to_fs(:long) %>
+    <% else %>
+      <span class="text-muted">Nothing fetched yet.</span>
+    <% end %>
+  </dd>
+
+  <%# A page can matter to several projects at once; that is why the join table
+      exists, so it is worth saying when it is true. %>
+  <% if @other_projects.any? %>
+    <dt class="col-sm-3">Also on</dt>
+    <dd class="col-sm-9"><%= @other_projects.map(&:name).to_sentence %></dd>
+  <% end %>
+</dl>
+
+<div class="d-flex gap-2">
+  <%# The crawling side is a separate concern with its own screens: fetched
+      content, the link graph and processing history are the same page whichever
+      project is looking at it. %>
+  <%= link_to "Crawler detail", source_path(@source), class: "btn btn-sm btn-outline-secondary" %>
+  <%= button_to "Remove from project", project_source_path(@project, @source), method: :delete,
+                class: "btn btn-sm btn-outline-danger",
+                form: { data: { turbo_confirm: "Remove this source from #{@project.name}? The page itself is kept." } } %>
+</div>

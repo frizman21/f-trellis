@@ -1,0 +1,43 @@
+<% content_for :title, "#{@project.name} — Sources" %>
+<p class="mb-3">
+  <%= link_to "← #{@project.name}", project_path(@project), class: "text-decoration-none" %>
+</p>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0">Sources</h1>
+  <%= link_to "Add source", new_project_source_path(@project), class: "btn btn-primary" %>
+</div>
+
+<% if @sources.any? %>
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>URL</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @sources.each do |source| %>
+        <tr>
+          <%# Stays inside the project. The crawler's own page for it is one
+              click further on, from there. %>
+          <td><%= link_to source.url.truncate(70), project_source_path(@project, source) %></td>
+          <td class="text-muted"><%= source.description.to_s.truncate(60) %></td>
+          <td class="text-muted"><%= source.status %></td>
+          <td>
+            <%= button_to "Remove", project_source_path(@project, source), method: :delete,
+                          class: "btn btn-sm btn-outline-danger",
+                          form: { class: "m-0",
+                                  data: { turbo_confirm: "Remove this source from #{@project.name}? The page itself is kept." } } %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <p class="text-muted small"><%= page_entries_info @sources %></p>
+  <%= paginate @sources %>
+<% else %>
+  <p>No sources on this project yet.</p>
+<% end %>
