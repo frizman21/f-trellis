@@ -16,11 +16,17 @@ end
 # Projects — the named bodies of work the application organises around, and the
 # list you land on at the root. Seeded in every environment: unlike the demo
 # knowledge base below, an empty projects list is a dead landing page.
-[
-  "Apollo Program",
-  "Gemini Program",
-  "Skylab"
-].each { |name| Project.find_or_create_by!(name: name) }
+#
+# Attempts vary across the three so the field on the project form is visible as
+# something that differs per project rather than as a constant. Set on create
+# only: a number somebody changed in the browser is not a seeding mistake.
+{
+  "Apollo Program" => 1,
+  "Gemini Program" => 3,
+  "Skylab" => 1
+}.each do |name, attempts|
+  Project.create_with(extraction_attempts: attempts).find_or_create_by!(name: name)
+end
 
 # The seeded ontology and data belong to the first project. A project's two
 # sides are its own: seeding one project gives both sides something to show

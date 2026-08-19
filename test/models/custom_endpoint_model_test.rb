@@ -59,6 +59,34 @@ class CustomEndpointModelTest < ActiveSupport::TestCase
     assert_equal "anthropic", chat.model.provider
   end
 
+  # --- how many times a call may be sent (#62) -------------------------------
+
+  def retries_in(chat) = chat.context.config.max_retries
+
+  test "a retry limit reaches a custom model's context without moving the address" do
+    chat = Chat.for_model(@custom, max_retries: 0)
+
+    assert_equal 0, retries_in(chat)
+    assert_equal "https://acme.internal/v1", provider_for(chat).api_base
+    assert_equal({ "Authorization" => "Bearer pat-xyz" }, provider_for(chat).headers)
+  end
+
+  # The endpoint is not what decides this — a dropped connection is as wasteful
+  # to retry against a registered provider as against a self-hosted one — so the
+  # override has to reach a model that has no endpoint at all.
+  test "a retry limit reaches a registered model too" do
+    chat = Chat.for_model(registered_model, max_retries: 0)
+
+    assert_equal 0, retries_in(chat)
+    assert_not chat.assume_model_exists
+  end
+
+  test "asking for no limit leaves RubyLLM's own default standing" do
+    chat = Chat.for_model(@custom)
+
+    assert_equal RubyLLM.config.max_retries, retries_in(chat)
+  end
+
   # --- staying in the pickers ------------------------------------------------
 
   # Model.current keeps the rows stamped by the most recent refresh. A custom

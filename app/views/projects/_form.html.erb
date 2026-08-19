@@ -25,6 +25,17 @@
     </div>
   </div>
 
+  <div class="mb-3">
+    <%= f.label :extraction_attempts, "Extraction attempts", class: "form-label" %>
+    <%= f.number_field :extraction_attempts, in: 1..10, step: 1, class: "form-control" %>
+    <div class="form-text">
+      How many times one extraction call may be sent. One is a single call with no
+      retry. Raise it only for an endpoint whose failures are worth repeating — a
+      model bills for a generation even when the connection drops before the
+      answer arrives.
+    </div>
+  </div>
+
   <%= f.submit submit_label, class: "btn btn-primary" %>
   <%= link_to "Cancel", projects_path, class: "btn btn-outline-secondary" %>
 <% end %>

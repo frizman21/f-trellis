@@ -34,4 +34,21 @@ class Project < ApplicationRecord
   has_many :sources, through: :project_sources
 
   validates :name, presence: true
+
+  # How many times one extraction call may be sent, not how many times it may be
+  # retried. One is a single call: an endpoint that closes the connection on a
+  # long generation still bills for the whole generation, so a run that cannot
+  # succeed should cost one of them rather than four.
+  #
+  # Capped rather than open-ended because there is no number above this that is
+  # a decision anyone meant to make.
+  validates :extraction_attempts,
+            numericality: { only_integer: true,
+                            greater_than_or_equal_to: 1,
+                            less_than_or_equal_to: 10 }
+
+  # RubyLLM counts the retries after the first call; this setting counts the
+  # calls. One place does the translation, so no caller has to remember which
+  # of the two it is holding.
+  def extraction_max_retries = extraction_attempts - 1
 end

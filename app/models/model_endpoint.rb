@@ -47,10 +47,16 @@ class ModelEndpoint < ApplicationRecord
   # than the global configuration: every registered OpenAI model in the
   # application still runs on the global OpenAI settings, and pointing those at
   # this endpoint would take them all with it.
-  def to_context
+  #
+  # `max_retries` is the caller's, not the endpoint's: how many times a failed
+  # call is worth repeating is a property of the work being done, and the two
+  # callers that care disagree — a trial wants none, an extraction wants what
+  # its project says. Left nil, RubyLLM's own default stands.
+  def to_context(max_retries: nil)
     RubyLLM.context do |config|
       config.custom_endpoint_api_base = base_url
       config.custom_endpoint_api_key = api_key
+      config.max_retries = max_retries unless max_retries.nil?
     end
   end
 

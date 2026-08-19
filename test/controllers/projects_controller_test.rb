@@ -91,6 +91,30 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Apollo Applications", projects(:apollo).reload.name
   end
 
+  test "the form offers the attempt count with the project's current value" do
+    projects(:apollo).update!(extraction_attempts: 3)
+
+    get edit_project_path(projects(:apollo))
+
+    assert_response :success
+    assert_select "input[name=?][value=?]", "project[extraction_attempts]", "3"
+  end
+
+  # #62. The form is the only place the number can be changed, so an unpermitted
+  # parameter here would look like a setting that silently refuses to move.
+  test "update changes how many times an extraction is attempted" do
+    patch project_path(projects(:apollo)), params: { project: { extraction_attempts: 4 } }
+
+    assert_equal 4, projects(:apollo).reload.extraction_attempts
+  end
+
+  test "update rejects an attempt count outside the allowed range" do
+    patch project_path(projects(:apollo)), params: { project: { extraction_attempts: 0 } }
+
+    assert_response :unprocessable_entity
+    assert_equal 1, projects(:apollo).reload.extraction_attempts
+  end
+
   test "update rejects a blank name" do
     patch project_path(projects(:apollo)), params: { project: { name: "" } }
 
