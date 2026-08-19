@@ -35,4 +35,17 @@ class AiConfigurationTest < ActionDispatch::IntegrationTest
 
     assert_response :not_found
   end
+
+  test "the page ends with a worked example" do
+    get ai_configuration_project_path(@project)
+
+    assert_response :success
+    assert_match(/An example of a correct reply/, response.body)
+    # The page escapes the JSON's quotes, so the assertion reads the rendered
+    # text rather than the raw body.
+    rendered = css_select("pre").first.text
+
+    assert_includes rendered, %("from": "e1")
+    assert_includes rendered, %("id": "e1")
+  end
 end
