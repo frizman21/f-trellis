@@ -36,6 +36,23 @@ volumes. If both live in identically-named directories, set
 `COMPOSE_PROJECT_NAME` in one of them as well. Postgres is not published to the
 host, so it needs no deconfliction.
 
+#### Restarting kills in-flight jobs
+
+Development uses ActiveJob's `async` adapter: jobs run in the web server's own
+threads and are not written down anywhere. Anything that restarts the server —
+a branch switch, a migration, a `Gemfile` change, all of which `rerun` watches —
+takes every job that was running with it, silently.
+
+An extraction caught that way keeps its `running` status forever, because the
+job that would have finished it is gone. The application knows this shape:
+anything still in flight past the point RubyLLM gives up (`request_timeout` ×
+`max_retries + 1`, twenty minutes by default) is shown as **stalled** rather
+than running, stops blocking the Extract button, and can be marked failed from
+the source's page. `FetchSourceJob` does the same for a source stuck `in_work`.
+
+Production runs Solid Queue, where jobs are rows in a database and survive a
+restart, so this is a development-only hazard.
+
 ### 2. Start the containers
 
 ```sh

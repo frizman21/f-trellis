@@ -20,9 +20,53 @@ class ExtractionRun < ApplicationRecord
   scope :recent, -> { order(created_at: :desc) }
   scope :in_flight, -> { where(status: IN_FLIGHT) }
 
+  # In flight for longer than a call could possibly still be open. The usual
+  # cause is a worker that died — in development every server restart kills the
+  # async adapter's threads — and the row then says `running` forever.
+  #
+  # Measured from `started_at` when there is one and `created_at` otherwise, so
+  # a run that was queued and never picked up is covered too.
+  scope :stalled, -> {
+    in_flight.where(
+      "COALESCE(extraction_runs.started_at, extraction_runs.created_at) < ?", stall_after.ago
+    )
+  }
+
+  # In flight and still plausibly working. `in_flight` deliberately keeps its
+  # old meaning — anything that wants "not yet finished" still wants that — and
+  # only the question "may I start another?" narrows to this.
+  scope :live, -> { in_flight.where.not(id: stalled.select(:id)) }
+
+  # Derived rather than chosen. RubyLLM waits `request_timeout` per attempt and
+  # makes `max_retries + 1` of them, so nothing can legitimately be open past
+  # that; the grace covers queueing and the writes either side. A hardcoded
+  # number would be wrong the first time anybody tuned the configuration.
+  GRACE = 5.minutes
+
+  # What a call cannot outlive: RubyLLM waits `request_timeout` per attempt and
+  # makes `max_retries + 1` of them. Said out loud on the page while a run works.
+  def self.gives_up_after
+    (RubyLLM.config.request_timeout * (RubyLLM.config.max_retries + 1)).seconds
+  end
+
+  def self.stall_after = gives_up_after + GRACE
+
   def in_flight? = IN_FLIGHT.include?(status)
   def complete? = status == "complete"
   def failed? = status == "failed"
+
+  def stalled? = in_flight? && started_or_created_at < self.class.stall_after.ago
+
+  # Still in flight and still worth waiting for.
+  def live? = in_flight? && !stalled?
+
+  # How long this run has been going, or went on for. Seconds.
+  def elapsed
+    finish = completed_at || Time.current
+    finish - started_or_created_at
+  end
+
+  def started_or_created_at = started_at || created_at
 
   # The reply parsed, or nil when the model did not return JSON. Models wrap
   # answers in prose and in markdown fences often enough that "it did not parse"

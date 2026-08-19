@@ -39,6 +39,12 @@ Rails.application.routes.draw do
       end
     end
 
+    # No screens of its own: a run is shown on its source's page. This exists so
+    # a run whose worker died can be corrected from there.
+    resources :extraction_runs, only: [], module: :projects do
+      member { post :abandon }
+    end
+
     resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]
 

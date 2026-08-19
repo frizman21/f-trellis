@@ -11,5 +11,8 @@ class ChatsController < ApplicationController
     @chat = Chat.includes(messages: [ :model, :parent_tool_call, :tool_calls ]).find(params[:id])
     @messages = @chat.messages.order(:created_at)
     @cost = ChatCost.new(@chat)
+    # A chat says nothing about why it happened, so a chat with no reply reads
+    # as frozen rather than as failed. This is what created it, and how it went.
+    @owner = ChatOwner.for(@chat)
   end
 end

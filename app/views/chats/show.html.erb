@@ -2,6 +2,24 @@
 
 <h1>Chat #<%= @chat.id %></h1>
 
+<%# Without this a chat that never got a reply is indistinguishable from one
+    still waiting for it: the messages look the same either way. %>
+<% if @owner %>
+  <div class="alert alert-<%= @owner.complete? ? "success" : @owner.failed? || @owner.stalled? ? "danger" : "secondary" %>">
+    <strong><%= @owner.label %></strong> — <%= @owner.status %>
+    <%= link_to "Open", @owner.path, class: "ms-2" %>
+    <% if @owner.error.present? %>
+      <div class="small mt-1 font-monospace"><%= @owner.error %></div>
+    <% end %>
+    <% if @owner.stalled? %>
+      <div class="small mt-1">
+        Past the time a call can take, so its worker was most likely restarted.
+        It can be marked failed from the page above.
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
 <dl>
   <dt>Model</dt>
   <dd><%= @chat.model&.model_id || "—" %><% if @chat.model&.provider %> <span class="text-muted">(<%= @chat.model.provider %>)</span><% end %></dd>

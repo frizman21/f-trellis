@@ -24,7 +24,10 @@ class ExtractionReadiness
 
   def runnable? = reason.nil?
 
+  # `live` rather than `in_flight`: a run whose worker died is in flight forever,
+  # and counting it would take this page out of service permanently. Reading
+  # this question is what unblocks the button — no write, and no click.
   def in_flight?
-    project.extraction_runs.where(source: source).in_flight.exists?
+    project.extraction_runs.where(source: source).live.exists?
   end
 end
