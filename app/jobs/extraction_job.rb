@@ -30,7 +30,13 @@ class ExtractionJob < ApplicationJob
     chat.with_instructions(instructions)
     reply = chat.ask(content)
 
-    run.update!(status: "complete", response: reply&.content.to_s,
+    run.update!(response: reply&.content.to_s)
+
+    # The reply is recorded before it is applied, so a reply that cannot be
+    # applied is still on the page to look at.
+    summary = ExtractionApplier.new(run).call
+
+    run.update!(status: "complete", summary: summary,
                 error: nil, completed_at: Time.current)
   rescue StandardError => e
     # The provider saying no is an outcome of the run, and the page is where to

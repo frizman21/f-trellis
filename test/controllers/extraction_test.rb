@@ -146,10 +146,58 @@ class ExtractionTest < ActionDispatch::IntegrationTest
     assert_match(/upstream said no/, response.body)
   end
 
-  test "the page says nothing is written to the project's data" do
+  test "the page says what happens to what it finds" do
     get project_source_path(@project, @source)
 
-    assert_match(/Nothing is written to the project's data/i, response.body)
+    assert_match(/recorded in the project and cited to this page/i, response.body)
+  end
+
+  test "a completed run shows what it did to the project" do
+    run_record(status: "complete", response: '{"entities":[],"relationships":[]}',
+               summary: { "entities" => { "created" => 3, "matched" => 1, "skipped" => [] },
+                          "relationships" => { "created" => 2, "matched" => 0, "skipped" => [] },
+                          "values" => { "created" => 7, "skipped" => [], "conflicts" => [] },
+                          "citations" => 11 })
+
+    get project_source_path(@project, @source)
+
+    # Whitespace-tolerant: the counts are rendered across wrapped lines.
+    assert_match(/3\s+created,\s+1\s+matched/, response.body)
+    assert_match(/11/, response.body)
+  end
+
+  # The skips are the useful half: they are where a description needs sharpening.
+  test "a run shows what it skipped and why" do
+    run_record(status: "complete", response: "{}",
+               summary: { "entities" => { "created" => 0, "matched" => 0,
+                                          "skipped" => [ { "name" => "Some Agency",
+                                                           "reason" => "no entity type named \"Agency\"" } ] },
+                          "relationships" => { "created" => 0, "matched" => 0, "skipped" => [] },
+                          "values" => { "created" => 0, "skipped" => [], "conflicts" => [] },
+                          "citations" => 0 })
+
+    get project_source_path(@project, @source)
+
+    assert_match(/Skipped 1/, response.body)
+    assert_match(/Some Agency/, response.body)
+    assert_match(/no entity type named/, response.body)
+  end
+
+  test "a run shows where it disagreed with a recorded value" do
+    run_record(status: "complete", response: "{}",
+               summary: { "entities" => { "created" => 0, "matched" => 1, "skipped" => [] },
+                          "relationships" => { "created" => 0, "matched" => 0, "skipped" => [] },
+                          "values" => { "created" => 0, "skipped" => [],
+                                        "conflicts" => [ { "owner" => "Rocketdyne F-1",
+                                                           "attribute" => "thrust_kn",
+                                                           "stored" => "6770.0",
+                                                           "offered" => "6900" } ] },
+                          "citations" => 1 })
+
+    get project_source_path(@project, @source)
+
+    assert_match(/Disagreed with 1 recorded value/, response.body)
+    assert_match(/kept.*6770\.0/m, response.body)
   end
 
   # Another project reading the same page has its own runs, behind its own

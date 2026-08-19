@@ -42,7 +42,7 @@
   and shows the JSON that comes back.
   <%# Stated on the page, not just in the change request: reading this and
       expecting new entities afterwards would be a reasonable mistake. %>
-  Nothing is written to the project's data — this shows the reply.
+  What it finds is recorded in the project and cited to this page.
 </p>
 
 <div class="mb-3">
@@ -73,6 +73,7 @@
       <% if run.failed? %>
         <p class="text-danger small mb-0"><%= run.error %></p>
       <% elsif run.complete? %>
+        <%= render "projects/sources/run_summary", run: run %>
         <% unless run.parsed? %>
           <%# A model wrapping its answer in prose is ordinary, so the raw reply
               is shown rather than an error. %>

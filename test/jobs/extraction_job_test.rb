@@ -103,16 +103,49 @@ class ExtractionJobTest < ActiveJob::TestCase
     assert_equal 1, run.parsed["entities"].size
   end
 
-  # The boundary of this change: it runs the prompt and shows the reply.
-  test "nothing is written to the ontology" do
+  # #43 reversed the boundary: the run now consumes its own reply.
+  test "a successful run records what the reply describes" do
     run = run_for
-    FakeChat.reply = '{"entities":[{"id":"e1","name":"New Thing","type":"Rocket Engine"}],' \
-                     '"relationships":[{"type":"Powers","from":"e1","to":"e1"}]}'
+    FakeChat.reply = '{"entities":[{"id":"e1","name":"New Thing","type":"Rocket Engine",' \
+                     '"attributes":{"thrust_kn":"900.5"}}],"relationships":[]}'
 
-    assert_no_difference [ -> { Entity.count }, -> { Relationship.count },
-                           -> { EntityAttributeValue.count }, -> { EntitySource.count } ] do
+    assert_difference [ -> { Entity.count }, -> { EntityAttributeValue.count },
+                        -> { EntitySource.count } ], 1 do
       with_fake_chat { ExtractionJob.perform_now(run) }
     end
+
+    created = @project.entities.kept.find_by(name: "New Thing")
+
+    assert_equal "Rocket Engine", created.entity_type.name
+    assert_in_delta 900.5, created.value_for("thrust_kn")
+    # Cited to the page it came from — the reason the join tables exist.
+    assert_equal @source, created.entity_sources.sole.source
+  end
+
+  test "the run records a summary of what it did" do
+    run = run_for
+    FakeChat.reply = '{"entities":[{"id":"e1","name":"New Thing","type":"Rocket Engine"}],' \
+                     '"relationships":[]}'
+
+    with_fake_chat { ExtractionJob.perform_now(run) }
+
+    assert_equal 1, run.reload.summary.dig("entities", "created")
+  end
+
+  # A reply that cannot be applied is still worth having on the page.
+  test "a reply that does not parse still completes and says so" do
+    run = run_for
+    FakeChat.reply = "Sorry, I could not find anything."
+
+    assert_no_difference -> { Entity.count } do
+      with_fake_chat { ExtractionJob.perform_now(run) }
+    end
+
+    run.reload
+
+    assert_equal "complete", run.status
+    assert_includes run.response, "could not find"
+    assert_match(/not valid JSON/i, run.summary["error"])
   end
 
   test "a provider error fails the run rather than raising" do

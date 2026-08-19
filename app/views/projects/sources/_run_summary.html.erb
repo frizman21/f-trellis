@@ -1,0 +1,57 @@
+<%# What the run did to the project. The skips are the useful half: they are
+    where a type description needs sharpening, or the model is guessing. %>
+<% summary = run.summary %>
+<% if summary.present? %>
+  <div class="mb-2 small">
+    <% if summary["error"].present? %>
+      <p class="text-warning mb-1"><%= summary["error"] %></p>
+    <% else %>
+      <p class="mb-1">
+        <strong>Entities</strong>
+        <%= summary.dig("entities", "created").to_i %> created,
+        <%= summary.dig("entities", "matched").to_i %> matched ·
+        <strong>Relationships</strong>
+        <%= summary.dig("relationships", "created").to_i %> created,
+        <%= summary.dig("relationships", "matched").to_i %> matched ·
+        <strong>Values</strong>
+        <%= summary.dig("values", "created").to_i %> recorded ·
+        <strong>Citations</strong> <%= summary["citations"].to_i %>
+      </p>
+
+      <% skipped = Array(summary.dig("entities", "skipped")) +
+                   Array(summary.dig("relationships", "skipped")) +
+                   Array(summary.dig("values", "skipped")) %>
+      <% if skipped.any? %>
+        <details class="mb-1">
+          <summary class="text-muted">Skipped <%= skipped.size %></summary>
+          <ul class="mb-0">
+            <% skipped.each do |skip| %>
+              <li class="text-muted">
+                <%= skip["name"].presence || skip["attribute"].presence || skip["type"] %>
+                — <%= skip["reason"] %>
+              </li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
+
+      <%# A value already recorded is never replaced, so a disagreement is shown
+          rather than resolved by whichever run went last. %>
+      <% conflicts = Array(summary.dig("values", "conflicts")) %>
+      <% if conflicts.any? %>
+        <details>
+          <summary class="text-muted">Disagreed with <%= conflicts.size %> recorded value<%= "s" if conflicts.size != 1 %></summary>
+          <ul class="mb-0">
+            <% conflicts.each do |conflict| %>
+              <li class="text-muted">
+                <%= conflict["owner"] %> · <%= conflict["attribute"] %>:
+                kept <strong><%= conflict["stored"] %></strong>,
+                this page said <%= conflict["offered"] %>
+              </li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

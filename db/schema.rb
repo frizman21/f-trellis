@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_19_004648) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_19_035151) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -146,6 +146,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_004648) do
     t.bigint "source_id", null: false
     t.datetime "started_at"
     t.string "status", default: "pending", null: false
+    t.jsonb "summary", default: {}, null: false
     t.datetime "updated_at", null: false
     t.index ["chat_id"], name: "index_extraction_runs_on_chat_id"
     t.index ["model_id"], name: "index_extraction_runs_on_model_id"
