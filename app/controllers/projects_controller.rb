@@ -65,6 +65,6 @@ class ProjectsController < ApplicationController
   private
 
   def project_params
-    params.require(:project).permit(:name, :default_model_id)
+    params.require(:project).permit(:name, :default_model_id, :extraction_attempts)
   end
 end

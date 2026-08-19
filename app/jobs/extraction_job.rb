@@ -25,7 +25,10 @@ class ExtractionJob < ApplicationJob
     content = run.source.latest_text
     raise NotRunnable, "this source has no fetched content" if content.blank?
 
-    chat = Chat.for_model(run.model)
+    # The project's own limit, not RubyLLM's default of three retries. An
+    # endpoint that drops the connection mid-generation bills for every attempt
+    # and returns nothing for any of them.
+    chat = Chat.for_model(run.model, max_retries: run.project.extraction_max_retries)
     run.update!(chat: chat)
     chat.with_instructions(instructions)
     reply = chat.ask(content)

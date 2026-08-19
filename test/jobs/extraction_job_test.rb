@@ -8,9 +8,10 @@ class ExtractionJobTest < ActiveJob::TestCase
       attr_accessor :last, :reply, :raise_with
     end
 
-    attr_reader :asked, :instructions
+    attr_reader :asked, :instructions, :max_retries
 
-    def initialize
+    def initialize(max_retries: nil)
+      @max_retries = max_retries
       self.class.last = self
     end
 
@@ -32,7 +33,9 @@ class ExtractionJobTest < ActiveJob::TestCase
     # reading nil. It also makes "the job asked nothing" mean something.
     FakeChat.last = nil
     original = Chat.method(:for_model)
-    Chat.define_singleton_method(:for_model) { |*| FakeChat.new }
+    # Keywords, not just positionals: how many retries the job asks for is part
+    # of what it hands the model, so the fake has to receive it to be asserted on.
+    Chat.define_singleton_method(:for_model) { |*, **options| FakeChat.new(**options) }
     # The job assigns the chat to the run; skip that write for the fake.
     ExtractionRun.class_eval do
       alias_method :update_without_chat_stub!, :update!
@@ -87,6 +90,26 @@ class ExtractionJobTest < ActiveJob::TestCase
     assert_includes FakeChat.last.asked, "Rocketdyne built the F-1 engine"
     # Stripped: the markup it was stored with must not reach the model.
     assert_not_includes FakeChat.last.asked, "<html>"
+  end
+
+  # #62. The default is one call: an endpoint that drops the connection bills for
+  # the generation behind each attempt and returns nothing for any of them.
+  test "asks for its project's attempt count, one call by default" do
+    run = run_for
+
+    with_fake_chat { ExtractionJob.perform_now(run) }
+
+    assert_equal 1, @project.extraction_attempts
+    assert_equal 0, FakeChat.last.max_retries
+  end
+
+  test "a project that allows more attempts asks for the retries they imply" do
+    @project.update!(extraction_attempts: 4)
+    run = run_for
+
+    with_fake_chat { ExtractionJob.perform_now(run) }
+
+    assert_equal 3, FakeChat.last.max_retries
   end
 
   test "a successful run records the reply and completes" do
