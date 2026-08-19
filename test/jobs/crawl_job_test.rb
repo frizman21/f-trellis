@@ -814,6 +814,69 @@ class CrawlJobTest < ActiveJob::TestCase
     assert_not_includes seed.reload.links_to, known
   end
 
+  # --- joining a crawl to a project ------------------------------------------
+  #
+  # A crawl started from a project's source page pulls a site into that project;
+  # one started from the crawler's own screens pulls it into nothing.
+
+  test "a crawl given a project joins every page it fetched to that project" do
+    project = projects(:apollo)
+    seed = make_seed("https://joined.test/start", '<a href="/child">c</a>')
+
+    with_fake_fetcher("https://joined.test/child" => "<p>leaf</p>") do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1, project: project)
+    end
+
+    child = Source.find_by(url: "https://joined.test/child")
+
+    assert_includes project.reload.sources, seed
+    assert_includes project.sources, child
+  end
+
+  test "a crawl given no project joins nothing" do
+    seed = make_seed("https://unjoined.test/start", '<a href="/child">c</a>')
+
+    assert_no_difference -> { ProjectSource.count } do
+      with_fake_fetcher("https://unjoined.test/child" => "<p>leaf</p>") do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1)
+      end
+    end
+  end
+
+  # Re-crawling a site the project already holds is the ordinary case, not an
+  # error: the join is what makes the page the project's concern, and it is
+  # already there.
+  test "re-crawling a page the project already holds adds no second join" do
+    project = projects(:apollo)
+    seed = make_seed("https://recrawl.test/start", "")
+    ProjectSource.create!(project: project, source: seed)
+
+    assert_no_difference -> { ProjectSource.count } do
+      with_fake_fetcher do
+        CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 0, project: project)
+      end
+    end
+
+    assert seed.reload.source_data.any?, "the crawl must still fetch the page"
+  end
+
+  # A page robots told us not to fetch has no content, so it is not something
+  # the project asked for — it is a URL the crawl walked past.
+  test "a disallowed page is not joined to the project" do
+    project = projects(:apollo)
+    seed = make_seed("https://robots-join.test/start", '<a href="/private/x">no</a><a href="/ok">yes</a>')
+    robots = { "robots-join.test" => "User-agent: *\nDisallow: /private\n" }
+
+    with_fake_fetcher({ "https://robots-join.test/ok" => "<p>fine</p>" }, {}, robots) do
+      CrawlJob.perform_now(seed, crawl_type: "stay_in_domain", max_depth: 1, project: project)
+    end
+
+    urls = project.reload.sources.map(&:url)
+
+    assert_includes urls, "https://robots-join.test/ok"
+    assert_not_includes urls, "https://robots-join.test/private/x"
+  end
+
   test "raises on invalid crawl_type" do
     seed = make_seed("https://invalid.test/x", "")
     assert_raises ArgumentError do

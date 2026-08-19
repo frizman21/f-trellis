@@ -25,9 +25,9 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
 
   def with_fake_chat(reply: "Acme Corp, Beta Inc", raise_with: nil, tool_calls: [])
     Recorder.reset(reply: reply, raise_with: raise_with, tool_calls: tool_calls)
-    original = Chat.method(:create!)
+    original = Chat.method(:for_model)
 
-    Chat.define_singleton_method(:create!) do |*args, **kwargs|
+    Chat.define_singleton_method(:for_model) do |*args, **kwargs|
       chat = original.call(*args, **kwargs)
       chat.define_singleton_method(:with_instructions) { |content| Recorder.instructions = content; self }
       chat.define_singleton_method(:with_tools) { |*tools| Recorder.tools = tools; self }
@@ -51,7 +51,7 @@ class RunSkillEvaluationJobTest < ActiveJob::TestCase
 
     yield
   ensure
-    Chat.define_singleton_method(:create!, original)
+    Chat.define_singleton_method(:for_model, original)
   end
 
   setup do

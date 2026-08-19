@@ -31,8 +31,8 @@ class ExtractionJobTest < ActiveJob::TestCase
     # once the block has returned, and clearing in `ensure` would leave them
     # reading nil. It also makes "the job asked nothing" mean something.
     FakeChat.last = nil
-    original = Chat.method(:create!)
-    Chat.define_singleton_method(:create!) { |*, **| FakeChat.new }
+    original = Chat.method(:for_model)
+    Chat.define_singleton_method(:for_model) { |*| FakeChat.new }
     # The job assigns the chat to the run; skip that write for the fake.
     ExtractionRun.class_eval do
       alias_method :update_without_chat_stub!, :update!
@@ -43,7 +43,7 @@ class ExtractionJobTest < ActiveJob::TestCase
     end
     yield
   ensure
-    Chat.define_singleton_method(:create!, original)
+    Chat.define_singleton_method(:for_model, original)
     ExtractionRun.class_eval do
       remove_method :update!
       alias_method :update!, :update_without_chat_stub!

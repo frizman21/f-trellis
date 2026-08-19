@@ -146,6 +146,11 @@
               <li class="nav-item">
                 <%= link_to "Models", models_path, class: "nav-link" %>
               </li>
+              <%# Beside Models, because it is the other half of the same
+                  question: which models this application can run. %>
+              <li class="nav-item">
+                <%= link_to "Model Endpoints", model_endpoints_path, class: "nav-link" %>
+              </li>
             </ul>
 
             <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted text-uppercase small">Admin</h6>

@@ -1,8 +1,20 @@
 class Model < ApplicationRecord
   acts_as_model
 
-  # Providers whose models this app actually lets you pick.
-  SELECTABLE_PROVIDERS = %w[anthropic openai].freeze
+  # Where to reach this model, for the ones no provider refresh discovered.
+  # Nil for every model that came from OpenAI's or Anthropic's own registry.
+  belongs_to :model_endpoint, optional: true
+
+  # A model is identified by its provider and its id, and the registry has a
+  # unique index saying so. Stated here too, because a custom model is the one
+  # kind that is typed in by hand: without it a repeated id is a 500 rather than
+  # a message on the form.
+  validates :model_id, uniqueness: { scope: :provider }
+
+  # Providers whose models this app actually lets you pick. `custom_endpoint` is
+  # the one that is not a provider in the world — it is this application's name
+  # for "reachable at an address somebody entered".
+  SELECTABLE_PROVIDERS = %w[anthropic custom_endpoint openai].freeze
 
   # Reasons drawn from a *declared* output modality. When a provider says what
   # comes out of a model, that settles it.
@@ -58,7 +70,11 @@ class Model < ApplicationRecord
   # resolve.
   scope :current, -> {
     cutoff = unscoped.maximum(:last_seen_at)
-    cutoff ? where(last_seen_at: cutoff..) : all
+    # A custom model is never stamped, because no provider was asked about it —
+    # it is current because somebody entered it. Without the exemption every
+    # custom model would fall out of every picker the first time the registry
+    # was refreshed.
+    cutoff ? where(last_seen_at: cutoff..).or(where.not(model_endpoint_id: nil)) : all
   }
 
   # Models nothing should spend money on: retired by their provider, or switched
@@ -68,6 +84,10 @@ class Model < ApplicationRecord
 
   # The registry as offered in model pickers.
   scope :selectable, -> { current.usable.where(provider: SELECTABLE_PROVIDERS).order(:provider, :model_id) }
+
+  # Served from an address somebody entered rather than from a provider's own
+  # registry. The endpoint is what carries the URL and the credential.
+  def custom? = model_endpoint_id.present?
 
   # Out of circulation, either way round. Both flags mean "do not run this"; they
   # are separate columns because they are cleared by different people.

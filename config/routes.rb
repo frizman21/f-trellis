@@ -29,7 +29,14 @@ Rails.application.routes.draw do
     # Declared before the ":type_slug" catch-all below, which would otherwise
     # swallow it. destroy removes the join, not the page — see the controller.
     resources :sources, only: [:index, :show, :new, :create, :destroy], module: :projects do
-      member { post :extract }
+      # crawl is the project's own: it hands CrawlJob this project, so what the
+      # crawl finds joins it. The crawler's own /sources/:id/crawl stays as it
+      # was and joins nothing.
+      member do
+        post :extract
+        post :crawl
+        post :fetch
+      end
     end
 
     resources :entities, except: [:index]
@@ -97,6 +104,13 @@ Rails.application.routes.draw do
     collection do
       post :refresh
     end
+  end
+  # Models the provider refreshes never discovered, and where to reach them.
+  # Adding one is done on its endpoint, which is what holds the address and
+  # names the credential; there is nowhere else a custom model could be entered.
+  resources :model_endpoints do
+    member { post :check }
+    resources :models, only: [:create], module: :model_endpoints
   end
   resources :source_processing_reports, only: [:index, :new, :create]
   get "source_data/:id/download", to: "source_data#download", as: :download_source_datum

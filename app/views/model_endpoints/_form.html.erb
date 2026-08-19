@@ -1,0 +1,44 @@
+<%= form_with model: endpoint, local: true do |f| %>
+  <% if endpoint.errors.any? %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% endpoint.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="mb-3" style="max-width: 32rem;">
+    <%= f.label :name, class: "form-label" %>
+    <%= f.text_field :name, class: "form-control", placeholder: "Acme internal" %>
+    <div class="form-text">What you will recognise this endpoint by.</div>
+  </div>
+
+  <div class="mb-3" style="max-width: 32rem;">
+    <%= f.label :base_url, "Base URL", class: "form-label" %>
+    <%= f.text_field :base_url, class: "form-control", placeholder: "https://acme.internal/v1" %>
+    <div class="form-text">
+      The OpenAI-compatible base, ending at the version — the address
+      <code>/chat/completions</code> and <code>/models</code> hang off. A trailing
+      slash is trimmed.
+    </div>
+  </div>
+
+  <div class="mb-3" style="max-width: 32rem;">
+    <%= f.label :api_key_env_var, "Token variable", class: "form-label" %>
+    <%= f.text_field :api_key_env_var, class: "form-control", placeholder: "ACME_PAT" %>
+    <div class="form-text">
+      <%# Stated on the form, because typing the token in here is the reasonable
+          mistake and the field gives no other clue that it is the wrong thing. %>
+      The <strong>name of the environment variable</strong> holding the personal
+      access token — not the token. The token itself stays in the environment,
+      beside <code>OPENAI_API_KEY</code>, and is never written to the database or
+      shown on a page. Leave blank for an endpoint that needs no authorisation.
+    </div>
+  </div>
+
+  <%= f.submit class: "btn btn-primary" %>
+  <%= link_to "Cancel", endpoint.persisted? ? endpoint : model_endpoints_path,
+              class: "btn btn-outline-secondary ms-2" %>
+<% end %>
