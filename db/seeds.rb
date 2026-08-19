@@ -818,13 +818,29 @@ current_hash = link_sample_source.latest_datum&.content_hash
   report.save!
 end
 
+# The project side of a source, so the project's source page — where a crawl is
+# started, content fetched and a model chosen for extraction — has something to
+# render on a fresh database. The join is what makes a page a project's concern;
+# the pages themselves are seeded above and belong to no project until this runs.
+[ link_sample_source, apollo_source ].each do |source|
+  ProjectSource.find_or_create_by!(project: seed_project, source: source)
+end
+
+# The extract control preselects this. Seeded only when the registry has been
+# refreshed — models are populated from the providers, not from here — and only
+# when the project has no default already, so a choice made in the app is not
+# overwritten by re-running seeds.
+if seed_project.default_model.nil? && (seed_default_model = Model.selectable.first)
+  seed_project.update!(default_model: seed_default_model)
+end
+
 # A worked example of a model served from somewhere the provider refreshes never
 # look, so the Model Endpoints screens render on a fresh database.
 #
-# Its model is seeded disabled on purpose. A custom model is offered wherever a
-# model is picked, and an endpoint that does not exist has no business appearing
-# in the project default-model select — the row is here to show the screens, not
-# to be run.
+# Its model is seeded disabled on purpose, and that is also why the default above
+# cannot pick it: a custom model is offered wherever a model is picked, and an
+# endpoint that does not exist has no business being a project's default. The row
+# is here to show the screens, not to be run.
 example_endpoint = ModelEndpoint.find_or_create_by!(name: "Example internal endpoint") do |endpoint|
   endpoint.base_url = "https://models.example.internal/v1"
   endpoint.api_key_env_var = "EXAMPLE_ENDPOINT_PAT"
