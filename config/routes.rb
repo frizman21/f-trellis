@@ -28,7 +28,9 @@ Rails.application.routes.draw do
     resources :relationship_types, except: [:index]
     # Declared before the ":type_slug" catch-all below, which would otherwise
     # swallow it. destroy removes the join, not the page — see the controller.
-    resources :sources, only: [:index, :show, :new, :create, :destroy], module: :projects
+    resources :sources, only: [:index, :show, :new, :create, :destroy], module: :projects do
+      member { post :extract }
+    end
 
     resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]
@@ -38,7 +40,15 @@ Rails.application.routes.draw do
     # first; EntityType additionally refuses a slug that would collide with one,
     # because route ordering alone would let such a type save and then be
     # unreachable.
-    get ":type_slug", to: "entities#index", as: :typed_entities
+    # The constraint is what keeps this from swallowing the project's own member
+    # routes: without it "/projects/1/edit" matches here with type_slug "edit"
+    # and 404s as an unknown entity type. Driven by the same list EntityType
+    # validates against, so a word cannot be taken by a route and free for a
+    # type at the same time.
+    get ":type_slug", to: "entities#index", as: :typed_entities,
+        constraints: ->(request) {
+          EntityType::RESERVED_SLUGS.exclude?(request.path_parameters[:type_slug])
+        }
   end
 
   resources :sources, only: [:index, :show, :new, :create] do

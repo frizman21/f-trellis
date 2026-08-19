@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_19_003826) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_19_004648) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -135,6 +135,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_003826) do
     t.index ["project_id"], name: "index_entity_types_on_project_id"
   end
 
+  create_table "extraction_runs", force: :cascade do |t|
+    t.bigint "chat_id"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.text "error"
+    t.bigint "model_id", null: false
+    t.bigint "project_id", null: false
+    t.text "response"
+    t.bigint "source_id", null: false
+    t.datetime "started_at"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_id"], name: "index_extraction_runs_on_chat_id"
+    t.index ["model_id"], name: "index_extraction_runs_on_model_id"
+    t.index ["project_id", "source_id", "status"], name: "index_extraction_runs_on_project_source_status"
+    t.index ["project_id"], name: "index_extraction_runs_on_project_id"
+    t.index ["source_id", "created_at"], name: "index_extraction_runs_on_source_id_and_created_at"
+    t.index ["source_id"], name: "index_extraction_runs_on_source_id"
+  end
+
   create_table "fetch_records", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "domain_id", null: false
@@ -229,8 +249,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_003826) do
 
   create_table "projects", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.bigint "default_model_id"
     t.string "name", null: false
     t.datetime "updated_at", null: false
+    t.index ["default_model_id"], name: "index_projects_on_default_model_id"
   end
 
   create_table "relationship_sources", force: :cascade do |t|
@@ -536,6 +558,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_003826) do
   add_foreign_key "entity_type_attributes", "entity_types"
   add_foreign_key "entity_type_attributes", "projects"
   add_foreign_key "entity_types", "projects"
+  add_foreign_key "extraction_runs", "chats"
+  add_foreign_key "extraction_runs", "models"
+  add_foreign_key "extraction_runs", "projects"
+  add_foreign_key "extraction_runs", "sources"
   add_foreign_key "fetch_records", "domains"
   add_foreign_key "learning_set_sources", "learning_sets", on_delete: :cascade
   add_foreign_key "learning_set_sources", "sources"
@@ -544,6 +570,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_003826) do
   add_foreign_key "messages", "tool_calls"
   add_foreign_key "project_sources", "projects"
   add_foreign_key "project_sources", "sources"
+  add_foreign_key "projects", "models", column: "default_model_id"
   add_foreign_key "relationship_sources", "relationships"
   add_foreign_key "relationship_sources", "sources"
   add_foreign_key "relationship_type_attributes", "projects"

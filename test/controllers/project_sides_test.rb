@@ -554,4 +554,30 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match(/Rocket Engine/, response.body)
   end
+
+  # The catch-all added in #21 swallowed the project's own member routes:
+  # /projects/:id/edit matched it with type_slug "edit" and 404d as an unknown
+  # entity type, which left the listing's Edit button dead. Asserted per route,
+  # since the next one added is the next one at risk.
+  test "the type-slug catch-all does not swallow the project's own routes" do
+    get edit_project_path(@project)
+    assert_response :success
+    assert_select "form input[name=?]", "project[name]"
+
+    get structure_project_path(@project)
+    assert_response :success
+
+    get ai_configuration_project_path(@project)
+    assert_response :success
+
+    get project_sources_path(@project)
+    assert_response :success
+  end
+
+  test "a real type slug still reaches the entity list" do
+    get project_typed_entities_path(@project, entity_types(:rocket_engine).slug)
+
+    assert_response :success
+    assert_select "h1", "Rocket Engine"
+  end
 end
