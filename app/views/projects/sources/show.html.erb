@@ -47,9 +47,19 @@
 
 <div class="mb-3">
   <% if @readiness.runnable? %>
-    <%= button_to "Extract with #{@project.default_model.model_id}",
-                  extract_project_source_path(@project, @source),
-                  method: :post, class: "btn btn-primary" %>
+    <%# The project's default is the preselection, not the only answer: reading
+        one page with a cheaper or a stronger model should not mean changing the
+        project's default and changing it back. %>
+    <%= form_with url: extract_project_source_path(@project, @source), method: :post,
+                  local: true, class: "d-flex gap-2 align-items-end", style: "max-width: 32rem;" do |f| %>
+      <div class="flex-grow-1">
+        <%= f.label :model_id, "Model", class: "form-label" %>
+        <%= f.collection_select :model_id, @models, :id, :model_id,
+                                { selected: @project.default_model_id },
+                                class: "form-select" %>
+      </div>
+      <%= f.submit "Extract", class: "btn btn-primary" %>
+    <% end %>
   <% else %>
     <%# Disabled with the reason rather than enabled and failing. %>
     <button class="btn btn-primary" disabled>Extract</button>
@@ -66,6 +76,11 @@
             <%= run.status %>
           </span>
           <span class="text-muted small ms-2"><%= run.model.model_id %></span>
+          <%# The conversation behind the reply — what was asked, what it cost.
+              A run that never reached the model has none. %>
+          <% if run.chat %>
+            <%= link_to "Chat ##{run.chat.id}", chat_path(run.chat), class: "small ms-2" %>
+          <% end %>
         </span>
         <span class="text-muted small"><%= run.created_at.to_fs(:long) %></span>
       </div>
@@ -85,6 +100,57 @@
       <% end %>
     </div>
   <% end %>
+<% end %>
+
+<h2 class="h5 mt-4">Crawl from this source</h2>
+<p class="text-muted small">
+  Walks out from this page and fetches what it finds. Everything it fetches
+  joins <strong><%= @project.name %></strong>, so a site pulled in from here does
+  not have to be re-entered URL by URL.
+</p>
+
+<%= form_with url: crawl_project_source_path(@project, @source), method: :post,
+              local: true, class: "mb-4" do |f| %>
+  <div class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <%= f.label :crawl_type, "Crawl type", class: "form-label" %>
+      <%= f.select :crawl_type,
+                   [["Stay in domain", "stay_in_domain"],
+                    ["Follow external links", "follow_external_links"],
+                    ["From the site's sitemap", "from_sitemap"]],
+                   {},
+                   class: "form-select" %>
+    </div>
+    <div class="col-md-2">
+      <%= f.label :max_depth, "Depth", class: "form-label" %>
+      <%= f.number_field :max_depth, value: 1, min: 0, max: 10, step: 1, class: "form-control" %>
+    </div>
+    <div class="col-md-3">
+      <%= f.label :max_pages, "Max pages", class: "form-label" %>
+      <%= f.number_field :max_pages, value: CrawlJob::DEFAULT_MAX_PAGES, min: 1,
+                         max: CrawlJob::MAX_MAX_PAGES, step: 1, class: "form-control" %>
+    </div>
+    <div class="col-md-3">
+      <%# Just the crawl: extracting every page it fetches is its own button,
+          with its own cost to show first. See change request #49. %>
+      <%= f.submit "Just Crawl", class: "btn btn-primary" %>
+    </div>
+  </div>
+  <div class="form-text">
+    Depth 0 only fetches this page. Stay-in-domain follows links only on
+    <code><%= @source.domain&.host %></code>. Already-known URLs are skipped.
+    From-the-sitemap starts with every page the site lists rather than this one,
+    then follows links within the domain from there.
+  </div>
+  <div class="form-text">
+    <% delay = CrawlJob.delay_for(@source.domain) %>
+    The crawler waits <%= pluralize(delay, "second") %> between requests to
+    <code><%= @source.domain&.host %></code><%
+      %><% if @source.domain&.min_crawl_delay_seconds.blank? %> (the default)<% end %>,
+    so a full <%= CrawlJob::DEFAULT_MAX_PAGES %>-page crawl of this site takes at
+    least <%= distance_of_time_in_words(delay * CrawlJob::DEFAULT_MAX_PAGES) %>.
+    <%= link_to "Change it", edit_domain_path(@source.domain) if @source.domain %>
+  </div>
 <% end %>
 
 <div class="d-flex gap-2">

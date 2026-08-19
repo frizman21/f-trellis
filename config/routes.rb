@@ -29,7 +29,13 @@ Rails.application.routes.draw do
     # Declared before the ":type_slug" catch-all below, which would otherwise
     # swallow it. destroy removes the join, not the page — see the controller.
     resources :sources, only: [:index, :show, :new, :create, :destroy], module: :projects do
-      member { post :extract }
+      # crawl is the project's own: it hands CrawlJob this project, so what the
+      # crawl finds joins it. The crawler's own /sources/:id/crawl stays as it
+      # was and joins nothing.
+      member do
+        post :extract
+        post :crawl
+      end
     end
 
     resources :entities, except: [:index]

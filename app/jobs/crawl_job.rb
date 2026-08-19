@@ -25,8 +25,15 @@ class CrawlJob < ApplicationJob
       DEFAULT_CRAWL_DELAY_SECONDS
   end
 
-  def perform(seed_source, crawl_type:, max_depth:, max_pages: DEFAULT_MAX_PAGES, pacer: CrawlPacer.new)
+  # `project` is what a crawl started from a project's source page passes: every
+  # page the crawl fetches is joined to it, so a site pulled in from inside a
+  # project does not then have to be re-entered URL by URL. Nil from the
+  # crawler's own screens, which are about pages on the internet and know
+  # nothing about projects.
+  def perform(seed_source, crawl_type:, max_depth:, max_pages: DEFAULT_MAX_PAGES,
+              project: nil, pacer: CrawlPacer.new)
     @pacer = pacer
+    @project = project
 
     crawl_type = crawl_type.to_s
     raise ArgumentError, "invalid crawl_type: #{crawl_type.inspect}" unless CRAWL_TYPES.include?(crawl_type)
@@ -92,12 +99,36 @@ class CrawlJob < ApplicationJob
       return
     end
 
+    # After the robots gate and before the fetch: a page we were told not to
+    # fetch has no content to offer a project, and joining after the fetch would
+    # drop the pages whose download failed — which are still pages this project
+    # asked for and will want to retry.
+    join_to_project(source)
+
     # Before the request, not after the last page: a one-page crawl never waits.
     @pacer.wait_for(source.domain&.host, self.class.delay_for(source.domain))
 
     FetchSourceJob.perform_now(source, trigger: "crawl")
   rescue StandardError => e
     Rails.logger.error("CrawlJob: failed processing #{source.url}: #{e.class}: #{e.message}")
+  end
+
+  # Makes one crawled page this project's concern. Idempotent by necessity:
+  # re-crawling a site the project already holds is the ordinary case, and two
+  # crawls of overlapping sites can race on the same page.
+  #
+  # A join that cannot be written must not end the crawl — the pages are still
+  # fetched and the operator can add them — so this logs and carries on.
+  def join_to_project(source)
+    return if @project.nil?
+
+    ProjectSource.find_or_create_by!(project: @project, source: source)
+  rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+    # Another crawl got there first; the join exists, which is all this wanted.
+    nil
+  rescue StandardError => e
+    Rails.logger.error("CrawlJob: could not join #{source.url} to project " \
+                       "##{@project.id}: #{e.class}: #{e.message}")
   end
 
   # Policies are cached per host for the run, so a 500-page crawl of one site

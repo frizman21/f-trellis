@@ -205,4 +205,77 @@ class ProjectSourcesTest < ActionDispatch::IntegrationTest
     assert_match(/Also on/, response.body)
     assert_match(/#{@other.name}/, response.body)
   end
+
+  # --- crawling from inside the project --------------------------------------
+
+  def crawl(params = {})
+    post crawl_project_source_path(@project, sources(:one)),
+         params: { crawl_type: "stay_in_domain", max_depth: 1, max_pages: 25 }.merge(params)
+  end
+
+  test "the page offers the crawl form" do
+    ProjectSource.create!(project: @project, source: sources(:one))
+
+    get project_source_path(@project, sources(:one))
+
+    assert_response :success
+    assert_select "form[action=?]", crawl_project_source_path(@project, sources(:one))
+    assert_select "input[type=submit][value=?]", "Just Crawl"
+  end
+
+  # The project is the whole point of this action existing beside the crawler's
+  # own: it is what makes the crawl fill this project's source list.
+  test "crawling enqueues one job carrying this project" do
+    ProjectSource.create!(project: @project, source: sources(:one))
+
+    assert_enqueued_with(job: CrawlJob) do
+      crawl
+    end
+
+    job = enqueued_jobs.find { |enqueued| enqueued["job_class"] == "CrawlJob" }
+    arguments = ActiveJob::Arguments.deserialize(job["arguments"])
+
+    assert_equal sources(:one), arguments.first
+    assert_equal @project, arguments.last[:project]
+    assert_equal "stay_in_domain", arguments.last[:crawl_type]
+    assert_equal 1, arguments.last[:max_depth]
+    assert_equal 25, arguments.last[:max_pages]
+
+    assert_redirected_to project_source_path(@project, sources(:one))
+  end
+
+  test "an unrecognised crawl type enqueues nothing" do
+    ProjectSource.create!(project: @project, source: sources(:one))
+
+    assert_no_enqueued_jobs only: CrawlJob do
+      crawl(crawl_type: "sideways")
+    end
+
+    assert_match(/Invalid crawl type/i, flash[:alert])
+  end
+
+  # A typo in a hand-made request must not queue an unbounded traversal.
+  test "depth and page count are clamped to the job's bounds" do
+    ProjectSource.create!(project: @project, source: sources(:one))
+
+    crawl(max_depth: 99, max_pages: CrawlJob::MAX_MAX_PAGES + 1000)
+
+    job = enqueued_jobs.find { |enqueued| enqueued["job_class"] == "CrawlJob" }
+    arguments = ActiveJob::Arguments.deserialize(job["arguments"])
+
+    assert_equal 10, arguments.last[:max_depth]
+    assert_equal CrawlJob::MAX_MAX_PAGES, arguments.last[:max_pages]
+  end
+
+  # Found through the project, like every other action here.
+  test "crawling a source another project holds is not found" do
+    ProjectSource.create!(project: @other, source: sources(:two))
+
+    assert_no_enqueued_jobs only: CrawlJob do
+      post crawl_project_source_path(@project, sources(:two)),
+           params: { crawl_type: "stay_in_domain", max_depth: 1 }
+    end
+
+    assert_response :not_found
+  end
 end
