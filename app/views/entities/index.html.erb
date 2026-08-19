@@ -67,8 +67,9 @@
             <% @columns.each do |attribute| %>
               <%# Truncated in the cell, not in the data: a string attribute has
                   no length limit, and one long value would otherwise decide the
-                  width of every column. %>
-              <td><%= values[attribute.id]&.display_value.to_s.truncate(60) %></td>
+                  width of every column. A value that is a web address is linked,
+                  with the whole address in the href and only the text cut. %>
+              <td><%= value_as_link values[attribute.id]&.display_value %></td>
             <% end %>
           </tr>
         <% end %>
