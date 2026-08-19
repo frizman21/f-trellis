@@ -817,3 +817,19 @@ current_hash = link_sample_source.latest_datum&.content_hash
   report.assign_attributes(status: "failed", facts: [], error: attrs[:error])
   report.save!
 end
+
+# The project side of a source, so the project's source page — where a crawl is
+# now started and a model chosen for extraction — has something to render on a
+# fresh database. The join is what makes a page a project's concern; the pages
+# themselves are seeded above and belong to no project until this runs.
+[ link_sample_source, apollo_source ].each do |source|
+  ProjectSource.find_or_create_by!(project: seed_project, source: source)
+end
+
+# The extract control preselects this. Seeded only when the registry has been
+# refreshed — models are populated from the providers, not from here — and only
+# when the project has no default already, so a choice made in the app is not
+# overwritten by re-running seeds.
+if seed_project.default_model.nil? && (seed_default_model = Model.selectable.first)
+  seed_project.update!(default_model: seed_default_model)
+end

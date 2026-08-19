@@ -22,8 +22,11 @@ module Projects
       @other_projects = @source.projects.where.not(id: @project.id).order(:name)
       # Scoped to this project: another project reading the same page has its own
       # runs, with its own structure behind them.
-      @runs = @project.extraction_runs.where(source: @source).includes(:model).recent.limit(10)
+      @runs = @project.extraction_runs.where(source: @source).includes(:model, :chat).recent.limit(10)
       @readiness = ExtractionReadiness.new(@project, @source)
+      # The run's model is chosen on the page, so the page needs the registry.
+      # The project's default is only the preselection.
+      @models = Model.selectable
     end
 
     # Enqueues a run of the project's extraction prompt over this page. The
@@ -37,12 +40,59 @@ module Projects
         return redirect_to project_source_path(@project, @source), alert: reason
       end
 
-      run = ExtractionRun.create!(project: @project, source: @source,
-                                  model: @project.default_model)
+      model = chosen_model
+      run = ExtractionRun.create!(project: @project, source: @source, model: model)
       ExtractionJob.perform_later(run)
 
       redirect_to project_source_path(@project, @source),
-                  notice: "Extraction queued with #{@project.default_model.model_id}."
+                  notice: "Extraction queued with #{model.model_id}."
+    end
+
+    # Crawls out from this page and joins everything it fetches to this project.
+    #
+    # Separate from SourcesController#crawl rather than sharing it: that one is
+    # the crawler asking about a page on the internet, this one is a project
+    # pulling a site in, and the difference is exactly the project it hands the
+    # job. Folding them together would mean one action deciding which of two
+    # pages to return to and whether the project it was given is real.
+    def crawl
+      @source = @project.sources.find(params[:id])
+      crawl_type = params[:crawl_type].to_s
+
+      unless CrawlJob::CRAWL_TYPES.include?(crawl_type)
+        return redirect_to project_source_path(@project, @source), alert: "Invalid crawl type."
+      end
+
+      max_depth = params[:max_depth].to_i.clamp(0, MAX_CRAWL_DEPTH)
+      max_pages = (params[:max_pages].presence || CrawlJob::DEFAULT_MAX_PAGES)
+                  .to_i.clamp(1, CrawlJob::MAX_MAX_PAGES)
+
+      CrawlJob.perform_later(@source, crawl_type: crawl_type, max_depth: max_depth,
+                                      max_pages: max_pages, project: @project)
+
+      redirect_to project_source_path(@project, @source),
+                  notice: "Crawl queued for #{@project.name} " \
+                          "(type: #{crawl_type}, depth: #{max_depth}, max pages: #{max_pages}). " \
+                          "What it fetches joins this project."
+    end
+
+    # Grabs this one page's content. A second entry point to FetchSourceJob, not
+    # a second way of fetching: the project page is where the operator is when
+    # they find the page has nothing on it, and the crawler's own screen for the
+    # same source is two navigations away.
+    #
+    # Forced, like SourcesController#fetch: an operator asking for one page
+    # explicitly is a different act from a crawl, and the unforced path returns
+    # early unless the status is still `new` — which would make Re-fetch quietly
+    # do nothing.
+    def fetch
+      @source = @project.sources.find(params[:id])
+      had_content = @source.source_data.exists?
+
+      FetchSourceJob.perform_later(@source, force: true, trigger: "manual")
+
+      redirect_to project_source_path(@project, @source),
+                  notice: had_content ? "Re-fetch queued (was #{@source.status})." : "Fetch queued."
     end
 
     def new
@@ -81,6 +131,17 @@ module Projects
     end
 
     private
+
+    # A crawl deep enough to matter is bounded by max_pages long before depth
+    # bites; this only stops a typo from queueing an unbounded traversal.
+    MAX_CRAWL_DEPTH = 10
+
+    # The model this run should use: the one picked on the form when it is still
+    # selectable, the project's default otherwise. Resolved against the registry
+    # rather than trusted, so a hand-made id cannot bill a deprecated model.
+    def chosen_model
+      Model.selectable.find_by(id: params[:model_id]) || @project.default_model
+    end
 
     def set_project
       @project = Project.find(params[:project_id])
