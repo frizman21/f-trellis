@@ -1,0 +1,67 @@
+<%# What the chat cost, as well as it can be known.
+
+    "Estimated" is on the screen rather than in a comment: input_tokens is not
+    recorded correctly, so the input side is derived from the characters actually
+    sent. A figure presented as exact would be about 40% low. %>
+<h2 class="h6 mt-4">Cost</h2>
+
+<% if cost.total.nil? %>
+  <p class="text-muted small mb-0">
+    No pricing recorded for
+    <%= chat.model ? chat.model.model_id : "this chat's model" %>, so there is
+    nothing to price it against.
+  </p>
+<% else %>
+  <table class="table table-sm w-auto small">
+    <tbody>
+      <tr>
+        <td>Input</td>
+        <%# Billable input: cached tokens are a subset of the prompt, so they are
+            priced on their own line rather than twice. %>
+        <td class="text-end"><%= number_with_delimiter cost.billable_input_tokens %> tok</td>
+        <td class="text-end">$<%= format("%.4f", cost.input_cost) %></td>
+        <td class="text-muted">
+          <%= "estimated from content" if cost.estimated? %>
+        </td>
+      </tr>
+      <% if cost.cached_tokens.positive? %>
+        <tr>
+          <td>Cached input</td>
+          <td class="text-end"><%= number_with_delimiter cost.cached_tokens %> tok</td>
+          <td class="text-end">$<%= format("%.4f", cost.cached_cost) %></td>
+          <td class="text-muted">
+            <%= cost.cached_rate_known? ? "at the cached rate, $#{cost.cached_rate}/Mtok" :
+                                          "at the full input rate — no cached rate recorded" %>
+          </td>
+        </tr>
+      <% end %>
+      <tr>
+        <td>Output</td>
+        <td class="text-end"><%= number_with_delimiter cost.output_tokens %> tok</td>
+        <td class="text-end">$<%= format("%.4f", cost.output_cost) %></td>
+        <td></td>
+      </tr>
+      <tr class="fw-bold">
+        <td>Estimated total</td>
+        <td></td>
+        <td class="text-end">$<%= format("%.4f", cost.total) %></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="text-muted small">
+    An estimate. The input side is derived from the characters sent, because the
+    recorded input token count is wrong for every chat here — this one reports
+    <%= cost.recorded_input_tokens %>.
+    <% if cost.cached_tokens.positive? %>
+      Of <%= number_with_delimiter cost.input_tokens %> input tokens,
+      <%= number_with_delimiter cost.cached_tokens %> were served from cache and are
+      priced separately.
+    <% end %>
+    <% unless cost.cached_rate_known? %>
+      No cached rate is recorded for this model, so those are priced at the full
+      input rate and the total is an upper bound.
+    <% end %>
+  </p>
+<% end %>
