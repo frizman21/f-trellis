@@ -20,5 +20,11 @@ class Project < ApplicationRecord
   has_many :entity_type_attributes, dependent: :destroy
   has_many :entity_types, dependent: :destroy
 
+  # The pages this project cares about. The joins go with the project; the
+  # sources do not — they are pages on the internet, another project may be
+  # using them, and a cited source cannot be deleted anyway.
+  has_many :project_sources, dependent: :destroy
+  has_many :sources, through: :project_sources
+
   validates :name, presence: true
 end

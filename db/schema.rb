@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_19_000708) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_19_003826) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -215,6 +215,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_000708) do
     t.index ["modalities"], name: "index_models_on_modalities", using: :gin
     t.index ["provider", "model_id"], name: "index_models_on_provider_and_model_id", unique: true
     t.index ["provider"], name: "index_models_on_provider"
+  end
+
+  create_table "project_sources", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "project_id", null: false
+    t.bigint "source_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["project_id", "source_id"], name: "index_project_sources_on_project_and_source", unique: true
+    t.index ["project_id"], name: "index_project_sources_on_project_id"
+    t.index ["source_id"], name: "index_project_sources_on_source_id"
   end
 
   create_table "projects", force: :cascade do |t|
@@ -532,6 +542,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_000708) do
   add_foreign_key "messages", "chats"
   add_foreign_key "messages", "models"
   add_foreign_key "messages", "tool_calls"
+  add_foreign_key "project_sources", "projects"
+  add_foreign_key "project_sources", "sources"
   add_foreign_key "relationship_sources", "relationships"
   add_foreign_key "relationship_sources", "sources"
   add_foreign_key "relationship_type_attributes", "projects"

@@ -27,6 +27,11 @@ class Source < ApplicationRecord
   has_many :links_to,    through: :outbound_links, source: :to_source
   has_many :linked_from, through: :inbound_links,  source: :from_source
 
+  # Which projects care about this page. Destroying a source would take its
+  # joins, though a cited source cannot be destroyed at all.
+  has_many :project_sources, dependent: :destroy
+  has_many :projects, through: :project_sources
+
   has_many :source_data, dependent: :destroy
   has_many :source_processing_reports, dependent: :destroy
   has_many :learning_set_sources, dependent: :destroy
