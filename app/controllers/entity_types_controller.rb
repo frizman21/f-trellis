@@ -4,6 +4,7 @@ class EntityTypesController < ApplicationController
 
   def show
     @entity_type = find_entity_type
+    @relationship_types = relationship_types_touching(@entity_type)
   end
 
   def new
@@ -58,6 +59,30 @@ class EntityTypesController < ApplicationController
 
   def find_entity_type
     @project.entity_types.find(params[:id])
+  end
+
+  # Every relationship type with this entity type at either end.
+  #
+  # One `or` rather than two queries added together: a type whose ends are both
+  # this type — one engine superseding another — is in both halves, and the
+  # database returning it once is cheaper and harder to get wrong than
+  # remembering to dedupe afterwards.
+  #
+  # Scoped through the project to match find_entity_type above, not because the
+  # scope is load-bearing: RelationshipType#ends_are_in_this_project already
+  # guarantees a type's ends belong to its own project, so filtering on an end's
+  # id cannot cross one. Removing `@project.` here changes no result today —
+  # it is here so a future query that does not have that guarantee inherits the
+  # habit rather than the exception.
+  #
+  # `includes` covers the three associations each row reads. Without it the
+  # fifteen relationship types F-DoD's Person sits in are forty-five queries.
+  # Order comes from RelationshipType's default scope.
+  def relationship_types_touching(entity_type)
+    @project.relationship_types
+            .where(from_entity_type_id: entity_type.id)
+            .or(@project.relationship_types.where(to_entity_type_id: entity_type.id))
+            .includes(:from_entity_type, :to_entity_type, :relationship_type_attributes)
   end
 
   def entity_type_params

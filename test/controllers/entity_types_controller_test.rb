@@ -20,6 +20,59 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match(/No attributes defined/, response.body)
+    assert_match(/No relationship types connect this entity type/, response.body)
+  end
+
+  test "show lists relationship types with this type at either end" do
+    get project_entity_type_path(@project, entity_types(:rocket_engine))
+
+    assert_response :success
+    # Outgoing, outgoing, and both ends at once. A type is connected by every
+    # relationship type that names it, not only the ones it points out of.
+    assert_select "a", text: "Powers"
+    assert_select "a", text: "Bare Relation"
+    assert_select "a", text: "Supersedes"
+  end
+
+  test "show lists a relationship type joining a type to itself only once" do
+    get project_entity_type_path(@project, entity_types(:rocket_engine))
+
+    # Supersedes is in both halves of the query. Once is the answer; twice is
+    # what an implementation that adds outgoing to incoming produces.
+    assert_select "a", text: "Supersedes", count: 1
+  end
+
+  test "show lists a relationship type that only points at this type" do
+    get project_entity_type_path(@project, entity_types(:bare))
+
+    assert_response :success
+    # Bare Type is the `to` end of Bare Relation and the `from` end of nothing.
+    # A type with no outgoing relationship types is not a type with none.
+    assert_select "a", text: "Bare Relation"
+  end
+
+  test "show links the other end of a relationship type but not this one" do
+    engine = entity_types(:rocket_engine)
+
+    get project_entity_type_path(@project, engine)
+
+    assert_response :success
+    assert_select "a[href=?]", project_entity_type_path(@project, entity_types(:launch_vehicle))
+    # Linking to the page being viewed is a dead control, and the plain-text end
+    # is what shows which side of the relationship this type is on.
+    assert_select "a[href=?]", project_entity_type_path(@project, engine), count: 0
+  end
+
+  test "show lists only the relationship types that name this type" do
+    get project_entity_type_path(@project, entity_types(:launch_vehicle))
+
+    assert_response :success
+    # Launch Vehicle is the `to` end of Powers and appears in nothing else. The
+    # other two Apollo relationship types are both about Rocket Engine, so a
+    # query that lost its where clause would put them here.
+    assert_select "a", text: "Powers"
+    assert_select "a", text: "Supersedes", count: 0
+    assert_select "a", text: "Bare Relation", count: 0
   end
 
   test "create makes a type" do
