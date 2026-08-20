@@ -68,6 +68,24 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     assert_select "nav.sidebar a[href=?]", users_path, text: "Users"
   end
 
+  # /admin 404s for a non-admin, so a link to it in their sidebar would be a
+  # door that reports itself missing.
+  test "the sidebar links an admin to the data admin" do
+    get users_path
+
+    assert_select "nav.sidebar a[href=?]", admin_root_path, text: "Data Admin"
+  end
+
+  test "the sidebar omits the data admin link for a non-admin" do
+    sign_out users(:admin)
+    sign_in users(:other)
+
+    get users_path
+
+    assert_response :success
+    assert_select "nav.sidebar a[href=?]", admin_root_path, count: 0
+  end
+
   # The route ordering has to keep Devise's own routes matching first.
   test "devise's sign-in route still resolves" do
     sign_out users(:admin)

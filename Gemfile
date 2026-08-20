@@ -75,6 +75,17 @@ gem "ruby_llm"
 # Authentication.
 gem "devise"
 
+# Generated CRUD back office at /admin, for reading and correcting rows no
+# screen in this application exposes. administrate rather than rails_admin,
+# activeadmin or avo because of this deployment rather than a feature
+# comparison: the container has no node/yarn and the pipeline is propshaft +
+# importmap, so rails_admin's importmap path (which shells out to `yarn add`)
+# and activeadmin's sprockets/sassc assumptions are both unavailable.
+# administrate ships pre-built CSS and JS in its own app/assets/builds and adds
+# no transitive dependency this Gemfile does not already carry — its only
+# runtime deps are actionpack/actionview/activerecord and kaminari.
+gem "administrate", "~> 1.0"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"

@@ -158,6 +158,14 @@
               <li class="nav-item">
                 <%= link_to "Users", users_path, class: "nav-link" %>
               </li>
+              <%# Shown only to admins, to match what /admin does to everyone
+                  else: it 404s, so a link to it would be a door that reports
+                  itself missing. %>
+              <% if current_user&.is_admin? %>
+                <li class="nav-item">
+                  <%= link_to "Data Admin", admin_root_path, class: "nav-link" %>
+                </li>
+              <% end %>
             </ul>
           </div>
         </nav>
