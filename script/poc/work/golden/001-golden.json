@@ -4,42 +4,53 @@
       "id": "org-albers",
       "name": "Albers Aerospace",
       "type": "Organization",
-      "attributes": {
-        "headquarters": "McKinney, TX 75069"
-      }
+      "attributes": [
+        {
+          "name": "headquarters",
+          "value": "McKinney, TX 75069"
+        }
+      ]
     },
     {
       "id": "org-parallel",
       "name": "Parallel Ventures",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "p-carter",
       "name": "Rich Carter",
       "type": "Person",
-      "attributes": {
-        "title": "Chief Revenue Officer"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Chief Revenue Officer"
+        }
+      ]
     },
     {
       "id": "t-cnc",
       "name": "CNC Precision Machining",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-milling",
       "name": "CNC Milling",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-turning",
       "name": "CNC Turning",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-edm",
       "name": "Electrical Discharge Machining (EDM)",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     }
   ],
   "relationships": [
@@ -47,17 +58,23 @@
       "type": "Employs",
       "from": "org-albers",
       "to": "p-carter",
-      "attributes": {
-        "role": "Chief Revenue Officer"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Chief Revenue Officer"
+        }
+      ]
     },
     {
       "type": "Acquires",
       "from": "org-albers",
       "to": "org-parallel",
-      "attributes": {
-        "announced": "2025-02-19"
-      }
+      "attributes": [
+        {
+          "name": "announced",
+          "value": "2025-02-19"
+        }
+      ]
     }
   ]
 }

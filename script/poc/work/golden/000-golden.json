@@ -4,52 +4,65 @@
       "id": "org-albers",
       "name": "Albers Aerospace",
       "type": "Organization",
-      "attributes": {
-        "headquarters": "McKinney, TX 75069"
-      }
+      "attributes": [
+        {
+          "name": "headquarters",
+          "value": "McKinney, TX 75069"
+        }
+      ]
     },
     {
       "id": "org-dod",
       "name": "U.S. Department of Defense",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "p-aflleje",
       "name": "Will Aflleje",
       "type": "Person",
-      "attributes": {
-        "title": "Chief Technology Officer"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Chief Technology Officer"
+        }
+      ]
     },
     {
       "id": "t-advmfg",
       "name": "Advanced Manufacturing",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-digeng",
       "name": "Digital Engineering",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-autonomy",
       "name": "Autonomy",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-ai",
       "name": "Artificial Intelligence",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "s-math",
       "name": "Mathematics",
-      "type": "Science"
+      "type": "Science",
+      "attributes": []
     },
     {
       "id": "s-stats",
       "name": "Statistics",
-      "type": "Science"
+      "type": "Science",
+      "attributes": []
     }
   ],
   "relationships": [
@@ -57,9 +70,12 @@
       "type": "Employs",
       "from": "org-albers",
       "to": "p-aflleje",
-      "attributes": {
-        "role": "Chief Technology Officer"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Chief Technology Officer"
+        }
+      ]
     }
   ]
 }

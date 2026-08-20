@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-08-20T15:52:10Z",
+  "exported_at": "2026-08-20T16:11:57Z",
   "project": {
     "id": 6,
     "name": "Extraction PoC"
@@ -227,6 +227,7 @@
   ],
   "schema": {
     "type": "object",
+    "additionalProperties": false,
     "required": [
       "entities",
       "relationships"
@@ -236,10 +237,12 @@
         "type": "array",
         "items": {
           "type": "object",
+          "additionalProperties": false,
           "required": [
             "id",
             "name",
-            "type"
+            "type",
+            "attributes"
           ],
           "properties": {
             "id": {
@@ -262,8 +265,46 @@
               ]
             },
             "attributes": {
-              "type": "object",
-              "description": "The attributes this entity has, as name and value. Use the attribute names given in the definitions above, and include only the ones the source states."
+              "type": "array",
+              "description": "The attributes this entity has, as name and value. Use the attribute names given in the definitions above, and include only the ones the source states.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "application_area",
+                      "award_amount",
+                      "category",
+                      "contract_number",
+                      "discipline",
+                      "email",
+                      "employee_count",
+                      "end_date",
+                      "field",
+                      "founded",
+                      "headquarters",
+                      "key_publication",
+                      "maturity_level",
+                      "model_number",
+                      "phone",
+                      "price",
+                      "released",
+                      "start_date",
+                      "title",
+                      "website"
+                    ]
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              }
             }
           }
         }
@@ -272,10 +313,12 @@
         "type": "array",
         "items": {
           "type": "object",
+          "additionalProperties": false,
           "required": [
             "type",
             "from",
-            "to"
+            "to",
+            "attributes"
           ],
           "properties": {
             "type": {
@@ -302,58 +345,29 @@
               "type": "string",
               "description": "The id of the entity at the to end."
             },
-            "ends": {
-              "description": "Which entity types each relationship type may join.",
-              "const": {
-                "Acquires": {
-                  "from": "Organization",
-                  "to": "Organization"
-                },
-                "Contract Develops": {
-                  "from": "Contract",
-                  "to": "Technology"
-                },
-                "Contract Researches": {
-                  "from": "Contract",
-                  "to": "Science"
-                },
-                "Develops": {
-                  "from": "Organization",
-                  "to": "Technology"
-                },
-                "Employs": {
-                  "from": "Organization",
-                  "to": "Person"
-                },
-                "Enters": {
-                  "from": "Organization",
-                  "to": "Contract"
-                },
-                "Point Of Contact": {
-                  "from": "Contract",
-                  "to": "Person"
-                },
-                "Researches": {
-                  "from": "Organization",
-                  "to": "Science"
-                },
-                "Sells": {
-                  "from": "Organization",
-                  "to": "Product"
-                },
-                "Supports": {
-                  "from": "Science",
-                  "to": "Technology"
-                },
-                "Uses": {
-                  "from": "Product",
-                  "to": "Technology"
+            "attributes": {
+              "type": "array",
+              "description": "The attributes this relationship has, as name and value. Use the attribute names given in the definitions above, and include only the ones the source states.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "announced",
+                      "role"
+                    ]
+                  },
+                  "value": {
+                    "type": "string"
+                  }
                 }
               }
-            },
-            "attributes": {
-              "type": "object",
-              "description": "The attributes this relationship has, as name and value. Use the attribute names given in the definitions above, and include only the ones the source states."
             }
           }
         }
@@ -366,21 +380,39 @@
         "id": "e1",
         "name": "The name the source gives this Organization",
         "type": "Organization",
-        "attributes": {
-          "employee_count": 1,
-          "founded": 1,
-          "headquarters": "the headquarters the source states"
-        }
+        "attributes": [
+          {
+            "name": "employee_count",
+            "value": "1"
+          },
+          {
+            "name": "founded",
+            "value": "1"
+          },
+          {
+            "name": "headquarters",
+            "value": "the headquarters the source states"
+          }
+        ]
       },
       {
         "id": "e2",
         "name": "The name the source gives this Organization",
         "type": "Organization",
-        "attributes": {
-          "employee_count": 1,
-          "founded": 1,
-          "headquarters": "the headquarters the source states"
-        }
+        "attributes": [
+          {
+            "name": "employee_count",
+            "value": "1"
+          },
+          {
+            "name": "founded",
+            "value": "1"
+          },
+          {
+            "name": "headquarters",
+            "value": "the headquarters the source states"
+          }
+        ]
       }
     ],
     "relationships": [
@@ -388,9 +420,12 @@
         "type": "Acquires",
         "from": "e1",
         "to": "e2",
-        "attributes": {
-          "announced": "1969-07-16T13:32:00Z"
-        }
+        "attributes": [
+          {
+            "name": "announced",
+            "value": "1969-07-16T13:32:00Z"
+          }
+        ]
       }
     ]
   }

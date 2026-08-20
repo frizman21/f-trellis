@@ -4,83 +4,119 @@
       "id": "c-award",
       "name": "AI Vision Based Guidance",
       "type": "Contract",
-      "attributes": {
-        "contract_number": "FA8649-24-P-0441",
-        "award_amount": 1247198,
-        "start_date": "2024-06-27",
-        "end_date": "2026-03-30"
-      }
+      "attributes": [
+        {
+          "name": "contract_number",
+          "value": "FA8649-24-P-0441"
+        },
+        {
+          "name": "award_amount",
+          "value": "1247198"
+        },
+        {
+          "name": "start_date",
+          "value": "2024-06-27"
+        },
+        {
+          "name": "end_date",
+          "value": "2026-03-30"
+        }
+      ]
     },
     {
       "id": "org-usi",
       "name": "Unmanned Systems Incorporated",
       "type": "Organization",
-      "attributes": {
-        "headquarters": "1700 Redbud Blvd Ste 400, McKinney, TX, 75069-3295, USA"
-      }
+      "attributes": [
+        {
+          "name": "headquarters",
+          "value": "1700 Redbud Blvd Ste 400, McKinney, TX, 75069-3295, USA"
+        }
+      ]
     },
     {
       "id": "org-dow",
       "name": "DOW",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "org-usaf",
       "name": "USAF",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "org-dra",
       "name": "Defense Research Associates",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "p-clayman",
       "name": "Gary Clayman",
       "type": "Person",
-      "attributes": {
-        "phone": "(937) 461-1644",
-        "email": "gclayman@dramail.com"
-      }
+      "attributes": [
+        {
+          "name": "phone",
+          "value": "(937) 461-1644"
+        },
+        {
+          "name": "email",
+          "value": "gclayman@dramail.com"
+        }
+      ]
     },
     {
       "id": "p-deschenes",
       "name": "Michael Deschenes",
       "type": "Person",
-      "attributes": {
-        "phone": "(937) 431-1644",
-        "email": "mdeschenes@dramail.com"
-      }
+      "attributes": [
+        {
+          "name": "phone",
+          "value": "(937) 431-1644"
+        },
+        {
+          "name": "email",
+          "value": "mdeschenes@dramail.com"
+        }
+      ]
     },
     {
       "id": "t-vbgs",
       "name": "Vision Based Guidance System",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-ai",
       "name": "Artificial Intelligence",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-cv",
       "name": "Computer Vision",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-localization",
       "name": "AI Object Localization",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-swarm",
       "name": "UAS Swarm Technology",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-ins",
       "name": "INS",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     }
   ],
   "relationships": [
@@ -88,43 +124,57 @@
       "type": "Enters",
       "from": "org-usi",
       "to": "c-award",
-      "attributes": {
-        "role": "Awardee"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Awardee"
+        }
+      ]
     },
     {
       "type": "Enters",
       "from": "org-dow",
       "to": "c-award",
-      "attributes": {
-        "role": "Awarding Agency"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Awarding Agency"
+        }
+      ]
     },
     {
       "type": "Point Of Contact",
       "from": "c-award",
       "to": "p-clayman",
-      "attributes": {
-        "role": "Principal Investigator"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Principal Investigator"
+        }
+      ]
     },
     {
       "type": "Point Of Contact",
       "from": "c-award",
       "to": "p-deschenes",
-      "attributes": {
-        "role": "Business Contact"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Business Contact"
+        }
+      ]
     },
     {
       "type": "Develops",
       "from": "org-dra",
-      "to": "t-vbgs"
+      "to": "t-vbgs",
+      "attributes": []
     },
     {
       "type": "Contract Develops",
       "from": "c-award",
-      "to": "t-vbgs"
+      "to": "t-vbgs",
+      "attributes": []
     }
   ]
 }

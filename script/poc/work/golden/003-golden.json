@@ -4,176 +4,219 @@
       "id": "org-skyfront",
       "name": "Skyfront",
       "type": "Organization",
-      "attributes": {
-        "headquarters": "500 Howland ST STE 5 Redwood City, CA 94063, United States of America"
-      }
+      "attributes": [
+        {
+          "name": "headquarters",
+          "value": "500 Howland ST STE 5 Redwood City, CA 94063, United States of America"
+        }
+      ]
     },
     {
       "id": "org-army",
       "name": "U.S. Army",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "org-silvus",
       "name": "Silvus Technologies",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "org-doodle",
       "name": "Doodle Labs",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "org-persistent",
       "name": "Persistent Systems",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "org-rfd",
       "name": "RFD",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "org-dagodzo",
       "name": "Dagodzo",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "p-gorman",
       "name": "Dylan Gorman",
-      "type": "Person"
+      "type": "Person",
+      "attributes": []
     },
     {
       "id": "prod-p8",
       "name": "Perimeter 8",
       "type": "Product",
-      "attributes": {
-        "category": "Hybrid Drone",
-        "price": 49900
-      }
+      "attributes": [
+        {
+          "name": "category",
+          "value": "Hybrid Drone"
+        },
+        {
+          "name": "price",
+          "value": "49900"
+        }
+      ]
     },
     {
       "id": "prod-p8plus",
       "name": "Perimeter 8+",
       "type": "Product",
-      "attributes": {
-        "category": "Hybrid Drone"
-      }
+      "attributes": [
+        {
+          "name": "category",
+          "value": "Hybrid Drone"
+        }
+      ]
     },
     {
       "id": "prod-magniphy",
       "name": "MagniPhy Magnetometer",
-      "type": "Product"
+      "type": "Product",
+      "attributes": []
     },
     {
       "id": "t-hybrid",
       "name": "Hybrid Gasoline-Electric Propulsion",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-efi",
       "name": "Electronic Fuel Injection",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-lidar",
       "name": "LiDAR",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-magnetometry",
       "name": "Magnetometry",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-rtk",
       "name": "RTK GNSS",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-terrain",
       "name": "Active Terrain Following",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "t-antijam",
       "name": "GPS Jamming Defense",
-      "type": "Technology"
+      "type": "Technology",
+      "attributes": []
     },
     {
       "id": "c-army",
       "name": "U.S. Army Contract for Perimeter 8 Long Endurance Drone Training and Integration",
-      "type": "Contract"
+      "type": "Contract",
+      "attributes": []
     }
   ],
   "relationships": [
     {
       "type": "Sells",
       "from": "org-skyfront",
-      "to": "prod-p8"
+      "to": "prod-p8",
+      "attributes": []
     },
     {
       "type": "Sells",
       "from": "org-skyfront",
-      "to": "prod-p8plus"
+      "to": "prod-p8plus",
+      "attributes": []
     },
     {
       "type": "Sells",
       "from": "org-skyfront",
-      "to": "prod-magniphy"
+      "to": "prod-magniphy",
+      "attributes": []
     },
     {
       "type": "Uses",
       "from": "prod-p8",
-      "to": "t-hybrid"
+      "to": "t-hybrid",
+      "attributes": []
     },
     {
       "type": "Uses",
       "from": "prod-p8",
-      "to": "t-efi"
+      "to": "t-efi",
+      "attributes": []
     },
     {
       "type": "Uses",
       "from": "prod-p8",
-      "to": "t-rtk"
+      "to": "t-rtk",
+      "attributes": []
     },
     {
       "type": "Uses",
       "from": "prod-p8",
-      "to": "t-terrain"
+      "to": "t-terrain",
+      "attributes": []
     },
     {
       "type": "Uses",
       "from": "prod-p8",
-      "to": "t-antijam"
+      "to": "t-antijam",
+      "attributes": []
     },
     {
       "type": "Uses",
       "from": "prod-p8",
-      "to": "t-lidar"
+      "to": "t-lidar",
+      "attributes": []
     },
     {
       "type": "Uses",
       "from": "prod-p8plus",
-      "to": "t-hybrid"
+      "to": "t-hybrid",
+      "attributes": []
     },
     {
       "type": "Uses",
       "from": "prod-magniphy",
-      "to": "t-magnetometry"
+      "to": "t-magnetometry",
+      "attributes": []
     },
     {
       "type": "Enters",
       "from": "org-skyfront",
-      "to": "c-army"
+      "to": "c-army",
+      "attributes": []
     },
     {
       "type": "Enters",
       "from": "org-army",
       "to": "c-army",
-      "attributes": {
-        "role": "Awarding Agency"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Awarding Agency"
+        }
+      ]
     }
   ]
 }

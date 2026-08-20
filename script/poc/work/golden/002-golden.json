@@ -4,109 +4,146 @@
       "id": "org-watermark",
       "name": "Watermark Community Church",
       "type": "Organization",
-      "attributes": {
-        "headquarters": "7540 Lyndon B Johnson Fwy, Dallas, TX 75251"
-      }
+      "attributes": [
+        {
+          "name": "headquarters",
+          "value": "7540 Lyndon B Johnson Fwy, Dallas, TX 75251"
+        }
+      ]
     },
     {
       "id": "org-tamu",
       "name": "Texas A&M",
-      "type": "Organization"
+      "type": "Organization",
+      "attributes": []
     },
     {
       "id": "p-anders",
       "name": "Todd Anders",
       "type": "Person",
-      "attributes": {
-        "title": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "id": "p-julie",
       "name": "Julie",
-      "type": "Person"
+      "type": "Person",
+      "attributes": []
     },
     {
       "id": "p-audrey",
       "name": "Audrey",
-      "type": "Person"
+      "type": "Person",
+      "attributes": []
     },
     {
       "id": "p-eve",
       "name": "Eve",
-      "type": "Person"
+      "type": "Person",
+      "attributes": []
     },
     {
       "id": "p-ateek",
       "name": "Timothy (TA) Ateek",
       "type": "Person",
-      "attributes": {
-        "title": "Elder, Lead Pastor"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder, Lead Pastor"
+        }
+      ]
     },
     {
       "id": "p-caldwell",
       "name": "Ben Caldwell",
       "type": "Person",
-      "attributes": {
-        "title": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "id": "p-coy",
       "name": "Scott Coy",
       "type": "Person",
-      "attributes": {
-        "title": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "id": "p-friedrich",
       "name": "Mickey Friedrich",
       "type": "Person",
-      "attributes": {
-        "title": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "id": "p-holmes",
       "name": "Blake Holmes",
       "type": "Person",
-      "attributes": {
-        "title": "Elder, Campus Pastor"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder, Campus Pastor"
+        }
+      ]
     },
     {
       "id": "p-johnston",
       "name": "Brett Johnston",
       "type": "Person",
-      "attributes": {
-        "title": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "id": "p-macfarlan",
       "name": "Dean Macfarlan",
       "type": "Person",
-      "attributes": {
-        "title": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "id": "p-thomas",
       "name": "Rob Thomas",
       "type": "Person",
-      "attributes": {
-        "title": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "id": "p-thompson",
       "name": "Kyle Thompson",
       "type": "Person",
-      "attributes": {
-        "title": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Elder"
+        }
+      ]
     }
   ],
   "relationships": [
@@ -114,81 +151,111 @@
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-anders",
-      "attributes": {
-        "role": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-ateek",
-      "attributes": {
-        "role": "Elder, Lead Pastor"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder, Lead Pastor"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-caldwell",
-      "attributes": {
-        "role": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-coy",
-      "attributes": {
-        "role": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-friedrich",
-      "attributes": {
-        "role": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-holmes",
-      "attributes": {
-        "role": "Elder, Campus Pastor"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder, Campus Pastor"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-johnston",
-      "attributes": {
-        "role": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-macfarlan",
-      "attributes": {
-        "role": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-thomas",
-      "attributes": {
-        "role": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder"
+        }
+      ]
     },
     {
       "type": "Employs",
       "from": "org-watermark",
       "to": "p-thompson",
-      "attributes": {
-        "role": "Elder"
-      }
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Elder"
+        }
+      ]
     }
   ]
 }

@@ -65,19 +65,32 @@ end
 
 def blank_string?(value) = !value.is_a?(String) || value.strip.empty?
 
+# The contract since #67: a list of {name, value} pairs. A hash is the shape it
+# used to declare, and reporting it as an error rather than quietly accepting it
+# is the point — a reply in the old shape is a reply to a prompt that is no
+# longer being sent.
 def check_attributes(record, path, declared, type_label, errors, kind)
-  bag = record["attributes"]
-  return 0 if bag.nil?
+  list = record["attributes"]
+  return 0 if list.nil?
 
-  unless bag.is_a?(Hash)
-    errors << { "path" => "#{path}.attributes", "code" => "attributes_not_object",
-                "message" => "attributes must be an object of name => value" }
+  unless list.is_a?(Array)
+    errors << { "path" => "#{path}.attributes", "code" => "attributes_not_array",
+                "message" => "attributes must be a list of {name, value} pairs" }
     return 0
   end
 
   counted = 0
+  pairs = list.each_with_index.filter_map do |entry, i|
+    unless entry.is_a?(Hash) && entry.key?("name") && entry.key?("value")
+      errors << { "path" => "#{path}.attributes[#{i}]", "code" => "attribute_not_a_pair",
+                  "message" => "attribute must be an object with a name and a value" }
+      next
+    end
 
-  bag.each do |name, value|
+    [ entry["name"], entry["value"] ]
+  end
+
+  pairs.each do |name, value|
     attribute = declared.call(type_label, name)
 
     if attribute.nil?

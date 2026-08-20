@@ -75,37 +75,104 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     assert_equal "array", schema.dig("properties", "relationships", "type")
   end
 
-  # A plain bag: the definitions already say each attribute's name and value type
-  # in prose, and declaring them again in JSON Schema said nothing new.
-  test "attributes are a name/value bag, not declared properties" do
+  # A list of name/value pairs: the definitions already say each attribute's name
+  # and value type in prose, and declaring a property per attribute says nothing
+  # new while colliding when two types share a name (#67).
+  test "attributes are a list of name/value pairs, not declared properties" do
     %w[entities relationships].each do |collection|
       attributes = schema.dig("properties", collection, "items", "properties", "attributes")
+      item = attributes["items"]
 
-      assert_equal "object", attributes["type"]
-      assert_nil attributes["properties"], "#{collection} still declares per-attribute properties"
+      assert_equal "array", attributes["type"]
       assert attributes["description"].present?
+      assert_equal %w[name value], item["properties"].keys.sort,
+                   "#{collection} attribute items carry more than a name and a value"
+      assert_equal %w[name value], item["required"].sort
     end
   end
 
-  # Walked rather than string-matched, so a nested declaration cannot hide.
+  # The prose says an attribute's value type and TypedValue#cast_value enforces
+  # it. A third statement in the schema is a third thing to disagree with the
+  # other two, so every value is declared a plain string.
   test "no value type is declared anywhere under attributes" do
     %w[entities relationships].each do |collection|
-      attributes = schema.dig("properties", collection, "items", "properties", "attributes")
+      value = schema.dig("properties", collection, "items", "properties",
+                         "attributes", "items", "properties", "value")
 
-      assert_equal %w[description type], attributes.keys.sort,
-                   "#{collection} attributes carry more than a type and a description"
-      assert_equal "object", attributes["type"]
+      assert_equal({ "type" => "string" }, value,
+                   "#{collection} attribute values carry a declared type")
     end
   end
 
+  # An attribute name the project has not declared is unrepresentable rather
+  # than something the applier discards afterwards.
+  test "attribute names are constrained to the ones the project declares" do
+    names = schema.dig("properties", "entities", "items", "properties",
+                       "attributes", "items", "properties", "name", "enum")
 
-  # A source that does not state a value should produce no value rather than an
-  # invented one.
-  test "an entity requires an id, a name and a type, and no attribute" do
+    assert_includes names, "thrust_kn"
+    assert_not_includes names, "not_a_real_attribute"
+  end
+
+  test "a disabled attribute is not offered as a name" do
+    entity_type_attributes(:engine_thrust).update!(is_disabled: true)
+
+    names = JSON.parse(ExtractionPrompt.new(@project).schema_json)
+                .dig("properties", "entities", "items", "properties",
+                     "attributes", "items", "properties", "name", "enum")
+
+    assert_not_includes names, "thrust_kn"
+  end
+
+  # An empty enum is invalid, and would surface as a provider error rather than
+  # here. A project declaring no attributes must leave the enum out entirely.
+  test "a project with no declared attributes omits the name enum" do
+    project = Project.create!(name: "Attribute-free")
+    bare = project.entity_types.create!(name: "Thing")
+    project.relationship_types.create!(name: "Touches", from_entity_type: bare, to_entity_type: bare)
+
+    name = JSON.parse(ExtractionPrompt.new(project).schema_json)
+               .dig("properties", "entities", "items", "properties",
+                    "attributes", "items", "properties", "name")
+
+    assert_equal({ "type" => "string" }, name)
+  end
+
+  # The whole point of #67: the schema has to be expressible as a grammar the
+  # provider can enforce. Walked rather than snapshotted, so it keeps holding as
+  # types are added.
+  test "every object in the schema is closed and fully required" do
+    problems = []
+
+    walk = lambda do |node, path|
+      case node
+      when Hash
+        if node["type"] == "object"
+          problems << "#{path}: additionalProperties is not false" unless node["additionalProperties"] == false
+          missing = (node["properties"] || {}).keys - Array(node["required"])
+          problems << "#{path}: properties not required: #{missing.inspect}" if missing.any?
+        end
+        problems << "#{path}: uses const" if node.key?("const")
+        problems << "#{path}: empty enum" if node["enum"].is_a?(Array) && node["enum"].empty?
+        node.each { |key, value| walk.call(value, "#{path}.#{key}") }
+      when Array
+        node.each_with_index { |value, i| walk.call(value, "#{path}[#{i}]") }
+      end
+    end
+
+    walk.call(schema, "$")
+
+    assert_empty problems, problems.join("\n")
+  end
+
+
+  # Everything is required, because a constrained grammar has no optional key.
+  # "Nothing stated" is an empty list, which is what the instructions ask for.
+  test "an entity requires an id, a name, a type and an attribute list" do
     entity = schema.dig("properties", "entities", "items")
 
-    assert_equal %w[id name type], entity["required"]
-    assert_nil entity.dig("properties", "attributes", "required")
+    assert_equal %w[attributes id name type], entity["required"].sort
+    assert_equal false, entity["additionalProperties"]
   end
 
   test "an entity's type is constrained to this project's types" do
@@ -119,7 +186,7 @@ class ExtractionPromptTest < ActiveSupport::TestCase
   test "relationships reference entities by the ids the model assigned" do
     relationship = schema.dig("properties", "relationships", "items")
 
-    assert_equal %w[type from to], relationship["required"]
+    assert_equal %w[attributes from to type], relationship["required"].sort
     %w[from to].each do |end_name|
       description = relationship.dig("properties", end_name, "description")
 
@@ -141,11 +208,18 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     assert_no_match(/by the same name you gave them/i, @prompt.instructions)
   end
 
-  # The schema carries the same rule the database enforces (#11).
-  test "a relationship's ends are constrained to what its type declares" do
-    ends = schema.dig("properties", "relationships", "items", "properties", "ends", "const")
+  # The rule the database enforces (#11) is stated once, in prose. It used to be
+  # repeated as an `ends` const in the schema, which read to a model as a field
+  # it had to emit — and models emitted it, once per relationship (#67).
+  test "a relationship declares no ends field" do
+    relationship = schema.dig("properties", "relationships", "items")
 
-    assert_equal({ "from" => "Rocket Engine", "to" => "Launch Vehicle" }, ends["Powers"])
+    assert_nil relationship.dig("properties", "ends")
+    assert_not_includes relationship["required"], "ends"
+  end
+
+  test "the prose still says which types each relationship joins" do
+    assert_match(/Joins a Rocket Engine \(from\) to a Launch Vehicle \(to\)/, @prompt.to_s)
   end
 
   # --- the instructions ------------------------------------------------------
@@ -156,8 +230,9 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     # Whitespace-tolerant: the instructions are a wrapped heredoc, and where a
     # line happens to break is not what these assertions are about.
     assert_match(/return\s+only that JSON/i, text)
-    assert_match(/Do not infer, estimate, or fill a\s+gap/i, text)
-    assert_match(/omit that attribute/i, text)
+    assert_match(/Do not infer,\s+estimate, or fill a\s+gap/i, text)
+    assert_match(/leave that attribute out of the list/i, text)
+    assert_match(/the list is\s+empty/i, text)
   end
 
   test "names the project it is extracting for" do
@@ -209,23 +284,38 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     assert_equal type.to_entity_type.name, example["entities"].last["type"]
   end
 
-  test "the example's attribute keys are real attributes of those types" do
+  test "the example's attribute names are real attributes of those types" do
     example["entities"].each do |entity|
       type = @project.entity_types.find_by!(name: entity["type"])
       declared = type.entity_type_attributes.active.pluck(:name)
 
-      entity.fetch("attributes", {}).each_key do |key|
-        assert_includes declared, key, "#{key} is not an attribute of #{type.name}"
+      entity.fetch("attributes").each do |pair|
+        assert_includes declared, pair["name"], "#{pair['name']} is not an attribute of #{type.name}"
       end
     end
   end
 
-  test "attributes in the example are a flat bag, not nested objects" do
+  # The example must not contradict the structure printed above it — that gap is
+  # where a model improvises.
+  test "the example's attributes are name/value pairs with scalar values" do
     example["entities"].each do |entity|
-      entity.fetch("attributes", {}).each_value do |value|
-        assert_not value.is_a?(Hash), "#{value.inspect} is nested; the bag is flat"
+      assert_kind_of Array, entity["attributes"]
+
+      entity["attributes"].each do |pair|
+        assert_equal %w[name value], pair.keys.sort
+        assert_kind_of String, pair["value"], "#{pair['value'].inspect} is not a string"
       end
     end
+  end
+
+  # Required means present, so a type with nothing to show still carries a list.
+  # Bare Type declares no attributes, and the example is built from Bare
+  # Relation, which is the first relationship type by name.
+  test "the example carries an attribute list even for a type with no attributes" do
+    bare = example["entities"].find { |entity| entity["type"] == entity_types(:bare).name }
+
+    assert_not_nil bare, "the example does not include the attribute-free type"
+    assert_equal [], bare["attributes"]
   end
 
   test "the prompt ends with the example" do

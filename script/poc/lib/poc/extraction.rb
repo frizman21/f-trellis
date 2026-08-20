@@ -119,11 +119,19 @@ module Poc
       value.is_a?(Array) ? value : []
     end
 
+    # Either shape. A list of {name, value} pairs is what the schema declares
+    # since #67; a name => value object is what it declared before, and what
+    # replies recorded before then still hold. Scoring has to span the change or
+    # a golden and a run on opposite sides of it would compare as total
+    # disagreement.
     def attributes_of(record)
-      bag = record["attributes"]
-      return [] unless bag.is_a?(Hash)
+      pairs = case record["attributes"]
+              when Hash  then record["attributes"].to_a
+              when Array then record["attributes"].filter_map { |p| [ p["name"], p["value"] ] if p.is_a?(Hash) }
+              else []
+              end
 
-      bag.filter_map do |name, value|
+      pairs.filter_map do |name, value|
         name = normalize(name)
         value = normalize(value)
         next if name.empty? || value.empty?
