@@ -160,19 +160,30 @@ targets.each do |n|
 
     reply = chat.ask(content)
     seconds = (Time.now - started).round(2)
-    body = reply.content.to_s
 
-    # Models fence JSON despite being told not to. Unfencing is a one-line fix
-    # and refusing to do it would waste the call, but the fact that it was
-    # needed is recorded — a model that cannot follow that instruction is
-    # telling you something about the rest of them.
-    fenced = body.strip.start_with?("```")
-    json_text = fenced ? body.strip.sub(/\A```(?:json)?\s*/m, "").sub(/```\s*\z/m, "") : body
+    # With a schema, RubyLLM has already parsed the reply into a Hash
+    # (Chat#normalize_schema_response) — `.to_s` on that yields Ruby inspect
+    # syntax, not JSON, and every reply would be recorded as unparseable.
+    # Without one, the reply is the string the model produced.
+    if reply.content.is_a?(Hash) || reply.content.is_a?(Array)
+      parsed = reply.content
+      body = JSON.pretty_generate(parsed)
+      fenced = false
+    else
+      body = reply.content.to_s
 
-    parsed = begin
-      JSON.parse(json_text)
-    rescue JSON::ParserError
-      nil
+      # Models fence JSON despite being told not to. Unfencing is a one-line fix
+      # and refusing to do it would waste the call, but the fact that it was
+      # needed is recorded — a model that cannot follow that instruction is
+      # telling you something about the rest of them.
+      fenced = body.strip.start_with?("```")
+      json_text = fenced ? body.strip.sub(/\A```(?:json)?\s*/m, "").sub(/```\s*\z/m, "") : body
+
+      parsed = begin
+        JSON.parse(json_text)
+      rescue JSON::ParserError
+        nil
+      end
     end
 
     usage = {
