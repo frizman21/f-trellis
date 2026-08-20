@@ -37,6 +37,13 @@
 /.env.production
 /.env.*.local
 
+# Any other .env.* is a real environment file until proven otherwise — a
+# .env.backup holding live API keys is the same leak as .env itself. The
+# committed templates are the exception, and are named as such.
+/.env.*
+!/.env.example
+!/.env.production.example
+
 # Local database dumps (see docs/dokku_devops.md)
 /backups/
 
