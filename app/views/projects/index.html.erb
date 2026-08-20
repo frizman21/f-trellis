@@ -24,7 +24,7 @@
               recorded. The counts are the useful thing to know before choosing. %>
           <td>
             <%= link_to structure_project_path(project), class: "btn btn-sm btn-outline-primary" do %>
-              Structure <span class="badge text-bg-secondary"><%= project.entity_types.size %></span>
+              Structure <span class="badge text-bg-secondary"><%= project.entity_types.count(&:kept?) %></span>
             <% end %>
           </td>
           <td>

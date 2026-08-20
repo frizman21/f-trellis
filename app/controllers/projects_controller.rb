@@ -12,10 +12,20 @@ class ProjectsController < ApplicationController
   # code keeps the modelling vocabulary.
   def structure
     @project = Project.find(params[:id])
-    @entity_types = @project.entity_types.includes(:entity_type_attributes, :entities)
-    @relationship_types = @project.relationship_types
+    # Kept only. The counts beside them deliberately are not — see
+    # OntologyHelper#instance_count, which says how many of the rows are deleted
+    # rather than omitting them.
+    @entity_types = @project.entity_types.kept.includes(:entity_type_attributes)
+    @relationship_types = @project.relationship_types.kept
                                   .includes(:relationship_type_attributes,
                                             :from_entity_type, :to_entity_type)
+
+    # Four grouped queries, the same shape #show already uses for its cards.
+    # Emphatically not `includes(:entities)` and a count in Ruby: F-DoD holds
+    # 352,894 entities and 1,015,988 relationships, and loading them to find out
+    # how many are deleted would make this page unopenable.
+    @entity_counts = counts_by(@project.entities, :entity_type_id)
+    @relationship_counts = counts_by(@project.relationships, :relationship_type_id)
   end
 
   # A project's data is not one list, it is a list per kind of thing, so the
@@ -23,7 +33,7 @@ class ProjectsController < ApplicationController
   # once. Counts come from one grouped query, not one per card.
   def show
     @project = Project.find(params[:id])
-    @entity_types = @project.entity_types.includes(:entity_type_attributes)
+    @entity_types = @project.entity_types.kept.includes(:entity_type_attributes)
     @counts = @project.entities.kept.group(:entity_type_id).count
   end
 
@@ -63,6 +73,13 @@ class ProjectsController < ApplicationController
   end
 
   private
+
+  # Kept and deleted totals per type id, defaulting to zero so a type with no
+  # instances at all needs no branch at the call site.
+  def counts_by(scope, column)
+    { kept: scope.kept.group(column).count,
+      deleted: scope.discarded.group(column).count }
+  end
 
   def project_params
     params.require(:project).permit(:name, :default_model_id, :extraction_attempts)

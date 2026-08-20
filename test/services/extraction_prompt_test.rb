@@ -241,4 +241,44 @@ class ExtractionPromptTest < ActiveSupport::TestCase
     assert_equal 1, example["entities"].size
     assert_empty example["relationships"]
   end
+
+  # --- deleted types (#66) ---------------------------------------------------
+
+  # The failure with a bill attached: a prompt naming a deleted type spends
+  # input tokens on every source asking a model for something nobody wants back.
+  test "omits a deleted entity type from the definitions, the enum and the example" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    text = ExtractionPrompt.new(@project).to_s
+
+    assert_not_includes text, "Rocket Engine"
+  end
+
+  test "omits a deleted relationship type" do
+    relationship_types(:powers).discard_with_relationships
+
+    text = ExtractionPrompt.new(@project).to_s
+
+    assert_not_includes text, "Powers"
+  end
+
+  # A relationship type naming a deleted entity type would be a rule no reply
+  # could satisfy. The cascade removes it; this is the prompt-side proof.
+  test "omits a relationship type whose end was deleted" do
+    entity_types(:launch_vehicle).discard_with_entities
+
+    text = ExtractionPrompt.new(@project).to_s
+
+    assert_not_includes text, "Powers"
+    assert_not_includes text, "Launch Vehicle"
+  end
+
+  # ExtractionJob raises NotRunnable on a blank prompt rather than sending an
+  # instructionless one.
+  test "is empty when every type is deleted" do
+    @project.relationship_types.kept.each(&:discard_with_relationships)
+    @project.entity_types.kept.each(&:discard_with_entities)
+
+    assert_predicate ExtractionPrompt.new(@project), :empty?
+  end
 end

@@ -7,7 +7,7 @@
     <%= link_to "Edit", edit_project_entity_type_path(@project, @entity_type), class: "btn btn-sm btn-outline-primary" %>
     <%= button_to "Delete", project_entity_type_path(@project, @entity_type), method: :delete,
                   class: "btn btn-sm btn-outline-danger",
-                  form: { class: "d-inline", data: { turbo_confirm: "Delete this entity type?" } } %>
+                  form: { class: "d-inline", data: { turbo_confirm: "Delete this entity type? Its entities, their relationships, and the relationship types that use it are deleted too." } } %>
   </div>
 </div>
 <p class="text-muted"><%= @entity_type.description %></p>

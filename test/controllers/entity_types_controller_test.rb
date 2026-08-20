@@ -109,26 +109,40 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Launch Vehicle", type.reload.name
   end
 
+  # Soft since #66: the row stays and the type leaves the ontology. Counted on
+  # `kept` rather than on EntityType.count, which no longer moves.
   test "destroy removes a type nothing is an instance of" do
     type = @project.entity_types.create!(name: "Disposable")
 
-    assert_difference -> { EntityType.count }, -1 do
-      delete project_entity_type_path(@project, type)
+    assert_difference -> { EntityType.kept.count }, -1 do
+      assert_no_difference -> { EntityType.count } do
+        delete project_entity_type_path(@project, type)
+      end
     end
 
     assert_redirected_to structure_project_path(@project)
+    assert type.reload.discarded?
   end
 
-  # A type with instances is not something to cascade away on a button press.
-  test "destroy refuses a type that still has entities and says why" do
+  # Was refused before #66, and refused forever after a single entity had been
+  # deleted, because restrict_with_error counted discarded rows too. It now
+  # takes its instances with it — nothing is destroyed, so there is nothing to
+  # refuse.
+  test "destroy takes a type's entities and relationship types with it" do
     type = entity_types(:rocket_engine)
+    entity = entities(:f1)
+    relationship_type = relationship_types(:powers)
 
     assert_no_difference -> { EntityType.count } do
       delete project_entity_type_path(@project, type)
     end
 
-    assert_redirected_to project_entity_type_path(@project, type)
-    assert flash[:alert].present?
+    assert_redirected_to structure_project_path(@project)
+    assert flash[:alert].blank?, "deleting a type with entities is no longer a refusal"
+    assert type.reload.discarded?
+    assert entity.reload.discarded?, "an entity of a deleted type is deleted"
+    assert relationship_type.reload.discarded?,
+           "a relationship type naming a deleted entity type is a rule nothing can satisfy"
   end
 
   # --- scoping ---------------------------------------------------------------
@@ -188,5 +202,53 @@ class EntityTypesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "a[href=?]", project_entity_path(@project, entities(:f1))
+  end
+
+  # --- a deleted type is gone from the ontology (#66) ------------------------
+
+  test "a deleted type's page is not found" do
+    type = entity_types(:rocket_engine)
+    type.discard_with_entities
+
+    get project_entity_type_path(@project, type)
+
+    assert_response :not_found
+  end
+
+  test "a deleted type is absent from the structure and project pages" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    get structure_project_path(@project)
+    assert_select "a", text: "Rocket Engine", count: 0
+
+    get project_path(@project)
+    assert_select "a", text: "Rocket Engine", count: 0
+  end
+
+  test "a deleted type's entity list is not found" do
+    type = entity_types(:rocket_engine)
+    slug = type.slug
+    type.discard_with_entities
+
+    get project_typed_entities_path(@project, slug)
+
+    assert_response :not_found
+  end
+
+  test "a deleted type is not offered as an end on the relationship type form" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    get new_project_relationship_type_path(@project)
+
+    assert_select "select[name=?] option", "relationship_type[from_entity_type_id]", text: "Rocket Engine", count: 0
+    assert_select "select[name=?] option", "relationship_type[to_entity_type_id]", text: "Rocket Engine", count: 0
+  end
+
+  test "a deleted type is not offered when creating an entity" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    get new_project_entity_path(@project)
+
+    assert_select "option", text: "Rocket Engine", count: 0
   end
 end

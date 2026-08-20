@@ -252,4 +252,27 @@ class ExtractionApplierTest < ActiveSupport::TestCase
     assert_equal before, [ Entity.count, EntitySource.count ],
                  "the first entity was left behind by a half-applied reply"
   end
+
+  # --- deleted types (#66) ---------------------------------------------------
+
+  test "does not create an entity of a deleted type" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    summary = apply reply(entities: [ entity_json ])
+
+    assert_equal 0, summary.dig("entities", "created").to_i
+    assert_nil @project.entities.kept.find_by(name: "Merlin 1D")
+  end
+
+  test "does not create a relationship of a deleted type" do
+    relationship_types(:powers).discard_with_relationships
+
+    summary = apply reply(
+      entities: [ entity_json,
+                  { "id" => "e2", "name" => "Falcon 9", "type" => "Launch Vehicle" } ],
+      relationships: [ { "type" => "Powers", "from" => "e1", "to" => "e2" } ]
+    )
+
+    assert_equal 0, summary.dig("relationships", "created").to_i
+  end
 end

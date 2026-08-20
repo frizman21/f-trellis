@@ -25,7 +25,7 @@
               list. The whole one is on the type's own page. %>
           <td><%= entity_type.description.to_s.truncate(100) %></td>
           <td><%= entity_type.entity_type_attributes.size %></td>
-          <td><%= entity_type.entities.kept.count %></td>
+          <td><%= instance_count @entity_counts[:kept][entity_type.id], @entity_counts[:deleted][entity_type.id] %></td>
         </tr>
       <% end %>
     </tbody>
@@ -65,7 +65,7 @@
                                        css_class: "text-muted" %></td>
           <td><%= relationship_type.description.to_s.truncate(100) %></td>
           <td><%= relationship_type.relationship_type_attributes.size %></td>
-          <td><%= relationship_type.relationships.kept.count %></td>
+          <td><%= instance_count @relationship_counts[:kept][relationship_type.id], @relationship_counts[:deleted][relationship_type.id] %></td>
         </tr>
       <% end %>
     </tbody>

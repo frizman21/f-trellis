@@ -39,16 +39,15 @@ class EntityTypesController < ApplicationController
 
   def destroy
     @entity_type = find_entity_type
+    # Soft, and it takes what is typed by it — see
+    # EntityType#discard_with_entities. Nothing is destroyed, so unlike the
+    # restrict_with_error this replaces, there is no failure branch: a type with
+    # entities is exactly the case that used to be impossible to delete and is
+    # now the ordinary one.
+    @entity_type.discard_with_entities
 
-    if @entity_type.destroy
-      redirect_to structure_project_path(@project),
-                  notice: "Entity type \"#{@entity_type.name}\" deleted."
-    else
-      # restrict_with_error: a type with entities of it still in the project is
-      # not something to cascade away silently.
-      redirect_to project_entity_type_path(@project, @entity_type),
-                  alert: @entity_type.errors.full_messages.to_sentence
-    end
+    redirect_to structure_project_path(@project),
+                notice: "Entity type \"#{@entity_type.name}\" deleted."
   end
 
   private
@@ -57,8 +56,10 @@ class EntityTypesController < ApplicationController
     @project = Project.find(params[:project_id])
   end
 
+  # Kept only: a deleted type's page is gone, the same way a deleted entity's
+  # is (EntitiesController#find_entity).
   def find_entity_type
-    @project.entity_types.find(params[:id])
+    @project.entity_types.kept.find(params[:id])
   end
 
   # Every relationship type with this entity type at either end.
@@ -79,9 +80,9 @@ class EntityTypesController < ApplicationController
   # fifteen relationship types F-DoD's Person sits in are forty-five queries.
   # Order comes from RelationshipType's default scope.
   def relationship_types_touching(entity_type)
-    @project.relationship_types
+    @project.relationship_types.kept
             .where(from_entity_type_id: entity_type.id)
-            .or(@project.relationship_types.where(to_entity_type_id: entity_type.id))
+            .or(@project.relationship_types.kept.where(to_entity_type_id: entity_type.id))
             .includes(:from_entity_type, :to_entity_type, :relationship_type_attributes)
   end
 

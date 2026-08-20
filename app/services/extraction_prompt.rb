@@ -10,9 +10,11 @@
 class ExtractionPrompt
   def initialize(project)
     @project = project
-    # Active only: the prompt asks for what the project tracks now.
-    @entity_types = project.entity_types.includes(:entity_type_attributes).to_a
-    @relationship_types = project.relationship_types
+    # Active and undeleted only: the prompt asks for what the project tracks
+    # now. A deleted type left in here is paid for on every source — tokens
+    # spent asking a model for a kind of thing nobody wants back.
+    @entity_types = project.entity_types.kept.includes(:entity_type_attributes).to_a
+    @relationship_types = project.relationship_types.kept
                                  .includes(:relationship_type_attributes,
                                            :from_entity_type, :to_entity_type).to_a
   end

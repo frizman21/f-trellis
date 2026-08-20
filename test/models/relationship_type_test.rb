@@ -62,4 +62,47 @@ class RelationshipTypeTest < ActiveSupport::TestCase
       assert type.destroy
     end
   end
+
+  # --- soft delete (#66) -----------------------------------------------------
+
+  test "discarding a type takes the relationships of that kind" do
+    type = relationship_types(:powers)
+
+    type.discard_with_relationships
+
+    assert type.reload.discarded?
+    assert relationships(:f1_powers_saturn_v).reload.discarded?
+  end
+
+  test "a cascade does not restamp an already deleted relationship" do
+    already = relationships(:f1_powers_saturn_v)
+    already.discard!
+    deleted_at = already.reload.deleted_at
+
+    travel 1.hour do
+      relationship_types(:powers).discard_with_relationships
+    end
+
+    assert_equal deleted_at, already.reload.deleted_at
+  end
+
+  test "a discarded type's name is free for a new one" do
+    relationship_types(:powers).discard_with_relationships
+
+    replacement = projects(:apollo).relationship_types.new(
+      name: "Powers",
+      from_entity_type: entity_types(:rocket_engine),
+      to_entity_type: entity_types(:launch_vehicle)
+    )
+
+    assert replacement.save, replacement.errors.full_messages.to_sentence
+  end
+
+  # The console guard the controller no longer reaches.
+  test "a hard destroy is still refused while relationships exist" do
+    type = relationship_types(:powers)
+
+    assert_not type.destroy
+    assert_includes type.errors.full_messages.to_sentence, "dependent relationships exist"
+  end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_19_213528) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_20_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -127,11 +127,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_213528) do
 
   create_table "entity_types", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.datetime "deleted_at"
     t.text "description"
     t.string "name", null: false
     t.bigint "project_id", null: false
     t.datetime "updated_at", null: false
-    t.index "project_id, lower((name)::text)", name: "index_entity_types_on_project_and_lower_name", unique: true
+    t.index "project_id, lower((name)::text)", name: "index_entity_types_on_project_and_lower_name", unique: true, where: "(deleted_at IS NULL)"
+    t.index ["deleted_at"], name: "index_entity_types_on_kept", where: "(deleted_at IS NULL)"
     t.index ["project_id"], name: "index_entity_types_on_project_id"
   end
 
@@ -322,13 +324,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_19_213528) do
 
   create_table "relationship_types", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.datetime "deleted_at"
     t.text "description"
     t.bigint "from_entity_type_id", null: false
     t.string "name", null: false
     t.bigint "project_id", null: false
     t.bigint "to_entity_type_id", null: false
     t.datetime "updated_at", null: false
-    t.index "project_id, lower((name)::text)", name: "index_relationship_types_on_project_and_lower_name", unique: true
+    t.index "project_id, lower((name)::text)", name: "index_relationship_types_on_project_and_lower_name", unique: true, where: "(deleted_at IS NULL)"
+    t.index ["deleted_at"], name: "index_relationship_types_on_kept", where: "(deleted_at IS NULL)"
     t.index ["from_entity_type_id"], name: "index_relationship_types_on_from_entity_type_id"
     t.index ["project_id"], name: "index_relationship_types_on_project_id"
     t.index ["to_entity_type_id"], name: "index_relationship_types_on_to_entity_type_id"

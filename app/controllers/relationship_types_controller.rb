@@ -39,15 +39,15 @@ class RelationshipTypesController < ApplicationController
   def destroy
     @relationship_type = find_relationship_type
 
-    if @relationship_type.destroy
-      redirect_to structure_project_path(@project),
-                  notice: "Relationship type \"#{@relationship_type.name}\" deleted."
-    else
-      # restrict_with_error: edges of this kind still exist, and deleting the
-      # kind out from under them would leave them meaning nothing.
-      redirect_to project_relationship_type_path(@project, @relationship_type),
-                  alert: @relationship_type.errors.full_messages.to_sentence
-    end
+    # Soft, and it takes the edges of this kind with it — see
+    # RelationshipType#discard_with_relationships. The old restrict_with_error
+    # branch is gone: it refused whenever any relationship row existed,
+    # including ones already removed through the UI, which made a type with a
+    # deleted edge undeletable forever (#66).
+    @relationship_type.discard_with_relationships
+
+    redirect_to structure_project_path(@project),
+                notice: "Relationship type \"#{@relationship_type.name}\" deleted."
   end
 
   private
@@ -57,7 +57,7 @@ class RelationshipTypesController < ApplicationController
   end
 
   def find_relationship_type
-    @project.relationship_types.find(params[:id])
+    @project.relationship_types.kept.find(params[:id])
   end
 
   def relationship_type_params

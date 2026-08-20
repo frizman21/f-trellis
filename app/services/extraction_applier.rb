@@ -87,7 +87,7 @@ class ExtractionApplier
   end
 
   def apply_relationship(attrs)
-    type = project.relationship_types.find { |t| t.name.casecmp?(attrs["type"].to_s) }
+    type = project.relationship_types.kept.find { |t| t.name.casecmp?(attrs["type"].to_s) }
     return skip_relationship(attrs, "no relationship type named #{attrs['type'].inspect}") if type.nil?
 
     from = @by_reply_id[attrs["from"].to_s]
@@ -176,7 +176,7 @@ class ExtractionApplier
   end
 
   def entity_type_for(name)
-    project.entity_types.find { |t| t.name.casecmp?(name.to_s) }
+    project.entity_types.kept.find { |t| t.name.casecmp?(name.to_s) }
   end
 
   def find_entity(type, name, scope:)

@@ -19,13 +19,13 @@
   <div class="row g-2 mb-3">
     <div class="col-sm-6">
       <%= f.label :from_entity_type_id, "From", class: "form-label" %>
-      <%= f.collection_select :from_entity_type_id, project.entity_types, :id, :name,
+      <%= f.collection_select :from_entity_type_id, project.entity_types.kept, :id, :name,
                               { prompt: "Choose an entity type" },
                               class: "form-select", required: true %>
     </div>
     <div class="col-sm-6">
       <%= f.label :to_entity_type_id, "To", class: "form-label" %>
-      <%= f.collection_select :to_entity_type_id, project.entity_types, :id, :name,
+      <%= f.collection_select :to_entity_type_id, project.entity_types.kept, :id, :name,
                               { prompt: "Choose an entity type" },
                               class: "form-select", required: true %>
     </div>
