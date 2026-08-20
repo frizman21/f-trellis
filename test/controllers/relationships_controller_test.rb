@@ -160,17 +160,17 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
   # --- citing a source -------------------------------------------------------
 
   test "create records a citation for the edge when a source is chosen" do
-    assert_difference -> { RelationshipSource.count }, 1 do
+    assert_difference -> { RelationshipExtractionRun.count }, 1 do
       post project_relationships_path(@project), params: {
         relationship: { relationship_type_id: relationship_types(:bare_relation).id,
                         from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id,
-                        relationship_sources_attributes: {
+                        relationship_extraction_runs_attributes: {
                           "0" => { source_id: sources(:one).id, confidence: "75" }
                         } }
       }
     end
 
-    citation = Relationship.order(:id).last.relationship_sources.sole
+    citation = Relationship.order(:id).last.relationship_extraction_runs.sole
 
     assert_equal sources(:one), citation.source
     assert_equal 75, citation.confidence
@@ -178,11 +178,11 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
 
   test "create records no citation when no source is chosen" do
     assert_difference -> { Relationship.count }, 1 do
-      assert_no_difference -> { RelationshipSource.count } do
+      assert_no_difference -> { RelationshipExtractionRun.count } do
         post project_relationships_path(@project), params: {
           relationship: { relationship_type_id: relationship_types(:bare_relation).id,
                           from_entity_id: entities(:f1).id, to_entity_id: entities(:bare).id,
-                          relationship_sources_attributes: { "0" => { source_id: "", confidence: "100" } } }
+                          relationship_extraction_runs_attributes: { "0" => { source_id: "", confidence: "100" } } }
         }
       end
     end
@@ -192,13 +192,13 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
     relationship = relationships(:f1_powers_saturn_v)
     stage = relationship_type_attributes(:powers_stage)
 
-    assert_difference -> { RelationshipTypeValueSource.count }, 1 do
+    assert_difference -> { RelationshipTypeValueExtractionRun.count }, 1 do
       patch project_relationship_path(@project, relationship), params: {
         relationship: {
           relationship_type_id: relationship.relationship_type_id,
           relationship_type_values_attributes: {
             "0" => { relationship_type_attribute_id: stage.id, value: "First",
-                     relationship_type_value_sources_attributes: {
+                     relationship_type_value_extraction_runs_attributes: {
                        "0" => { source_id: sources(:one).id, confidence: "55" }
                      } }
           }
@@ -208,7 +208,7 @@ class RelationshipsControllerTest < ActionDispatch::IntegrationTest
 
     value = relationship.reload.relationship_type_values.find_by(relationship_type_attribute: stage)
 
-    assert_equal 55, value.relationship_type_value_sources.sole.confidence
+    assert_equal 55, value.relationship_type_value_extraction_runs.sole.confidence
   end
 
   test "the relationship edit form offers a source search field" do

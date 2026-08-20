@@ -43,7 +43,7 @@
 
         <%# The citation belongs to this value, not to the entity: different
             facts about one thing can come from different pages. %>
-        <%= vf.fields_for :entity_attribute_value_sources do |sf| %>
+        <%= vf.fields_for :entity_attribute_value_extraction_runs do |sf| %>
           <%= render "shared/source_field", f: sf, label: "Source for #{attribute.name} (optional)" %>
         <% end %>
       </div>

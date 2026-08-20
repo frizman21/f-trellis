@@ -133,7 +133,7 @@ class ExtractionJobTest < ActiveJob::TestCase
                      '"attributes":{"thrust_kn":"900.5"}}],"relationships":[]}'
 
     assert_difference [ -> { Entity.count }, -> { EntityAttributeValue.count },
-                        -> { EntitySource.count } ], 1 do
+                        -> { EntityExtractionRun.count } ], 1 do
       with_fake_chat { ExtractionJob.perform_now(run) }
     end
 
@@ -142,7 +142,7 @@ class ExtractionJobTest < ActiveJob::TestCase
     assert_equal "Rocket Engine", created.entity_type.name
     assert_in_delta 900.5, created.value_for("thrust_kn")
     # Cited to the page it came from — the reason the join tables exist.
-    assert_equal @source, created.entity_sources.sole.source
+    assert_equal @source, created.entity_extraction_runs.sole.source
   end
 
   test "the run records a summary of what it did" do

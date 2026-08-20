@@ -16,8 +16,8 @@ class Entity < ApplicationRecord
   belongs_to :entity_type
 
   has_many :entity_attribute_values, dependent: :destroy
-  has_many :entity_sources, dependent: :destroy
-  has_many :sources, through: :entity_sources
+  has_many :entity_extraction_runs, dependent: :destroy
+  has_many :sources, through: :entity_extraction_runs
   has_many :outgoing_relationships, class_name: "Relationship",
            foreign_key: :from_entity_id, dependent: :destroy, inverse_of: :from_entity
   has_many :incoming_relationships, class_name: "Relationship",
@@ -28,7 +28,7 @@ class Entity < ApplicationRecord
   # erasure and must go through, which is why the id is what distinguishes them.
   accepts_nested_attributes_for :entity_attribute_values,
                                 reject_if: ->(attrs) { attrs["id"].blank? && attrs["value"].blank? }
-  accepts_nested_attributes_for :entity_sources, reject_if: ->(attrs) { attrs["source_id"].blank? }
+  accepts_nested_attributes_for :entity_extraction_runs, reject_if: ->(attrs) { attrs["source_id"].blank? }
 
   # Data in one project cannot be typed by another project's ontology. Without
   # this, a guessed entity_type_id would quietly pull a type across the boundary

@@ -47,9 +47,11 @@ class SoftDeleteTest < ActiveSupport::TestCase
   # Soft delete keeps things; a cascade here would defeat the point.
   test "a discarded entity keeps its values and its citations" do
     entity = entities(:f1)
-    EntitySource.create!(entity: entity, source: sources(:one))
+    EntityExtractionRun.create!(entity: entity, source: sources(:one),
+                                extraction_run: an_extraction_run(project: entity.project,
+                                                                  source: sources(:one)))
 
-    assert_no_difference [ -> { EntityAttributeValue.count }, -> { EntitySource.count } ] do
+    assert_no_difference [ -> { EntityAttributeValue.count }, -> { EntityExtractionRun.count } ] do
       entity.discard_with_relationships
     end
   end

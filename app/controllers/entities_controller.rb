@@ -28,9 +28,14 @@ class EntitiesController < ApplicationController
   def show
     @entity = find_entity
     @rows = @entity.attribute_rows
+    # The citations are counted beside every value and behind every pedigree
+    # icon. Preloaded, or a Contract with seventeen attributes is eighteen
+    # extra queries before the relationships are even reached.
+    @entity.entity_attribute_values.includes(:entity_attribute_value_extraction_runs).load
     @relationships = @entity.relationships.kept
-                            .includes(:relationship_type, :relationship_type_values,
-                                      from_entity: :entity_type, to_entity: :entity_type)
+                            .includes(:relationship_type, :relationship_extraction_runs,
+                                      { relationship_type_values: :relationship_type_value_extraction_runs },
+                                      { from_entity: :entity_type }, { to_entity: :entity_type })
                             .order(:id)
     # The union of columns the kinds of edge on this page ask for. An entity can
     # hold edges of several kinds, so the table shows what any of them declares
@@ -58,13 +63,13 @@ class EntitiesController < ApplicationController
 
     # One blank citation row for the form to bind to. Left empty it is rejected,
     # which is how "no source" is said.
-    @entity.entity_sources.build
+    @entity.entity_extraction_runs.build
   end
 
   def create
     @entity = @project.entities.new(entity_params)
 
-    if @entity.save
+    if save_with_manual_run(@entity)
       # If the form already carried the attributes there is nothing left to ask,
       # so go to the entity rather than to a second step that would be empty.
       if @entity.entity_attribute_values.any?
@@ -78,7 +83,7 @@ class EntitiesController < ApplicationController
         @entity.build_missing_attribute_values
         build_missing_citations
       end
-      @entity.entity_sources.build if @entity.entity_sources.empty?
+      @entity.entity_extraction_runs.build if @entity.entity_extraction_runs.empty?
       render :new, status: :unprocessable_entity
     end
   end
@@ -92,7 +97,9 @@ class EntitiesController < ApplicationController
   def update
     @entity = find_entity
 
-    if @entity.update(entity_params)
+    @entity.assign_attributes(entity_params)
+
+    if save_with_manual_run(@entity)
       redirect_to project_entity_path(@project, @entity), notice: "Entity updated."
     else
       @entity.build_missing_attribute_values
@@ -217,17 +224,36 @@ class EntitiesController < ApplicationController
   # without the form growing an "add source" step.
   def build_missing_citations
     @entity.entity_attribute_values.each do |value|
-      value.entity_attribute_value_sources.build if value.entity_attribute_value_sources.empty?
+      value.entity_attribute_value_extraction_runs.build if value.entity_attribute_value_extraction_runs.empty?
     end
+  end
+
+  # Citations a person entered need a run of their own before they will save.
+  #
+  # In a transaction with the record: the run is created first because the
+  # citations point at it, and a save that then fails must not leave a run
+  # behind claiming an edit that never happened.
+  def save_with_manual_run(entity)
+    ActiveRecord::Base.transaction do
+      ManualCitationRun.stamp!(project: @project, citations: citations_of(entity))
+      raise ActiveRecord::Rollback unless entity.save
+
+      true
+    end
+  end
+
+  def citations_of(entity)
+    entity.entity_extraction_runs +
+      entity.entity_attribute_values.flat_map(&:entity_attribute_value_extraction_runs)
   end
 
   def entity_params
     params.require(:entity).permit(
       :name, :entity_type_id,
-      entity_sources_attributes: [ :id, :source_id, :confidence ],
+      entity_extraction_runs_attributes: [ :id, :source_id, :confidence ],
       entity_attribute_values_attributes: [
         :id, :entity_type_attribute_id, :value,
-        { entity_attribute_value_sources_attributes: [ :id, :source_id, :confidence ] }
+        { entity_attribute_value_extraction_runs_attributes: [ :id, :source_id, :confidence ] }
       ]
     )
   end

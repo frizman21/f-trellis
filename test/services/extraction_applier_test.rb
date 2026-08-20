@@ -39,10 +39,10 @@ class ExtractionApplierTest < ActiveSupport::TestCase
     assert_in_delta 845.0, entity.value_for("thrust_kn")
     assert_equal 1, entity.value_for("chambers")
 
-    assert_equal @source, entity.entity_sources.sole.source
-    assert_equal ExtractionApplier::CONFIDENCE, entity.entity_sources.sole.confidence
+    assert_equal @source, entity.entity_extraction_runs.sole.source
+    assert_equal ExtractionApplier::CONFIDENCE, entity.entity_extraction_runs.sole.confidence
     entity.entity_attribute_values.each do |value|
-      assert_equal @source, value.entity_attribute_value_sources.sole.source
+      assert_equal @source, value.entity_attribute_value_extraction_runs.sole.source
     end
   end
 
@@ -57,7 +57,7 @@ class ExtractionApplierTest < ActiveSupport::TestCase
     assert_equal 1, summary.dig("relationships", "created")
     assert_equal "Merlin 1D", edge.from_entity.name
     assert_equal "Falcon 9", edge.to_entity.name
-    assert_equal @source, edge.relationship_sources.sole.source
+    assert_equal @source, edge.relationship_extraction_runs.sole.source
   end
 
   # --- matching --------------------------------------------------------------
@@ -89,10 +89,32 @@ class ExtractionApplierTest < ActiveSupport::TestCase
                  relationships: [])
     apply json
 
-    assert_no_difference [ -> { Entity.count }, -> { EntityAttributeValue.count },
-                           -> { EntitySource.count } ] do
+    assert_no_difference [ -> { Entity.count }, -> { EntityAttributeValue.count } ] do
       apply json
     end
+  end
+
+  # What #71 changed. The graph does not grow — the entity is matched, not
+  # duplicated — but the second run saw the same fact on the same page, and that
+  # is now recorded rather than discarded. Each apply here is its own run.
+  test "applying twice records the second sighting" do
+    json = reply(entities: [ entity_json("attributes" => { "thrust_kn" => "845.0" }) ],
+                 relationships: [])
+    apply json
+
+    assert_difference [ -> { EntityExtractionRun.count },
+                        -> { EntityAttributeValueExtractionRun.count } ], 1 do
+      apply json
+    end
+  end
+
+  test "a citation names the run that recorded it" do
+    apply reply(entities: [ entity_json ])
+
+    citation = @project.entities.kept.find_by(name: "Merlin 1D").entity_extraction_runs.sole
+
+    assert_equal @source, citation.source
+    assert_equal ExtractionRun.order(:id).last, citation.extraction_run
   end
 
   # --- skipping, each reason on its own --------------------------------------
@@ -174,7 +196,7 @@ class ExtractionApplierTest < ActiveSupport::TestCase
                                                   "attributes" => { "thrust_kn" => "9999.0" }) ])
 
     assert_in_delta stored, existing.reload.value
-    assert_equal @source, existing.entity_attribute_value_sources.sole.source
+    assert_equal @source, existing.entity_attribute_value_extraction_runs.sole.source
     conflict = summary.dig("values", "conflicts").sole
     assert_equal "thrust_kn", conflict["attribute"]
     assert_equal "9999.0", conflict["offered"]
@@ -187,7 +209,7 @@ class ExtractionApplierTest < ActiveSupport::TestCase
                                                   "attributes" => { "thrust_kn" => existing.value.to_s }) ])
 
     assert_empty summary.dig("values", "conflicts")
-    assert_equal @source, existing.reload.entity_attribute_value_sources.sole.source
+    assert_equal @source, existing.reload.entity_attribute_value_extraction_runs.sole.source
   end
 
   # --- soft-deleted ----------------------------------------------------------
@@ -225,7 +247,7 @@ class ExtractionApplierTest < ActiveSupport::TestCase
   test "a failure partway through writes nothing at all" do
     json = reply(entities: [ entity_json,
                              { "id" => "e2", "name" => "Falcon 9", "type" => "Launch Vehicle" } ])
-    before = [ Entity.count, EntitySource.count ]
+    before = [ Entity.count, EntityExtractionRun.count ]
 
     original = Entity.instance_method(:save!)
     calls = 0
@@ -249,7 +271,7 @@ class ExtractionApplierTest < ActiveSupport::TestCase
     end
 
     assert raised, "the stub should have blown up on the second entity"
-    assert_equal before, [ Entity.count, EntitySource.count ],
+    assert_equal before, [ Entity.count, EntityExtractionRun.count ],
                  "the first entity was left behind by a half-applied reply"
   end
 

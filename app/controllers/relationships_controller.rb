@@ -6,7 +6,7 @@ class RelationshipsController < ApplicationController
   def create
     @relationship = @project.relationships.new(relationship_params)
 
-    if @relationship.save
+    if save_with_manual_run(@relationship)
       redirect_to project_entity_path(@project, @relationship.from_entity),
                   notice: "Relationship added."
     else
@@ -25,7 +25,9 @@ class RelationshipsController < ApplicationController
   def update
     @relationship = find_relationship
 
-    if @relationship.update(relationship_params)
+    @relationship.assign_attributes(relationship_params)
+
+    if save_with_manual_run(@relationship)
       redirect_to project_entity_path(@project, @relationship.from_entity),
                   notice: "Relationship updated."
     else
@@ -51,6 +53,23 @@ class RelationshipsController < ApplicationController
     @project = Project.find(params[:project_id])
   end
 
+  # Citations a person entered need a run of their own before they will save.
+  # In a transaction with the record, so a failed save leaves no run behind
+  # claiming an edit that never happened.
+  def save_with_manual_run(relationship)
+    ActiveRecord::Base.transaction do
+      ManualCitationRun.stamp!(project: @project, citations: citations_of(relationship))
+      raise ActiveRecord::Rollback unless relationship.save
+
+      true
+    end
+  end
+
+  def citations_of(relationship)
+    relationship.relationship_extraction_runs +
+      relationship.relationship_type_values.flat_map(&:relationship_type_value_extraction_runs)
+  end
+
   def find_relationship
     @project.relationships.kept.find(params[:id])
   end
@@ -66,17 +85,17 @@ class RelationshipsController < ApplicationController
 
   def build_missing_citations
     @relationship.relationship_type_values.each do |value|
-      value.relationship_type_value_sources.build if value.relationship_type_value_sources.empty?
+      value.relationship_type_value_extraction_runs.build if value.relationship_type_value_extraction_runs.empty?
     end
   end
 
   def relationship_params
     params.require(:relationship).permit(
       :from_entity_id, :to_entity_id, :relationship_type_id,
-      relationship_sources_attributes: [ :id, :source_id, :confidence ],
+      relationship_extraction_runs_attributes: [ :id, :source_id, :confidence ],
       relationship_type_values_attributes: [
         :id, :relationship_type_attribute_id, :value,
-        { relationship_type_value_sources_attributes: [ :id, :source_id, :confidence ] }
+        { relationship_type_value_extraction_runs_attributes: [ :id, :source_id, :confidence ] }
       ]
     )
   end

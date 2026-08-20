@@ -48,6 +48,14 @@ Rails.application.routes.draw do
     resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]
 
+    # Where one recorded fact came from. Four kinds of fact can be cited, so the
+    # kind is in the path rather than four near-identical routes — see
+    # PedigreesController::KINDS.
+    #
+    # Three segments, so it cannot collide with the one-segment :type_slug
+    # catch-all below and needs no entry in RESERVED_SLUGS.
+    get "pedigree/:kind/:id", to: "pedigrees#show", as: :pedigree
+
     # A project's entities of one kind, at the type's own slug — /projects/1/
     # rocket-engines. Declared last so every named route above wins the match
     # first; EntityType additionally refuses a slug that would collide with one,
