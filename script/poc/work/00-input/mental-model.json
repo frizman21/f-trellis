@@ -1,0 +1,803 @@
+{
+  "exported_at": "2026-08-20T14:10:38Z",
+  "project": {
+    "id": 4,
+    "name": "F-DoD"
+  },
+  "entity_types": [
+    {
+      "name": "Contract",
+      "description": "A specific award of money for work: a contract, grant, task order, or other transaction agreement. Record it when the source names an award identifier, a value, a period of performance, or the parties to a particular award. Do not record a general funding relationship, a budget line, or a programme with no award behind it. A statement that an agency funded the work is not a Contract unless the source names the award.",
+      "attributes": [
+        {
+          "name": "abstract",
+          "value_type": "string"
+        },
+        {
+          "name": "agency_tracking_number",
+          "value_type": "string"
+        },
+        {
+          "name": "award_year",
+          "value_type": "int"
+        },
+        {
+          "name": "end_date",
+          "value_type": "datetime"
+        },
+        {
+          "name": "identifier",
+          "value_type": "string"
+        },
+        {
+          "name": "import_key",
+          "value_type": "string"
+        },
+        {
+          "name": "notification_date",
+          "value_type": "datetime"
+        },
+        {
+          "name": "phase",
+          "value_type": "string"
+        },
+        {
+          "name": "program",
+          "value_type": "string"
+        },
+        {
+          "name": "proposal_receipt_date",
+          "value_type": "datetime"
+        },
+        {
+          "name": "solicitation_close_date",
+          "value_type": "datetime"
+        },
+        {
+          "name": "solicitation_number",
+          "value_type": "string"
+        },
+        {
+          "name": "solicitation_year",
+          "value_type": "int"
+        },
+        {
+          "name": "start_date",
+          "value_type": "datetime"
+        },
+        {
+          "name": "title",
+          "value_type": "string"
+        },
+        {
+          "name": "topic_code",
+          "value_type": "string"
+        },
+        {
+          "name": "value_usd",
+          "value_type": "float"
+        }
+      ]
+    },
+    {
+      "name": "Organization",
+      "description": "A company, government agency, laboratory, university, programme office, or other named body that acts as a unit. Record it when the source treats it as an actor: awarding, building, funding, employing, regulating, or operating something. Record a named division or subunit as its own Organization when the source names it separately from its parent. Do not record a place, a product line, or a project name as an Organization; a named built thing is a Part.",
+      "attributes": [
+        {
+          "name": "acronym",
+          "value_type": "string"
+        },
+        {
+          "name": "city",
+          "value_type": "string"
+        },
+        {
+          "name": "disadvantaged_owned",
+          "value_type": "string"
+        },
+        {
+          "name": "duns",
+          "value_type": "string"
+        },
+        {
+          "name": "employee_count",
+          "value_type": "int"
+        },
+        {
+          "name": "hubzone_owned",
+          "value_type": "string"
+        },
+        {
+          "name": "import_key",
+          "value_type": "string"
+        },
+        {
+          "name": "organization_kind",
+          "value_type": "string"
+        },
+        {
+          "name": "postal_code",
+          "value_type": "string"
+        },
+        {
+          "name": "state",
+          "value_type": "string"
+        },
+        {
+          "name": "street_address",
+          "value_type": "string"
+        },
+        {
+          "name": "uei",
+          "value_type": "string"
+        },
+        {
+          "name": "website",
+          "value_type": "string"
+        },
+        {
+          "name": "woman_owned",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Part",
+      "description": "A concrete, built artefact with an identity of its own: an engine, a stage, a computer, an airframe, an instrument, a subassembly. Record it when the source names a specific thing that was built, is being built, or is to be delivered. Record a component separately when the source names it apart from the whole it belongs to. Do not record a capability or a method, which is a Technology, and do not record a product category with no named instance.",
+      "attributes": [
+        {
+          "name": "mass_kg",
+          "value_type": "float"
+        }
+      ]
+    },
+    {
+      "name": "Person",
+      "description": "An individual human being named in the source. Record people who take part in the subject matter: engineers, researchers, officials, executives, or the authors of the work being described. Do not record the journalist or editor who wrote the source itself, people named only in a passing comparison, or a job title with no named holder. A team, an office, or a committee is an Organization, not a Person.",
+      "attributes": [
+        {
+          "name": "email",
+          "value_type": "string"
+        },
+        {
+          "name": "first_name",
+          "value_type": "string"
+        },
+        {
+          "name": "import_key",
+          "value_type": "string"
+        },
+        {
+          "name": "last_name",
+          "value_type": "string"
+        },
+        {
+          "name": "phone",
+          "value_type": "string"
+        },
+        {
+          "name": "title",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Science",
+      "description": "A body of knowledge about how the world behaves: a field, a discipline, a principle, a law, or an observed effect. Record it when the source invokes it as the reason something works or as the subject of research. Do not record a way of doing something, which is a Technology, and do not record a specific built object, which is a Part. Superconductivity is a Science; superconducting magnet design is a Technology.",
+      "attributes": [
+        {
+          "name": "summary",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Technology",
+      "description": "An engineered capability: a method, process, technique, material, or class of device that can be applied to make something happen. Record it when the source describes a way of achieving something that could be applied more than once. Do not record a single built artefact or product, which is a Part, and do not record the underlying physics, which is a Science. Stealth shaping is a Technology; a particular aircraft built using it is a Part.",
+      "attributes": [
+        {
+          "name": "summary",
+          "value_type": "string"
+        }
+      ]
+    }
+  ],
+  "relationship_types": [
+    {
+      "name": "Adopter",
+      "description": "The organization uses the technology in its own work or products. Record it for a stated user, as distinct from a developer or a funder.",
+      "from": "Organization",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Affiliation",
+      "description": "The person is associated with the organization without being its staff: a fellow, an advisor, a board member, a visiting researcher, or a named collaborator. Record it when the source ties the two together but stops short of stating employment.",
+      "from": "Person",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Application",
+      "description": "The technology applies the science: it puts the principle to work. Record it when the source explains a capability by naming the knowledge behind it.",
+      "from": "Science",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Apply",
+      "description": "The contract funds applying an existing technology rather than developing it. Record it when the award uses a capability that already exists.",
+      "from": "Contract",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Author",
+      "description": "The person wrote a paper, book, or report in the field. Record it when the source names the person as an author of work in that discipline.",
+      "from": "Person",
+      "to": "Science",
+      "attributes": []
+    },
+    {
+      "name": "Awardee",
+      "description": "The organization holds the contract and is responsible for delivering the work. Record it for the prime recipient of the award.",
+      "from": "Contract",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Awarding Agency",
+      "description": "The organization issued the contract and is paying for the work. Record it for the buyer, not for the recipient.",
+      "from": "Contract",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Component",
+      "description": "The part is a component covered by the contract without being the contract's headline deliverable. Record it for a subassembly or supplied item named in the award alongside what the award is for.",
+      "from": "Contract",
+      "to": "Part",
+      "attributes": []
+    },
+    {
+      "name": "Composition",
+      "description": "The first part is a component of the second. Record it when the source places one built thing inside another, and record the quantity when the source gives one.",
+      "from": "Part",
+      "to": "Part",
+      "attributes": [
+        {
+          "name": "quantity",
+          "value_type": "int"
+        }
+      ]
+    },
+    {
+      "name": "Consumer",
+      "description": "The organization uses or operates the part. Record it for the fielded user, not for whoever paid for it.",
+      "from": "Part",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Contracting Officer",
+      "description": "The person administers the award on the buyer's side: signing, modifying, or overseeing the contract itself rather than the work. Record it for the named administering official, not for the technical lead.",
+      "from": "Contract",
+      "to": "Person",
+      "attributes": []
+    },
+    {
+      "name": "Contributor",
+      "description": "The person contributed to the field without being described as a researcher or as an author of a named work: an advisor, a reviewer, or a named collaborator. Record it when the source credits them without saying they did the research or wrote it up.",
+      "from": "Person",
+      "to": "Science",
+      "attributes": []
+    },
+    {
+      "name": "Deliverable",
+      "description": "The part is delivered under the contract. Record it when the source names the thing the award produces.",
+      "from": "Contract",
+      "to": "Part",
+      "attributes": []
+    },
+    {
+      "name": "Demand",
+      "description": "The organization wants the part built or has stated a requirement for it. Record it for a stated need that has not yet produced an award; once an award exists, use the Contract relationships instead.",
+      "from": "Part",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Dependency",
+      "description": "The part depends on the technology to function. Record it when the source says the artefact could not work without it, as distinct from the artefact being an instance of it.",
+      "from": "Part",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Derived From",
+      "description": "The technology came out of research in the science. Record it when the source describes a lineage from a field of study to an engineered capability.",
+      "from": "Science",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Develop",
+      "description": "The contract funds developing the technology. Record it when the source says the award is to build or advance the capability.",
+      "from": "Contract",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Developer",
+      "description": "The organization builds or develops the technology. Record it for the party doing the engineering, whether or not an award is named.",
+      "from": "Organization",
+      "to": "Technology",
+      "attributes": [
+        {
+          "name": "since",
+          "value_type": "datetime"
+        }
+      ]
+    },
+    {
+      "name": "Employment",
+      "description": "The person is or was paid staff of the organization. Record it when the source states a role, a post held, or that the person works or worked there. A one-off consultation or a quoted opinion is not employment; use Affiliation when the tie is looser than a job.",
+      "from": "Person",
+      "to": "Organization",
+      "attributes": [
+        {
+          "name": "role",
+          "value_type": "string"
+        },
+        {
+          "name": "since",
+          "value_type": "datetime"
+        }
+      ]
+    },
+    {
+      "name": "Enabler",
+      "description": "The part is what made the technology practical. Record it when the source credits a specific built thing with making a capability usable, rather than the other way round.",
+      "from": "Part",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Enabling Principle",
+      "description": "The science is the reason the technology works at all. Record it for the fundamental effect or law the capability rests on, rather than for a field that merely relates to it.",
+      "from": "Science",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Evaluate",
+      "description": "The contract funds assessing or testing the technology rather than developing or applying it. Record it for test, trial, and assessment awards where nothing new is being built.",
+      "from": "Contract",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Family",
+      "description": "The two people are related by blood or by marriage. Record the relation the source states.",
+      "from": "Person",
+      "to": "Person",
+      "attributes": []
+    },
+    {
+      "name": "Friendship",
+      "description": "The two people are known associates outside a reporting line. Record it when the source describes a personal or professional acquaintance that is neither employment nor family.",
+      "from": "Person",
+      "to": "Person",
+      "attributes": []
+    },
+    {
+      "name": "Funder",
+      "description": "The organization pays for work on the technology without necessarily doing it. Record it when the source names a funding role but no specific award; when the award is named, use the Contract relationships.",
+      "from": "Organization",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Implementation",
+      "description": "The part implements the technology: it is a working instance of the method or capability. Record it when the source says the artefact is how the technology was realised.",
+      "from": "Part",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Licensee",
+      "description": "The organization licensed the technology from whoever owns it. Record it when the source names a licensing arrangement.",
+      "from": "Organization",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Manufacturer",
+      "description": "The organization builds or built the part. Record it when the source says who made the thing, including a prime contractor building it under its own name.",
+      "from": "Part",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Marriage",
+      "description": "The two people are or were married to each other. Record it only when the source says so.",
+      "from": "Person",
+      "to": "Person",
+      "attributes": []
+    },
+    {
+      "name": "Mature",
+      "description": "The contract funds raising the technology's readiness, moving it from demonstrated toward fielded. Record it for maturation, qualification, or transition rather than initial development.",
+      "from": "Contract",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Partnership",
+      "description": "The two organizations work together on something the source names: a joint venture, a teaming arrangement, a consortium, or a stated collaboration. Do not record two organizations merely appearing in the same document.",
+      "from": "Organization",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Principal Investigator",
+      "description": "The person leads the technical work under the contract. Record it for the named lead, whatever the source calls the role.",
+      "from": "Contract",
+      "to": "Person",
+      "attributes": []
+    },
+    {
+      "name": "Procurement",
+      "description": "The contract buys existing parts rather than funding their development. Record it for a purchase of something already designed.",
+      "from": "Contract",
+      "to": "Part",
+      "attributes": []
+    },
+    {
+      "name": "Research Contact",
+      "description": "The research institution's point of contact for the award.",
+      "from": "Contract",
+      "to": "Person",
+      "attributes": []
+    },
+    {
+      "name": "Researcher",
+      "description": "The person conducts or conducted research in the field. Record it when the source describes them working in the discipline, whether or not a publication is named.",
+      "from": "Person",
+      "to": "Science",
+      "attributes": []
+    },
+    {
+      "name": "Research Institution",
+      "description": "The organization performs research under the contract as a university, laboratory, or research centre rather than as a commercial supplier. Record it when the source names the institution's research role rather than a delivery role.",
+      "from": "Contract",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Subcontractor",
+      "description": "The organization performs part of the work under the contract but does not hold it. Record it when the source names a supplier or subcontractor beneath a prime.",
+      "from": "Contract",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Subsidiary",
+      "description": "The first organization is owned or controlled by the second. Record it for a wholly owned unit, a named division, or an acquired company. Direction matters: from is the owned, to is the owner.",
+      "from": "Organization",
+      "to": "Organization",
+      "attributes": []
+    },
+    {
+      "name": "Technical Contact",
+      "description": "The person is the named technical point of contact for the contract, without being described as leading the work. Record it when the source gives a contact rather than a lead.",
+      "from": "Contract",
+      "to": "Person",
+      "attributes": []
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "required": [
+      "entities",
+      "relationships"
+    ],
+    "properties": {
+      "entities": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "name",
+            "type"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "A short id you assign, unique within this response."
+            },
+            "name": {
+              "type": "string",
+              "description": "What the source calls this thing."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Contract",
+                "Organization",
+                "Part",
+                "Person",
+                "Science",
+                "Technology"
+              ]
+            },
+            "attributes": {
+              "type": "object",
+              "description": "The attributes this entity has, as name and value. Use the attribute names given in the definitions above, and include only the ones the source states."
+            }
+          }
+        }
+      },
+      "relationships": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "type",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "Adopter",
+                "Affiliation",
+                "Application",
+                "Apply",
+                "Author",
+                "Awardee",
+                "Awarding Agency",
+                "Component",
+                "Composition",
+                "Consumer",
+                "Contracting Officer",
+                "Contributor",
+                "Deliverable",
+                "Demand",
+                "Dependency",
+                "Derived From",
+                "Develop",
+                "Developer",
+                "Employment",
+                "Enabler",
+                "Enabling Principle",
+                "Evaluate",
+                "Family",
+                "Friendship",
+                "Funder",
+                "Implementation",
+                "Licensee",
+                "Manufacturer",
+                "Marriage",
+                "Mature",
+                "Partnership",
+                "Principal Investigator",
+                "Procurement",
+                "Research Contact",
+                "Researcher",
+                "Research Institution",
+                "Subcontractor",
+                "Subsidiary",
+                "Technical Contact"
+              ]
+            },
+            "from": {
+              "type": "string",
+              "description": "The id of the entity at the from end."
+            },
+            "to": {
+              "type": "string",
+              "description": "The id of the entity at the to end."
+            },
+            "ends": {
+              "description": "Which entity types each relationship type may join.",
+              "const": {
+                "Adopter": {
+                  "from": "Organization",
+                  "to": "Technology"
+                },
+                "Affiliation": {
+                  "from": "Person",
+                  "to": "Organization"
+                },
+                "Application": {
+                  "from": "Science",
+                  "to": "Technology"
+                },
+                "Apply": {
+                  "from": "Contract",
+                  "to": "Technology"
+                },
+                "Author": {
+                  "from": "Person",
+                  "to": "Science"
+                },
+                "Awardee": {
+                  "from": "Contract",
+                  "to": "Organization"
+                },
+                "Awarding Agency": {
+                  "from": "Contract",
+                  "to": "Organization"
+                },
+                "Component": {
+                  "from": "Contract",
+                  "to": "Part"
+                },
+                "Composition": {
+                  "from": "Part",
+                  "to": "Part"
+                },
+                "Consumer": {
+                  "from": "Part",
+                  "to": "Organization"
+                },
+                "Contracting Officer": {
+                  "from": "Contract",
+                  "to": "Person"
+                },
+                "Contributor": {
+                  "from": "Person",
+                  "to": "Science"
+                },
+                "Deliverable": {
+                  "from": "Contract",
+                  "to": "Part"
+                },
+                "Demand": {
+                  "from": "Part",
+                  "to": "Organization"
+                },
+                "Dependency": {
+                  "from": "Part",
+                  "to": "Technology"
+                },
+                "Derived From": {
+                  "from": "Science",
+                  "to": "Technology"
+                },
+                "Develop": {
+                  "from": "Contract",
+                  "to": "Technology"
+                },
+                "Developer": {
+                  "from": "Organization",
+                  "to": "Technology"
+                },
+                "Employment": {
+                  "from": "Person",
+                  "to": "Organization"
+                },
+                "Enabler": {
+                  "from": "Part",
+                  "to": "Technology"
+                },
+                "Enabling Principle": {
+                  "from": "Science",
+                  "to": "Technology"
+                },
+                "Evaluate": {
+                  "from": "Contract",
+                  "to": "Technology"
+                },
+                "Family": {
+                  "from": "Person",
+                  "to": "Person"
+                },
+                "Friendship": {
+                  "from": "Person",
+                  "to": "Person"
+                },
+                "Funder": {
+                  "from": "Organization",
+                  "to": "Technology"
+                },
+                "Implementation": {
+                  "from": "Part",
+                  "to": "Technology"
+                },
+                "Licensee": {
+                  "from": "Organization",
+                  "to": "Technology"
+                },
+                "Manufacturer": {
+                  "from": "Part",
+                  "to": "Organization"
+                },
+                "Marriage": {
+                  "from": "Person",
+                  "to": "Person"
+                },
+                "Mature": {
+                  "from": "Contract",
+                  "to": "Technology"
+                },
+                "Partnership": {
+                  "from": "Organization",
+                  "to": "Organization"
+                },
+                "Principal Investigator": {
+                  "from": "Contract",
+                  "to": "Person"
+                },
+                "Procurement": {
+                  "from": "Contract",
+                  "to": "Part"
+                },
+                "Research Contact": {
+                  "from": "Contract",
+                  "to": "Person"
+                },
+                "Researcher": {
+                  "from": "Person",
+                  "to": "Science"
+                },
+                "Research Institution": {
+                  "from": "Contract",
+                  "to": "Organization"
+                },
+                "Subcontractor": {
+                  "from": "Contract",
+                  "to": "Organization"
+                },
+                "Subsidiary": {
+                  "from": "Organization",
+                  "to": "Organization"
+                },
+                "Technical Contact": {
+                  "from": "Contract",
+                  "to": "Person"
+                }
+              }
+            },
+            "attributes": {
+              "type": "object",
+              "description": "The attributes this relationship has, as name and value. Use the attribute names given in the definitions above, and include only the ones the source states."
+            }
+          }
+        }
+      }
+    }
+  },
+  "example": {
+    "entities": [
+      {
+        "id": "e1",
+        "name": "The name the source gives this Organization",
+        "type": "Organization",
+        "attributes": {
+          "acronym": "the acronym the source states",
+          "city": "the city the source states",
+          "disadvantaged_owned": "the disadvantaged_owned the source states"
+        }
+      },
+      {
+        "id": "e2",
+        "name": "The name the source gives this Technology",
+        "type": "Technology",
+        "attributes": {
+          "summary": "the summary the source states"
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Adopter",
+        "from": "e1",
+        "to": "e2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,290 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Stage 4 — check each reply against the mental model it was asked to fill in.
+#
+#   docker compose exec web bundle exec ruby script/poc/bin/validate-json
+#   docker compose exec web bundle exec ruby script/poc/bin/validate-json --run claude-haiku-4-5
+#
+# This is deliberately more than JSON Schema validation. The schema in the
+# prompt cannot express the two rules that matter most:
+#
+#   - a relationship's `from` and `to` must name entities the reply itself
+#     listed. JSON Schema sees two strings and is satisfied; the applier sees a
+#     dangling reference and can write nothing.
+#   - a relationship may only join the entity types its definition names. The
+#     prompt carries that as a `const` the model reads and no validator enforces,
+#     and the database enforces it at write time.
+#
+# So a reply can be schema-valid and still be unappliable. Judging it here on
+# what the applier would actually accept is the only way the pass rate means
+# anything.
+#
+# Failures are counted by code as well as reported, because how a model fails is
+# more useful than how often: "half the relationships point at entities it never
+# listed" and "half the attribute values are the wrong type" are different
+# problems with different fixes, and one pass-rate number hides both.
+
+require "json"
+require "optparse"
+require "time"
+require_relative "../lib/poc"
+require_relative "../lib/poc/ontology"
+
+options = {}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: validate-json [--run LABEL] [--only NNN,NNN]"
+  opts.on("--run LABEL", "Run to validate (default: every run found)") { |v| options[:run] = v }
+  opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v.split(",").map(&:strip) }
+  opts.on("--work PATH", "Work directory (default script/poc/work)") { |v| Poc.work = v }
+  opts.on("-h", "--help") { puts opts; exit }
+end.parse!
+
+ontology = Poc::Ontology.load
+manifest = Poc::Manifest.new
+
+runs = if options[:run]
+         [ options[:run] ]
+       else
+         Dir.glob(File.join(Poc.stage_dir(:extracted), "*")).select { |p| File.directory?(p) }.map { |p| File.basename(p) }.sort
+       end
+abort "nothing extracted yet — run bin/llm-process first" if runs.empty?
+
+# The same casting rules TypedValue#cast_value applies before a value is stored.
+# Validating against anything looser would pass values the applier then drops.
+def castable?(raw, value_type)
+  case value_type
+  when "int"      then !Integer(raw.to_s, exception: false).nil?
+  when "float"    then !Float(raw.to_s, exception: false).nil?
+  when "string"   then true
+  when "datetime" then (Time.parse(raw.to_s) rescue nil) ? true : false
+  else true
+  end
+end
+
+def blank_string?(value) = !value.is_a?(String) || value.strip.empty?
+
+def check_attributes(record, path, declared, type_label, errors, kind)
+  bag = record["attributes"]
+  return 0 if bag.nil?
+
+  unless bag.is_a?(Hash)
+    errors << { "path" => "#{path}.attributes", "code" => "attributes_not_object",
+                "message" => "attributes must be an object of name => value" }
+    return 0
+  end
+
+  counted = 0
+
+  bag.each do |name, value|
+    attribute = declared.call(type_label, name)
+
+    if attribute.nil?
+      errors << { "path" => "#{path}.attributes.#{name}", "code" => "unknown_#{kind}_attribute",
+                  "message" => "#{type_label.inspect} declares no attribute named #{name.inspect}" }
+      next
+    end
+
+    unless castable?(value, attribute["value_type"])
+      errors << { "path" => "#{path}.attributes.#{name}", "code" => "uncastable_value",
+                  "message" => "#{value.inspect} is not a valid #{attribute['value_type']}" }
+      next
+    end
+
+    counted += 1
+  end
+
+  counted
+end
+
+def validate(data, ontology)
+  errors = []
+  counts = { "entities" => 0, "relationships" => 0, "entity_attributes" => 0, "relationship_attributes" => 0 }
+
+  unless data.is_a?(Hash)
+    return [ [ { "path" => "$", "code" => "not_object", "message" => "reply is not a JSON object" } ], counts ]
+  end
+
+  entities = data["entities"]
+  relationships = data["relationships"]
+
+  errors << { "path" => "$.entities", "code" => "entities_not_array", "message" => "entities must be an array" } unless entities.is_a?(Array)
+  errors << { "path" => "$.relationships", "code" => "relationships_not_array", "message" => "relationships must be an array" } unless relationships.is_a?(Array)
+
+  entities = [] unless entities.is_a?(Array)
+  relationships = [] unless relationships.is_a?(Array)
+
+  # id => declared entity type, built as we go. This is what makes the
+  # referential checks below possible at all.
+  ids = {}
+
+  entities.each_with_index do |entity, i|
+    path = "$.entities[#{i}]"
+
+    unless entity.is_a?(Hash)
+      errors << { "path" => path, "code" => "entity_not_object", "message" => "entity must be an object" }
+      next
+    end
+
+    counts["entities"] += 1
+    id = entity["id"]
+
+    if blank_string?(id)
+      errors << { "path" => "#{path}.id", "code" => "entity_missing_id", "message" => "entity has no id" }
+    elsif ids.key?(id)
+      errors << { "path" => "#{path}.id", "code" => "entity_duplicate_id",
+                  "message" => "id #{id.inspect} was already used — relationships naming it are ambiguous" }
+    end
+
+    errors << { "path" => "#{path}.name", "code" => "entity_missing_name", "message" => "entity has no name" } if blank_string?(entity["name"])
+
+    type = entity["type"]
+
+    if blank_string?(type)
+      errors << { "path" => "#{path}.type", "code" => "entity_missing_type", "message" => "entity has no type" }
+    elsif !ontology.entity_type?(type)
+      errors << { "path" => "#{path}.type", "code" => "unknown_entity_type",
+                  "message" => "#{type.inspect} is not one of the project's entity types" }
+    end
+
+    ids[id] = type unless blank_string?(id)
+
+    next if blank_string?(type) || !ontology.entity_type?(type)
+
+    counts["entity_attributes"] += check_attributes(
+      entity, path, ontology.method(:entity_attribute), type, errors, "entity"
+    )
+  end
+
+  relationships.each_with_index do |relationship, i|
+    path = "$.relationships[#{i}]"
+
+    unless relationship.is_a?(Hash)
+      errors << { "path" => path, "code" => "relationship_not_object", "message" => "relationship must be an object" }
+      next
+    end
+
+    counts["relationships"] += 1
+    type = relationship["type"]
+    known = !blank_string?(type) && ontology.relationship_type?(type)
+
+    if blank_string?(type)
+      errors << { "path" => "#{path}.type", "code" => "relationship_missing_type", "message" => "relationship has no type" }
+    elsif !known
+      errors << { "path" => "#{path}.type", "code" => "unknown_relationship_type",
+                  "message" => "#{type.inspect} is not one of the project's relationship types" }
+    end
+
+    ends = known ? ontology.relationship_ends(type) : nil
+
+    %w[from to].each_with_index do |side, index|
+      value = relationship[side]
+
+      if blank_string?(value)
+        errors << { "path" => "#{path}.#{side}", "code" => "relationship_missing_end",
+                    "message" => "relationship has no #{side}" }
+        next
+      end
+
+      unless ids.key?(value)
+        # The failure JSON Schema cannot see, and the one that most often makes
+        # an otherwise plausible reply worthless.
+        errors << { "path" => "#{path}.#{side}", "code" => "unresolved_end",
+                    "message" => "#{value.inspect} is not the id of any entity in this reply" }
+        next
+      end
+
+      next if ends.nil?
+
+      actual = ids[value]
+      expected = ends[index]
+      next if actual == expected
+
+      errors << { "path" => "#{path}.#{side}", "code" => "wrong_end_type",
+                  "message" => "#{type.inspect} joins #{expected.inspect} to #{ends[1].inspect}, " \
+                               "but #{side} is #{actual.inspect}" }
+    end
+
+    next unless known
+
+    counts["relationship_attributes"] += check_attributes(
+      relationship, path, ontology.method(:relationship_attribute), type, errors, "relationship"
+    )
+  end
+
+  [ errors, counts ]
+end
+
+overall_ok = true
+
+runs.each do |run|
+  dir = Poc.stage_dir(:extracted, run: run)
+  out_dir = Poc.mkdir(Poc.stage_dir(:validated, run: run))
+
+  numbers = Dir.glob(File.join(dir, "*-extracted.json")).map { |p| File.basename(p)[0, 3] }.sort
+  numbers &= options[:only] if options[:only]
+
+  # A run where the model returned prose is a validation result, not an absence
+  # of one: the reply exists, it just is not JSON.
+  raw_only = Dir.glob(File.join(dir, "*-raw.txt")).map { |p| File.basename(p)[0, 3] }.sort
+  raw_only &= options[:only] if options[:only]
+  raw_only -= numbers
+
+  puts "== #{run} (#{numbers.size + raw_only.size} replies)"
+
+  passed = 0
+  failed = 0
+  by_code = Hash.new(0)
+
+  (numbers + raw_only).sort.each do |n|
+    path = Poc.path_for(:extracted, n, run: run)
+
+    if raw_only.include?(n)
+      errors = [ { "path" => "$", "code" => "not_json", "message" => "reply was not JSON — see #{n}-raw.txt" } ]
+      counts = { "entities" => 0, "relationships" => 0, "entity_attributes" => 0, "relationship_attributes" => 0 }
+    else
+      errors, counts = validate(Poc.read_json(path), ontology)
+    end
+
+    ok = errors.empty?
+    ok ? passed += 1 : failed += 1
+    errors.each { |e| by_code[e["code"]] += 1 }
+
+    result = {
+      "n" => n, "run" => run, "ok" => ok,
+      "counts" => counts, "error_count" => errors.size, "errors" => errors,
+      "at" => Time.now.utc.iso8601
+    }
+    Poc.write_json(Poc.path_for(:validated, n, run: run), result)
+    manifest.record_run(n, :validated, run, result.slice("ok", "counts", "error_count", "at"))
+
+    if ok
+      puts format("%s ok     %d entities, %d relationships, %d attribute values", n,
+                  counts["entities"], counts["relationships"],
+                  counts["entity_attributes"] + counts["relationship_attributes"])
+    else
+      first = errors.first
+      more = errors.size > 1 ? " (+#{errors.size - 1} more)" : ""
+      puts format("%s FAIL   %s: %s%s", n, first["code"], first["message"], more)
+    end
+  end
+
+  total = passed + failed
+  overall_ok &&= failed.zero?
+
+  summary = {
+    "run" => run, "files" => total, "passed" => passed, "failed" => failed,
+    "pass_rate" => total.positive? ? (passed.to_f / total).round(3) : nil,
+    "errors_by_code" => by_code.sort_by { |_, v| -v }.to_h,
+    "at" => Time.now.utc.iso8601
+  }
+  Poc.write_json(File.join(out_dir, "summary.json"), summary)
+
+  puts
+  puts format("   %d/%d valid%s", passed, total, total.positive? ? format(" (%.0f%%)", 100.0 * passed / total) : "")
+  by_code.sort_by { |_, v| -v }.each { |code, count| puts format("   %-28s %d", code, count) }
+  puts
+end
+
+exit(overall_ok ? 0 : 1)

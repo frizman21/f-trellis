@@ -1,0 +1,13 @@
+# Generated stages are disposable — they can be rebuilt from 00-input, and
+# fetched pages and model replies do not belong in the repository.
+/01-fetched/
+/02-stripped/
+/03-extracted/
+/04-validated/
+/05-scored/
+/manifest.json
+
+# 00-input/ and golden/ are NOT ignored. The URL list, the exported mental
+# model, the hand-edited instructions and the ground truth are the inputs that
+# make a run reproducible and the only files here that cost anything to
+# recreate.

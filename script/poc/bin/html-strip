@@ -1,0 +1,122 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Stage 2 — reduce each fetched page to the text a model should read.
+#
+#   docker compose exec web bundle exec ruby script/poc/bin/html-strip
+#   docker compose exec web bundle exec ruby script/poc/bin/html-strip --stripper HtmlStripper --force
+#
+# This uses the application's own ContentExtractor rather than a stripper
+# written for the proof of concept. The scores this pipeline produces are only
+# worth anything if they predict what the real extraction path would do, and the
+# real path is SourceDatum -> ContentExtractor. A different stripper here would
+# measure a pipeline nobody is going to ship.
+#
+# The service files are required directly rather than through Rails: both are
+# plain Nokogiri and neither touches the database, so booting the application
+# would buy nothing but startup time.
+#
+# --stripper exists because the codebase contains two of them and only
+# ContentExtractor is wired into the extraction path. How much the choice is
+# worth is a question this pipeline can now answer instead of assume.
+
+require "optparse"
+require "time"
+require "nokogiri"
+require_relative "../lib/poc"
+require_relative "../../../app/services/content_extractor"
+require_relative "../../../app/services/html_stripper"
+
+STRIPPERS = { "ContentExtractor" => ContentExtractor, "HtmlStripper" => HtmlStripper }.freeze
+
+options = { force: false, stripper: "ContentExtractor" }
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: html-strip [--only NNN,NNN] [--stripper NAME] [--force]"
+  opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v.split(",").map(&:strip) }
+  opts.on("--stripper NAME", "#{STRIPPERS.keys.join(' or ')} (default ContentExtractor)") { |v| options[:stripper] = v }
+  opts.on("--force", "Re-strip even if the file is already there") { options[:force] = true }
+  opts.on("--work PATH", "Work directory (default script/poc/work)") { |v| Poc.work = v }
+  opts.on("-h", "--help") { puts opts; exit }
+end.parse!
+
+stripper = STRIPPERS[options[:stripper]]
+abort "unknown stripper #{options[:stripper].inspect} — one of #{STRIPPERS.keys.join(', ')}" if stripper.nil?
+
+manifest = Poc::Manifest.new
+Poc.mkdir(Poc.stage_dir(:stripped))
+
+targets = manifest.numbers
+targets &= options[:only] if options[:only]
+abort "nothing fetched yet — run bin/fetch first" if targets.empty?
+
+stripped = skipped = missing = 0
+total_html = total_text = 0
+
+targets.each do |n|
+  source = Poc.path_for(:fetched, n)
+  path = Poc.path_for(:stripped, n)
+
+  unless File.exist?(source)
+    puts "#{n} none   no fetched HTML"
+    missing += 1
+    next
+  end
+
+  previous = manifest.stage_record(n, :stripped)
+
+  # A file produced by the other stripper is not the file this invocation would
+  # produce, and silently leaving it in place would mix two variants into one
+  # comparison without anything on disk saying so.
+  changed_stripper = previous && previous["stripper"] != options[:stripper]
+
+  if File.exist?(path) && !options[:force] && !changed_stripper
+    puts "#{n} skip   #{path}"
+    skipped += 1
+    next
+  end
+
+  if changed_stripper && !options[:force]
+    warn "#{n} SKIP   was stripped with #{previous['stripper']}; --force to replace with #{options[:stripper]}"
+    skipped += 1
+    next
+  end
+
+  html = File.read(source)
+  text = stripper.call(html)
+
+  File.write(path, text)
+
+  total_html += html.bytesize
+  total_text += text.bytesize
+
+  reduction = html.bytesize.positive? ? (100.0 * (1 - text.bytesize.to_f / html.bytesize)).round(1) : 0.0
+
+  manifest.record(n, :stripped, {
+    "stripper" => options[:stripper],
+    "html_bytes" => html.bytesize,
+    "text_bytes" => text.bytesize,
+    "text_chars" => text.length,
+    "approx_tokens" => (text.length / 4.0).ceil,
+    "reduction_percent" => reduction,
+    "sha256" => Poc.sha(text),
+    "at" => Time.now.utc.iso8601,
+    "file" => File.basename(path)
+  })
+
+  # An empty result is not an error but it is almost always a mistake — a
+  # JavaScript-rendered page, or a fetch that stored an error page. Saying so
+  # here is cheaper than wondering why the extraction found nothing.
+  note = text.empty? ? "  EMPTY — nothing to extract from" : ""
+  puts "#{n} ok     #{html.bytesize} -> #{text.bytesize} bytes (-#{reduction}%)#{note}"
+  stripped += 1
+end
+
+manifest.save
+
+puts
+if total_html.positive?
+  overall = (100.0 * (1 - total_text.to_f / total_html)).round(1)
+  puts "#{options[:stripper]}: #{total_html} -> #{total_text} bytes overall (-#{overall}%)"
+end
+puts "stripped #{stripped}, skipped #{skipped}, missing #{missing} — #{Poc.stage_dir(:stripped)}"

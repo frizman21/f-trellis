@@ -1,0 +1,18 @@
+# Sources for project 4 "F-DoD", exported 2026-08-20T14:10:38Z.
+#
+# Position in this file assigns each URL its number: the first URL is 000,
+# the second 001, and so on. Blank lines and comments are ignored, so they
+# cost nothing. APPEND new URLs at the end — inserting one renumbers
+# everything below it, which orphans every fetched page, extraction, golden
+# and score already carrying those numbers. fetch refuses to run when that
+# happens rather than quietly rewriting history.
+https://www.nasa.gov/about
+https://albers.aero/
+https://albers.aero/team/will-aflleje
+https://albers.aero/team/john-albers
+https://www.watermark.org/people/anders-todd
+https://fedsupernova.com/page/6158037/crawl
+https://www.decisivellc.us/
+https://fedsupernova.com/page/5140643/partners
+https://www.aerodyne.com/
+https://tennasys.com/

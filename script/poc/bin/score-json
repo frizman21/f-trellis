@@ -1,0 +1,227 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Stage 5 — score each reply against the golden file for the same source.
+#
+#   docker compose exec web bundle exec ruby script/poc/bin/score-json
+#   docker compose exec web bundle exec ruby script/poc/bin/score-json --run claude-haiku-4-5
+#
+# A perfect score is an exact match. Content the golden file has and the reply
+# does not costs recall; content the reply has and the golden file does not
+# costs precision; the score is the F1 of the two, so both directions hurt and
+# neither can be gamed by returning more or less.
+#
+# Precision and recall are reported separately as well as combined, and that
+# separation is the number to actually read. A wrong entity written into a
+# shared graph stays there and has to be found again by hand; an entity this
+# source missed is usually stated again by the next source that mentions it. Two
+# models with the same F1 and opposite error profiles are not equally useful,
+# and only the split says which is which.
+#
+# Four things are scored separately rather than pooled into one figure:
+# entities, their attribute values, relationships, and relationship attribute
+# values. A run that finds every organization but no detail about any of them
+# and a run that finds half of them completely can share an overall score, and
+# they are not the same result.
+#
+# Comparison is by identity, never by the ids in the reply — those are the
+# model's own and differ between two replies that found exactly the same thing.
+# See Poc::Extraction.
+
+require "json"
+require "optparse"
+require "time"
+require_relative "../lib/poc"
+require_relative "../lib/poc/extraction"
+
+options = {}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: score-json [--run LABEL] [--only NNN,NNN]"
+  opts.on("--run LABEL", "Run to score (default: every run found)") { |v| options[:run] = v }
+  opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v.split(",").map(&:strip) }
+  opts.on("--work PATH", "Work directory (default script/poc/work)") { |v| Poc.work = v }
+  opts.on("-h", "--help") { puts opts; exit }
+end.parse!
+
+CHANNELS = %w[entities entity_attributes relationships relationship_attributes].freeze
+
+def channels_of(extraction)
+  {
+    "entities" => extraction.entity_keys,
+    "entity_attributes" => extraction.entity_attributes,
+    "relationships" => extraction.relationship_keys,
+    "relationship_attributes" => extraction.relationship_attributes
+  }
+end
+
+# Precision, recall and F1 for one channel of one source.
+#
+# Both sets empty is a perfect score, not a division by zero: a source that
+# states nothing the project tracks and a reply that says so agree completely,
+# and the instructions explicitly ask for empty lists in that case. Scoring the
+# correct answer as zero would push every model toward inventing content.
+def measure(got, want)
+  got = got.uniq
+  want = want.uniq
+  tp = (got & want).size
+  combine(tp, got.size - tp, want.size - tp).merge("expected" => want.size, "found" => got.size)
+end
+
+# F1 from raw counts, used for both the per-source and the micro-averaged
+# figures so one definition covers every number this script prints.
+def combine(tp, fp, fn)
+  precision = (tp + fp).zero? ? 1.0 : tp.to_f / (tp + fp)
+  recall = (tp + fn).zero? ? 1.0 : tp.to_f / (tp + fn)
+  f1 = (precision + recall).zero? ? 0.0 : 2 * precision * recall / (precision + recall)
+  { "matched" => tp, "extra" => fp, "missing" => fn,
+    "precision" => precision.round(4), "recall" => recall.round(4), "f1" => f1.round(4) }
+end
+
+def label(key)
+  case key
+  when Array
+    if key.size == 2 && key.all?(String)          then "#{key[0]}: #{key[1]}"
+    elsif key.size == 3 && key[1].is_a?(Array)    then "#{key[0]}: #{label(key[1])} -> #{label(key[2])}"
+    elsif key.size == 3                           then "#{label(key[0])} | #{key[1]} = #{key[2]}"
+    else key.inspect
+    end
+  else key.to_s
+  end
+end
+
+manifest = Poc::Manifest.new
+
+runs = if options[:run]
+         [ options[:run] ]
+       else
+         Dir.glob(File.join(Poc.stage_dir(:extracted), "*")).select { |p| File.directory?(p) }.map { |p| File.basename(p) }.sort
+       end
+abort "nothing extracted yet — run bin/llm-process first" if runs.empty?
+
+goldens = Dir.glob(File.join(Poc.golden_dir, "*-golden.json")).map { |p| File.basename(p)[0, 3] }.sort
+goldens &= options[:only] if options[:only]
+
+if goldens.empty?
+  abort <<~MSG
+    No golden files in #{Poc.golden_dir}.
+
+    Scoring needs ground truth: one NNN-golden.json per source you want scored,
+    in the same shape a reply takes. See #{File.join(Poc.golden_dir, 'README.md')}.
+  MSG
+end
+
+table = []
+
+runs.each do |run|
+  out_dir = Poc.mkdir(Poc.stage_dir(:scored, run: run))
+  puts "== #{run}"
+
+  totals = CHANNELS.to_h { |c| [ c, { "matched" => 0, "extra" => 0, "missing" => 0 } ] }
+  scored = 0
+  unanswered = []
+
+  goldens.each do |n|
+    extraction_path = Poc.path_for(:extracted, n, run: run)
+
+    # No reply is a score of zero, not an absent row. A model that failed to
+    # return usable JSON for half the corpus has not earned the average of the
+    # half it managed, and leaving those out of the table would say it had.
+    got = File.exist?(extraction_path) ? Poc::Extraction.load(extraction_path) : nil
+    unanswered << n if got.nil?
+
+    want = Poc::Extraction.load(Poc.golden_path(n))
+    got_channels = got ? channels_of(got) : CHANNELS.to_h { |c| [ c, [] ] }
+    want_channels = channels_of(want)
+
+    per_channel = CHANNELS.to_h { |c| [ c, measure(got_channels[c], want_channels[c]) ] }
+
+    CHANNELS.each do |c|
+      %w[matched extra missing].each { |k| totals[c][k] += per_channel[c][k] }
+    end
+
+    tp = per_channel.values.sum { |m| m["matched"] }
+    fp = per_channel.values.sum { |m| m["extra"] }
+    fn = per_channel.values.sum { |m| m["missing"] }
+    overall = combine(tp, fp, fn)
+
+    result = {
+      "n" => n, "run" => run, "answered" => !got.nil?,
+      "score" => overall["f1"], "overall" => overall,
+      "channels" => per_channel,
+      # What was actually wrong, not just how much. This is the part worth
+      # reading when a score drops.
+      "missing" => CHANNELS.to_h { |c| [ c, (want_channels[c] - got_channels[c]).map { |k| label(k) } ] },
+      "extra" => CHANNELS.to_h { |c| [ c, (got_channels[c] - want_channels[c]).map { |k| label(k) } ] },
+      "at" => Time.now.utc.iso8601
+    }
+
+    Poc.write_json(Poc.path_for(:scored, n, run: run), result)
+    manifest.record_run(n, :scored, run, { "score" => overall["f1"], "answered" => !got.nil?, "at" => result["at"] })
+
+    puts format("%s %s  score %.3f   P %.3f  R %.3f   +%d extra  -%d missing", n,
+                got ? "     " : "NOANS", overall["f1"], overall["precision"], overall["recall"], fp, fn)
+    scored += 1
+  end
+
+  # Micro-averaged: every matched, extra and missing item across every source
+  # and every channel counts once. A source with forty entities therefore
+  # weighs more than one with two, which is what "how much of this corpus did
+  # the model get right" means.
+  tp = totals.values.sum { |t| t["matched"] }
+  fp = totals.values.sum { |t| t["extra"] }
+  fn = totals.values.sum { |t| t["missing"] }
+  overall = combine(tp, fp, fn)
+
+  run_meta = begin
+    Poc.read_json(File.join(Poc.stage_dir(:extracted, run: run), "run.json"))
+  rescue StandardError
+    {}
+  end
+
+  summary = {
+    "run" => run, "model" => run_meta["model"], "schema" => run_meta["schema"],
+    "sources_scored" => scored, "unanswered" => unanswered,
+    "score" => overall["f1"], "overall" => overall,
+    "channels" => CHANNELS.to_h { |c|
+      [ c, combine(totals[c]["matched"], totals[c]["extra"], totals[c]["missing"]).merge(totals[c]) ]
+    },
+    "cost" => run_meta.dig("totals", "cost"),
+    "input_tokens" => run_meta.dig("totals", "input_tokens"),
+    "output_tokens" => run_meta.dig("totals", "output_tokens"),
+    "seconds" => run_meta.dig("totals", "seconds"),
+    "at" => Time.now.utc.iso8601
+  }
+  Poc.write_json(File.join(out_dir, "summary.json"), summary)
+  table << summary
+
+  puts
+  CHANNELS.each do |c|
+    m = summary["channels"][c]
+    puts format("   %-24s F1 %.3f  P %.3f  R %.3f   %d matched, %d extra, %d missing",
+                c, m["f1"], m["precision"], m["recall"], m["matched"], m["extra"], m["missing"])
+  end
+  puts format("   %-24s %.3f", "SCORE", overall["f1"])
+  puts "   #{unanswered.size} source(s) with no usable reply: #{unanswered.join(', ')}" if unanswered.any?
+  puts
+end
+
+manifest.save
+
+# The table this pipeline exists to produce: what each model scored and what it
+# cost to get there. Ordered by score, with cost alongside rather than in a
+# separate report, because the decision is always the pair.
+if table.size > 1 || table.first["cost"]
+  puts "== score against cost"
+  puts format("%-28s %7s %9s %9s %10s %12s", "run", "score", "precision", "recall", "cost", "cost/source")
+  table.sort_by { |t| -t["score"] }.each do |t|
+    per_source = t["cost"] && t["sources_scored"].positive? ? t["cost"] / t["sources_scored"] : nil
+    puts format("%-28s %7.3f %9.3f %9.3f %10s %12s", t["run"], t["score"],
+                t["overall"]["precision"], t["overall"]["recall"],
+                t["cost"] ? format("$%.4f", t["cost"]) : "-",
+                per_source ? format("$%.4f", per_source) : "-")
+  end
+  puts
+  puts "Cost covers only the sources this run actually processed; a run that answered"
+  puts "fewer sources is cheaper for a reason the score column already reflects."
+end
