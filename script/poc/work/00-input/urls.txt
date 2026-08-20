@@ -6,13 +6,11 @@
 # everything below it, which orphans every fetched page, extraction, golden
 # and score already carrying those numbers. fetch refuses to run when that
 # happens rather than quietly rewriting history.
-https://www.nasa.gov/about
-https://albers.aero/
+
 https://albers.aero/team/will-aflleje
-https://albers.aero/team/john-albers
+https://albers.aero/news/albers-aerospace-announces-acquisition-of-parallel-ventures-to-strengthen-aerospace-manufacturing-capabilities
 https://www.watermark.org/people/anders-todd
-https://fedsupernova.com/page/6158037/crawl
-https://www.decisivellc.us/
-https://fedsupernova.com/page/5140643/partners
-https://www.aerodyne.com/
-https://tennasys.com/
+https://skyfront.com/perimeter-8
+https://www.sbir.gov/topics/11947
+https://www.sbir.gov/awards/208950
+

@@ -52,7 +52,8 @@ carrying those numbers would silently start describing a different page.
 
 | | Script | Reads | Writes |
 |---|---|---|---|
-| 0 | `export-model` | a project in the database | `00-input/mental-model.json`, `instructions.md`, `urls.txt` |
+| 0a | `seed-model` | the tables inside the script | the `Extraction PoC` project's ontology |
+| 0b | `export-model` | a project in the database | `00-input/mental-model.json`, `instructions.md`, `urls.txt` |
 | 1 | `fetch` | `urls.txt` | `01-fetched/NNN-fetched.html` |
 | 2 | `html-strip` | fetched HTML | `02-stripped/NNN-stripped.txt` |
 | 3 | `llm-process` | `instructions.md` + stripped text | `03-extracted/<run>/NNN-extracted.json` |
@@ -64,7 +65,8 @@ carrying those numbers would silently start describing a different page.
 ```bash
 C="docker compose exec web bundle exec ruby script/poc/bin"
 
-$C/export-model --project 4 --urls     # mental model + instructions + URL list
+$C/seed-model                           # define the ontology under test
+$C/export-model --project 6 --force     # mental model + instructions
 $C/fetch                                # pull the pages
 $C/html-strip                           # HTML -> text
 
@@ -81,6 +83,18 @@ $C/score-json                           # how good is it, and what did it cost?
 its score, its precision/recall split, and its cost per source.
 
 ## What each stage is deliberately doing
+
+**`seed-model`** defines the ontology under test in two tables in the script
+rather than in a console session, because the ontology is the independent
+variable: a scoreboard is only comparable across runs if the thing being scored
+is written down somewhere that can be diffed. It is idempotent, and `--prune`
+deletes types the script no longer declares — soft, so a mis-edit is
+recoverable.
+
+It creates its own project rather than reshaping F-DoD. F-DoD holds 352,894
+entities and 1,015,988 relationships concentrated in seven relationship types,
+two of which run opposite to the ones here, so reshaping it would be a data
+migration on 346,175 rows rather than an ontology edit.
 
 **`export-model`** takes the mental model out of the application rather than
 restating it. `ExtractionPrompt` already turns a project's structure into
