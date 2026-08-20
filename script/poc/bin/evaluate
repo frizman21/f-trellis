@@ -1,0 +1,98 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# One model, end to end: ask it, check the replies are appliable, score them.
+#
+#   docker-compose exec web bundle exec ruby script/poc/bin/evaluate --model gpt-4.1 --schema
+#   docker-compose exec web bundle exec ruby script/poc/bin/evaluate --model gpt-4.1 --dry-run
+#
+# Stages 3, 4 and 5 in one call. They stay separate scripts because each is
+# independently re-runnable and validate and score cost nothing to repeat — but
+# evaluating a model always means all three, and typing three commands with the
+# same --run label is three chances to compare one model's extractions against
+# another's scores.
+#
+# Nothing is reimplemented here. Each stage is invoked as it would be by hand,
+# with its own output shown, so what this prints is what running them yourself
+# prints and there is no second story about what happened.
+
+require "optparse"
+require_relative "../lib/poc"
+
+BIN = __dir__
+
+options = { dry_run: false, schema: false }
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: evaluate --model ID [--schema] [--dry-run] [--run LABEL]"
+  opts.on("--model ID", "Model id to evaluate") { |v| options[:model] = v }
+  opts.on("--provider NAME", "Force a provider") { |v| options[:provider] = v }
+  opts.on("--endpoint NAME_OR_ID", "Route through a ModelEndpoint") { |v| options[:endpoint] = v }
+  opts.on("--run LABEL", "Run label (default: the model id)") { |v| options[:run] = v }
+  opts.on("--schema", "Constrain decoding with the mental model's JSON Schema") { options[:schema] = true }
+  opts.on("--dry-run", "Show what the calls would cost; ask nothing, and stop there") { options[:dry_run] = true }
+  opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v }
+  opts.on("--limit N", "Stop after N calls") { |v| options[:limit] = v }
+  opts.on("--force", "Re-ask sources this run has already answered") { options[:force] = true }
+  opts.on("-h", "--help") { puts opts; exit }
+end
+parser.parse!
+
+abort "--model is required\n\n#{parser}" if options[:model].to_s.empty?
+
+run = Poc.slug(options[:run] || options[:model])
+
+# Each stage as it would be typed. Built rather than interpolated into a shell
+# string: a model id or run label with a space in it would otherwise become two
+# arguments, and the failure would look like an unknown model.
+def stage(name, *args)
+  command = [ RbConfig.ruby, File.join(BIN, name), *args ]
+  puts
+  puts "── #{name} #{args.join(' ')}"
+  puts
+  system(*command)
+end
+
+extract = [ "--model", options[:model], "--run", run ]
+extract += [ "--provider", options[:provider] ] if options[:provider]
+extract += [ "--endpoint", options[:endpoint] ] if options[:endpoint]
+extract += [ "--only", options[:only] ] if options[:only]
+extract += [ "--limit", options[:limit] ] if options[:limit]
+extract << "--schema" if options[:schema]
+extract << "--force" if options[:force]
+extract << "--dry-run" if options[:dry_run]
+
+stage("llm-process", *extract)
+
+if options[:dry_run]
+  # A dry run asks nothing, so there are no replies to check or score. Stopping
+  # is the honest thing: running the later stages would report on whatever an
+  # earlier run left behind and read as though this one had produced it.
+  puts
+  puts "Dry run — nothing was asked, so there is nothing to validate or score."
+  exit 0
+end
+
+# Whether the run produced anything, rather than llm-process's exit status.
+# That status is 1 both when a single source failed — where the rest are still
+# worth scoring — and when the model was never callable at all. The files on
+# disk tell the two apart.
+answers = Dir.glob(File.join(Poc.stage_dir(:extracted, run: run), "*-extracted.json"))
+
+if answers.empty?
+  warn ""
+  warn "No replies were recorded, so there is nothing to validate or score."
+  exit 1
+end
+
+shared = options[:only] ? [ "--only", options[:only] ] : []
+
+# Non-zero from either of these means "some replies are invalid" or "some
+# sources scored badly", which is a result rather than a reason to stop. The
+# summary each prints is the point of running them.
+stage("validate-json", "--run", run, *shared)
+stage("score-json", "--run", run, *shared)
+
+puts
+puts "#{run}: #{answers.size} #{answers.size == 1 ? 'reply' : 'replies'} extracted, validated and scored."
+puts Poc.stage_dir(:scored, run: run)

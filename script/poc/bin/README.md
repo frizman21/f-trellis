@@ -138,6 +138,35 @@ docker-compose exec web bundle exec ruby script/poc/bin/llm-process --model gpt-
 One call. The cheapest way to find out whether a provider accepts the request at
 all before committing to a sweep.
 
+## 3a. `evaluate` — all three stages for one model
+
+```bash
+docker-compose exec web bundle exec ruby script/poc/bin/evaluate --model gpt-4.1 --schema
+```
+
+`llm-process`, `validate-json` and `score-json` in one call, each shown as it
+would look run by hand. Evaluating a model always means all three, and typing
+them separately is three chances to compare one model's extractions against
+another's scores.
+
+```bash
+docker-compose exec web bundle exec ruby script/poc/bin/evaluate --model gpt-4.1 --dry-run
+```
+
+Stops after the estimate. A dry run asks nothing, so there is nothing to
+validate or score — running the later stages would report on whatever an earlier
+run left behind and read as though this one had produced it.
+
+`--schema`, `--provider`, `--endpoint`, `--run`, `--only`, `--limit` and
+`--force` pass through. `--only` reaches all three stages, so the scores are
+over the same sources that were asked.
+
+> **A partial run scores as a failed one.** `score-json` compares against every
+> golden, and a source with no reply counts as zero. So `evaluate --only 000`
+> then `score-json` with no `--only` shows that run near zero across the corpus.
+> Either keep `--only` on the scoring too, or give the partial run its own
+> `--run` label and delete it when done.
+
 ## 4. `validate-json` — would the applier accept these replies?
 
 ```bash

@@ -57,6 +57,7 @@ carrying those numbers would silently start describing a different page.
 | 1 | `fetch` | `urls.txt` | `01-fetched/NNN-fetched.html` |
 | 2 | `html-strip` | fetched HTML | `02-stripped/NNN-stripped.txt` |
 | 3 | `llm-process` | `instructions.md` + stripped text | `03-extracted/<run>/NNN-extracted.json` |
+| 3a | `evaluate` | a model id | stages 3, 4 and 5 in one call |
 | 4 | `validate-json` | extractions + `mental-model.json` | `04-validated/<run>/NNN-validation.json` |
 | 5 | `score-json` | extractions + `golden/NNN-golden.json` | `05-scored/<run>/NNN-score.json` |
 | 6 | `apply-json` | extractions + their validation | records in the project |
@@ -71,14 +72,12 @@ poc export-model --project 6 --force     # mental model + instructions
 poc fetch                                # pull the pages
 poc html-strip                           # HTML -> text
 
-poc llm-process --model claude-opus-5 --dry-run    # what would this cost?
-poc llm-process --model claude-haiku-4-5
-poc llm-process --model gpt-5-nano
-poc llm-process --model claude-haiku-4-5 --schema --run haiku-schema
+poc evaluate --model gpt-5-nano --dry-run       # what would this cost?
+poc evaluate --model gpt-5-nano --schema       # ask, validate and score
+poc evaluate --model claude-haiku-4-5 --schema # again, for a second model
 
-poc validate-json                        # is every reply appliable?
-poc score-json                           # how good is it, and what did it cost?
-poc apply-json --run gpt-5-nano --dry-run   # what would it put in the graph?
+poc score-json                                 # both runs, one table
+poc apply-json --run gpt-5-nano --dry-run      # what would it put in the graph?
 ```
 
 `score-json` finishes with the table the exercise exists to produce: every run,
