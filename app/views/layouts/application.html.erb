@@ -57,7 +57,7 @@
               else: it 404s, so a link to it would be a door that reports itself
               missing. %>
           <% if current_user&.is_admin? %>
-            <%= link_to admin_root_path,
+            <%= link_to motor_admin_path,
                         class: "text-white-50 me-3 text-decoration-none",
                         title: "Data Admin", "aria-label": "Data Admin" do %>
               <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"

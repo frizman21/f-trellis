@@ -1,60 +1,26 @@
 Rails.application.routes.draw do
-  # The generated CRUD back office (administrate), reachable only by accounts
-  # with is_admin. Every model gets the full seven actions: this is the
-  # interface for reading and correcting rows the application's own screens do
-  # not expose, so narrowing it here would only mean going back to a rails
-  # console for whatever was left out.
+  # The CRUD back office, at /admin rather than motor-admin's own default so
+  # the address says what it is. Passive by design: motor reads the schema at
+  # request time and builds the screens from it, so there is nothing here to
+  # keep in step with the models.
   #
-  # Deliberately not wrapped in a routing constraint. The check lives in
-  # Admin::ApplicationController, where it covers every action including any
-  # added later and can be tested per-action; a constraint here would be a
-  # second place to remember.
-  namespace :admin do
-    resources :domains
-    resources :entities
-    resources :entity_attribute_value_extraction_runs
-    resources :entity_attribute_values
-    resources :entity_extraction_runs
-    resources :entity_type_attributes
-    resources :entity_types
-    resources :extraction_runs
-    resources :fetch_records
-    resources :learning_set_sources
-    resources :learning_sets
-    resources :messages
-    resources :model_endpoints
-    resources :models
-    resources :project_sources
-    resources :projects
-    resources :relationship_extraction_runs
-    resources :relationship_type_attributes
-    resources :relationship_type_value_extraction_runs
-    resources :relationship_type_values
-    resources :relationship_types
-    resources :relationships
-    resources :research_starting_points
-    resources :skill_evaluation_models
-    resources :skill_evaluation_results
-    resources :skill_evaluations
-    resources :skill_revisions
-    resources :skills
-    resources :source_data
-    resources :source_exclusions
-    resources :source_imports
-    resources :source_links
-    resources :source_processing_reports
-    resources :sources
-    resources :tool_calls
-    resources :triage_configurations
-    resources :users
-resources :chats
-
-    # Administrate's landing page is whichever resource is named here. The
-    # generator picks the alphabetically first one; projects is what the rest of
-    # the application organises around, and is the root outside /admin too.
-    root to: "projects#index"
+  # A routing constraint, which is the opposite of what the rest of this
+  # application does — and correct here for the reason it is wrong elsewhere.
+  # Motor::Admin is a mounted engine whose controllers this application does
+  # not own, so there is no before_action to hang the check on. The constraint
+  # is the only place the check can live, and it covers the whole engine
+  # rather than an action list that could fall behind it.
+  #
+  # A failing constraint means no route matched, so a non-admin gets 404. That
+  # is what is wanted: a 403 would confirm the interface is there and that they
+  # are the wrong kind of account.
+  #
+  # Writes by read-only accounts are refused separately, by Motor::Ability —
+  # the engine is outside ApplicationController, so the verb rule there does
+  # not reach it.
+  authenticate :user, ->(user) { user.is_admin? } do
+    mount Motor::Admin => "/admin"
   end
-
   devise_for :users, skip: [:registrations]
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

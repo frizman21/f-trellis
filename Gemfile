@@ -76,15 +76,24 @@ gem "ruby_llm"
 gem "devise"
 
 # Generated CRUD back office at /admin, for reading and correcting rows no
-# screen in this application exposes. administrate rather than rails_admin,
-# activeadmin or avo because of this deployment rather than a feature
-# comparison: the container has no node/yarn and the pipeline is propshaft +
-# importmap, so rails_admin's importmap path (which shells out to `yarn add`)
-# and activeadmin's sprockets/sassc assumptions are both unavailable.
-# administrate ships pre-built CSS and JS in its own app/assets/builds and adds
-# no transitive dependency this Gemfile does not already carry — its only
-# runtime deps are actionpack/actionview/activerecord and kaminari.
-gem "administrate", "~> 1.0"
+# screen in this application exposes.
+#
+# motor-admin rather than administrate, rails_admin, activeadmin or avo
+# because it is the only one that is *passive*: it reads the schema at
+# runtime and builds the CRUD interface from it, so there is no per-model
+# dashboard or controller to generate, and a new model appears on its own.
+# The alternatives all wanted a file per model — administrate wanted 77 of
+# them, 4,961 lines — and those files go stale silently the moment a model is
+# renamed.
+#
+# rails_admin is passive too and was the first choice, but its assets ship as
+# unbundled ES modules and SCSS; it needs node or sprockets to build them and
+# this container has neither, with propshaft as the pipeline. motor-admin
+# ships its interface prebuilt.
+#
+# The price, paid knowingly: it brings ar_lazy_preload, audited, cancancan
+# and fugit, and its install adds sixteen motor_* tables of its own.
+gem "motor-admin", "~> 0.5"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

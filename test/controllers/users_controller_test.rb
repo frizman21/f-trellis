@@ -73,7 +73,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
   test "the navbar links an admin to the data admin" do
     get users_path
 
-    assert_select "nav.navbar a[href=?]", admin_root_path do |links|
+    assert_select "nav.navbar a[href=?]", motor_admin_path do |links|
       assert_equal "Data Admin", links.first["aria-label"],
                    "the icon is the whole link, so it needs a name of its own"
       assert_select "svg"
@@ -89,7 +89,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     get users_path
 
     assert_response :success
-    assert_select "a[href=?]", admin_root_path, count: 0
+    assert_select "a[href=?]", motor_admin_path, count: 0
   end
 
   # The sidebar is absent on full-width pages, which is why the link is not
@@ -98,7 +98,7 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     get projects_path
 
     assert_select "nav.sidebar", count: 0
-    assert_select "nav.navbar a[href=?]", admin_root_path, count: 1
+    assert_select "nav.navbar a[href=?]", motor_admin_path, count: 1
   end
 
   # The route ordering has to keep Devise's own routes matching first.
