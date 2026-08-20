@@ -226,4 +226,4 @@ puts "project #{project.id}: #{project.name.inspect}"
 puts "  #{project.entity_types.kept.count} entity types, #{project.relationship_types.kept.count} relationship types"
 puts "  #{created} created, #{updated} updated"
 puts
-puts "next: bundle exec ruby script/poc/bin/export-model --project #{project.id} --force"
+puts "next: docker-compose exec web bundle exec ruby script/poc/bin/export-model --project #{project.id} --force"
