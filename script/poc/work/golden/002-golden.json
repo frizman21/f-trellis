@@ -1,0 +1,194 @@
+{
+  "entities": [
+    {
+      "id": "org-watermark",
+      "name": "Watermark Community Church",
+      "type": "Organization",
+      "attributes": {
+        "headquarters": "7540 Lyndon B Johnson Fwy, Dallas, TX 75251"
+      }
+    },
+    {
+      "id": "org-tamu",
+      "name": "Texas A&M",
+      "type": "Organization"
+    },
+    {
+      "id": "p-anders",
+      "name": "Todd Anders",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder"
+      }
+    },
+    {
+      "id": "p-julie",
+      "name": "Julie",
+      "type": "Person"
+    },
+    {
+      "id": "p-audrey",
+      "name": "Audrey",
+      "type": "Person"
+    },
+    {
+      "id": "p-eve",
+      "name": "Eve",
+      "type": "Person"
+    },
+    {
+      "id": "p-ateek",
+      "name": "Timothy (TA) Ateek",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder, Lead Pastor"
+      }
+    },
+    {
+      "id": "p-caldwell",
+      "name": "Ben Caldwell",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder"
+      }
+    },
+    {
+      "id": "p-coy",
+      "name": "Scott Coy",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder"
+      }
+    },
+    {
+      "id": "p-friedrich",
+      "name": "Mickey Friedrich",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder"
+      }
+    },
+    {
+      "id": "p-holmes",
+      "name": "Blake Holmes",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder, Campus Pastor"
+      }
+    },
+    {
+      "id": "p-johnston",
+      "name": "Brett Johnston",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder"
+      }
+    },
+    {
+      "id": "p-macfarlan",
+      "name": "Dean Macfarlan",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder"
+      }
+    },
+    {
+      "id": "p-thomas",
+      "name": "Rob Thomas",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder"
+      }
+    },
+    {
+      "id": "p-thompson",
+      "name": "Kyle Thompson",
+      "type": "Person",
+      "attributes": {
+        "title": "Elder"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-anders",
+      "attributes": {
+        "role": "Elder"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-ateek",
+      "attributes": {
+        "role": "Elder, Lead Pastor"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-caldwell",
+      "attributes": {
+        "role": "Elder"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-coy",
+      "attributes": {
+        "role": "Elder"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-friedrich",
+      "attributes": {
+        "role": "Elder"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-holmes",
+      "attributes": {
+        "role": "Elder, Campus Pastor"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-johnston",
+      "attributes": {
+        "role": "Elder"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-macfarlan",
+      "attributes": {
+        "role": "Elder"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-thomas",
+      "attributes": {
+        "role": "Elder"
+      }
+    },
+    {
+      "type": "Employs",
+      "from": "org-watermark",
+      "to": "p-thompson",
+      "attributes": {
+        "role": "Elder"
+      }
+    }
+  ]
+}

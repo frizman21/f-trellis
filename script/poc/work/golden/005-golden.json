@@ -1,0 +1,130 @@
+{
+  "entities": [
+    {
+      "id": "c-award",
+      "name": "AI Vision Based Guidance",
+      "type": "Contract",
+      "attributes": {
+        "contract_number": "FA8649-24-P-0441",
+        "award_amount": 1247198,
+        "start_date": "2024-06-27",
+        "end_date": "2026-03-30"
+      }
+    },
+    {
+      "id": "org-usi",
+      "name": "Unmanned Systems Incorporated",
+      "type": "Organization",
+      "attributes": {
+        "headquarters": "1700 Redbud Blvd Ste 400, McKinney, TX, 75069-3295, USA"
+      }
+    },
+    {
+      "id": "org-dow",
+      "name": "DOW",
+      "type": "Organization"
+    },
+    {
+      "id": "org-usaf",
+      "name": "USAF",
+      "type": "Organization"
+    },
+    {
+      "id": "org-dra",
+      "name": "Defense Research Associates",
+      "type": "Organization"
+    },
+    {
+      "id": "p-clayman",
+      "name": "Gary Clayman",
+      "type": "Person",
+      "attributes": {
+        "phone": "(937) 461-1644",
+        "email": "gclayman@dramail.com"
+      }
+    },
+    {
+      "id": "p-deschenes",
+      "name": "Michael Deschenes",
+      "type": "Person",
+      "attributes": {
+        "phone": "(937) 431-1644",
+        "email": "mdeschenes@dramail.com"
+      }
+    },
+    {
+      "id": "t-vbgs",
+      "name": "Vision Based Guidance System",
+      "type": "Technology"
+    },
+    {
+      "id": "t-ai",
+      "name": "Artificial Intelligence",
+      "type": "Technology"
+    },
+    {
+      "id": "t-cv",
+      "name": "Computer Vision",
+      "type": "Technology"
+    },
+    {
+      "id": "t-localization",
+      "name": "AI Object Localization",
+      "type": "Technology"
+    },
+    {
+      "id": "t-swarm",
+      "name": "UAS Swarm Technology",
+      "type": "Technology"
+    },
+    {
+      "id": "t-ins",
+      "name": "INS",
+      "type": "Technology"
+    }
+  ],
+  "relationships": [
+    {
+      "type": "Enters",
+      "from": "org-usi",
+      "to": "c-award",
+      "attributes": {
+        "role": "Awardee"
+      }
+    },
+    {
+      "type": "Enters",
+      "from": "org-dow",
+      "to": "c-award",
+      "attributes": {
+        "role": "Awarding Agency"
+      }
+    },
+    {
+      "type": "Point Of Contact",
+      "from": "c-award",
+      "to": "p-clayman",
+      "attributes": {
+        "role": "Principal Investigator"
+      }
+    },
+    {
+      "type": "Point Of Contact",
+      "from": "c-award",
+      "to": "p-deschenes",
+      "attributes": {
+        "role": "Business Contact"
+      }
+    },
+    {
+      "type": "Develops",
+      "from": "org-dra",
+      "to": "t-vbgs"
+    },
+    {
+      "type": "Contract Develops",
+      "from": "c-award",
+      "to": "t-vbgs"
+    }
+  ]
+}

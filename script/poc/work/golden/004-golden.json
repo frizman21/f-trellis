@@ -1,0 +1,75 @@
+{
+  "entities": [
+    {
+      "id": "org-dow",
+      "name": "DOW",
+      "type": "Organization"
+    },
+    {
+      "id": "org-osd",
+      "name": "OSD",
+      "type": "Organization"
+    },
+    {
+      "id": "org-ousd",
+      "name": "OUSD (R&E)",
+      "type": "Organization"
+    },
+    {
+      "id": "org-nga",
+      "name": "NGA",
+      "type": "Organization"
+    },
+    {
+      "id": "org-microsoft",
+      "name": "Microsoft",
+      "type": "Organization"
+    },
+    {
+      "id": "t-labeling",
+      "name": "Machine-Assisted Image Labeling",
+      "type": "Technology"
+    },
+    {
+      "id": "t-cv",
+      "name": "Computer Vision",
+      "type": "Technology"
+    },
+    {
+      "id": "t-ml",
+      "name": "Machine Learning",
+      "type": "Technology"
+    },
+    {
+      "id": "t-autonomy",
+      "name": "Trusted AI and Autonomy",
+      "type": "Technology"
+    },
+    {
+      "id": "p-sager",
+      "name": "Sager, C.",
+      "type": "Person"
+    },
+    {
+      "id": "p-jamiesch",
+      "name": "Jamiesch, C.",
+      "type": "Person"
+    },
+    {
+      "id": "p-zscheh",
+      "name": "Zscheh, P.",
+      "type": "Person"
+    },
+    {
+      "id": "p-haider",
+      "name": "Haider, T.",
+      "type": "Person"
+    },
+    {
+      "id": "p-michahelles",
+      "name": "Michahelles, F.",
+      "type": "Person"
+    }
+  ],
+  "relationships": []
+}
