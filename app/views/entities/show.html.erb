@@ -40,7 +40,7 @@
           <td><%= value_as_link value&.display_value, truncate: nil %></td>
           <td>
             <%= render "shared/citations",
-                       citations: value ? value.entity_attribute_value_sources.includes(:source) : [] %>
+                       citations: value ? value.entity_attribute_value_extraction_runs.includes(:source) : [] %>
           </td>
         </tr>
       <% end %>

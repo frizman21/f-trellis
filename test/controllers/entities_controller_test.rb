@@ -249,14 +249,14 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   # --- citing a source -------------------------------------------------------
 
   test "create records a citation for the entity when a source is chosen" do
-    assert_difference -> { EntitySource.count }, 1 do
+    assert_difference -> { EntityExtractionRun.count }, 1 do
       post project_entities_path(@project), params: {
         entity: { name: "Cited Engine", entity_type_id: entity_types(:rocket_engine).id,
-                  entity_sources_attributes: { "0" => { source_id: sources(:one).id, confidence: "80" } } }
+                  entity_extraction_runs_attributes: { "0" => { source_id: sources(:one).id, confidence: "80" } } }
       }
     end
 
-    citation = Entity.order(:id).last.entity_sources.sole
+    citation = Entity.order(:id).last.entity_extraction_runs.sole
 
     assert_equal sources(:one), citation.source
     assert_equal 80, citation.confidence
@@ -265,20 +265,20 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   # Citing is optional, so a blank search box is not an error.
   test "create records no citation when no source is chosen" do
     assert_difference -> { Entity.count }, 1 do
-      assert_no_difference -> { EntitySource.count } do
+      assert_no_difference -> { EntityExtractionRun.count } do
         post project_entities_path(@project), params: {
           entity: { name: "Uncited Engine", entity_type_id: entity_types(:rocket_engine).id,
-                    entity_sources_attributes: { "0" => { source_id: "", confidence: "100" } } }
+                    entity_extraction_runs_attributes: { "0" => { source_id: "", confidence: "100" } } }
         }
       end
     end
   end
 
   test "create rejects a confidence outside 1..100 and records nothing" do
-    assert_no_difference [ -> { Entity.count }, -> { EntitySource.count } ] do
+    assert_no_difference [ -> { Entity.count }, -> { EntityExtractionRun.count } ] do
       post project_entities_path(@project), params: {
         entity: { name: "Cited Engine", entity_type_id: entity_types(:rocket_engine).id,
-                  entity_sources_attributes: { "0" => { source_id: sources(:one).id, confidence: "101" } } }
+                  entity_extraction_runs_attributes: { "0" => { source_id: sources(:one).id, confidence: "101" } } }
       }
     end
 
@@ -291,12 +291,12 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     entity = entities(:f1)
     chambers = entity_type_attributes(:engine_chambers)
 
-    assert_difference -> { EntityAttributeValueSource.count }, 1 do
-      assert_no_difference -> { EntitySource.count } do
+    assert_difference -> { EntityAttributeValueExtractionRun.count }, 1 do
+      assert_no_difference -> { EntityExtractionRun.count } do
         patch project_entity_path(@project, entity), params: {
           entity: { entity_attribute_values_attributes: {
             "0" => { entity_type_attribute_id: chambers.id, value: "5",
-                     entity_attribute_value_sources_attributes: {
+                     entity_attribute_value_extraction_runs_attributes: {
                        "0" => { source_id: sources(:one).id, confidence: "60" }
                      } }
           } }
@@ -306,18 +306,18 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
 
     value = entity.reload.entity_attribute_values.find_by(entity_type_attribute: chambers)
 
-    assert_equal sources(:one), value.entity_attribute_value_sources.sole.source
-    assert_equal 60, value.entity_attribute_value_sources.sole.confidence
+    assert_equal sources(:one), value.entity_attribute_value_extraction_runs.sole.source
+    assert_equal 60, value.entity_attribute_value_extraction_runs.sole.confidence
   end
 
   test "a blank source with a confidence filled in records nothing" do
     entity = entities(:f1)
 
-    assert_no_difference -> { EntityAttributeValueSource.count } do
+    assert_no_difference -> { EntityAttributeValueExtractionRun.count } do
       patch project_entity_path(@project, entity), params: {
         entity: { entity_attribute_values_attributes: {
           "0" => { entity_type_attribute_id: entity_type_attributes(:engine_chambers).id, value: "5",
-                   entity_attribute_value_sources_attributes: {
+                   entity_attribute_value_extraction_runs_attributes: {
                      "0" => { source_id: "", confidence: "60" }
                    } }
         } }
@@ -326,8 +326,11 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "show displays what each fact is cited from, with its confidence" do
-    EntityAttributeValueSource.create!(entity_attribute_value: entity_attribute_values(:f1_manufacturer),
-                                       source: sources(:one), confidence: 42)
+    EntityAttributeValueExtractionRun.create!(
+      entity_attribute_value: entity_attribute_values(:f1_manufacturer),
+      source: sources(:one), confidence: 42,
+      extraction_run: an_extraction_run(project: @project, source: sources(:one))
+    )
 
     get project_entity_path(@project, entities(:f1))
 
@@ -340,7 +343,7 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     get new_project_entity_path(@project)
 
     assert_select "[data-controller=?]", "source-search"
-    assert_select "input[name=?]", "entity[entity_sources_attributes][0][source_id]"
+    assert_select "input[name=?]", "entity[entity_extraction_runs_attributes][0][source_id]"
   end
 
   # --- the relationship picker respects the declared ends --------------------
@@ -512,5 +515,69 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "p.text-muted", text: "Rocket Engine"
     assert_select "a[href=?]", project_entity_type_path(@project, entity_types(:rocket_engine)), count: 0
+  end
+
+  # --- the run a person's own edit belongs to (#71) ---------------------------
+
+  test "a hand-entered citation gets a manual run of its own" do
+    assert_difference -> { ExtractionRun.count }, 1 do
+      post project_entities_path(@project), params: {
+        entity: { name: "By Hand", entity_type_id: entity_types(:rocket_engine).id,
+                  entity_extraction_runs_attributes: { "0" => { source_id: sources(:one).id, confidence: "90" } } }
+      }
+    end
+
+    citation = Entity.order(:id).last.entity_extraction_runs.sole
+    run = citation.extraction_run
+
+    assert_predicate run, :manual?
+    assert_equal sources(:one), run.source
+    assert_equal @project, run.project
+  end
+
+  # Nothing was cited, so nothing was seen, so there is no sighting to record.
+  test "a submission that cites nothing creates no run" do
+    assert_no_difference -> { ExtractionRun.count } do
+      post project_entities_path(@project), params: {
+        entity: { name: "Uncited", entity_type_id: entity_types(:rocket_engine).id,
+                  entity_extraction_runs_attributes: { "0" => { source_id: "", confidence: "100" } } }
+      }
+    end
+  end
+
+  # Each save is its own sighting: recording the same page again is a second
+  # observation, not a correction of the first.
+  test "editing the same entity twice records two sightings" do
+    post project_entities_path(@project), params: {
+      entity: { name: "Twice Seen", entity_type_id: entity_types(:rocket_engine).id,
+                entity_extraction_runs_attributes: { "0" => { source_id: sources(:one).id, confidence: "90" } } }
+    }
+    entity = Entity.order(:id).last
+
+    assert_difference [ -> { ExtractionRun.count }, -> { EntityExtractionRun.count } ], 1 do
+      patch project_entity_path(@project, entity), params: {
+        entity: { entity_extraction_runs_attributes: { "0" => { source_id: sources(:two).id, confidence: "70" } } }
+      }
+    end
+
+    assert_equal 2, entity.reload.entity_extraction_runs.count
+  end
+
+  # A failed save must not leave a run behind claiming an edit that never
+  # happened, which is why the two are in one transaction.
+  test "a rejected submission leaves no run behind" do
+    assert_no_difference [ -> { ExtractionRun.count }, -> { Entity.count } ] do
+      post project_entities_path(@project), params: {
+        entity: { name: "", entity_type_id: entity_types(:rocket_engine).id,
+                  entity_extraction_runs_attributes: { "0" => { source_id: sources(:one).id, confidence: "90" } } }
+      }
+    end
+  end
+
+  # The sentinel exists to satisfy a foreign key, not to be chosen.
+  test "the manual sentinel is offered by no picker" do
+    ExtractionRun.manual_model
+
+    assert_not_includes Model.selectable, Model.find_by(provider: "manual")
   end
 end

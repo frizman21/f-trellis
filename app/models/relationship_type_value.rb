@@ -8,10 +8,10 @@ class RelationshipTypeValue < ApplicationRecord
 
   belongs_to :relationship_type_attribute
 
-  has_many :relationship_type_value_sources, dependent: :destroy
-  has_many :sources, through: :relationship_type_value_sources
+  has_many :relationship_type_value_extraction_runs, dependent: :destroy
+  has_many :sources, through: :relationship_type_value_extraction_runs
 
-  accepts_nested_attributes_for :relationship_type_value_sources, reject_if: ->(attrs) { attrs["source_id"].blank? }
+  accepts_nested_attributes_for :relationship_type_value_extraction_runs, reject_if: ->(attrs) { attrs["source_id"].blank? }
 
   validates :relationship_type_attribute_id, uniqueness: { scope: :relationship_id }
 

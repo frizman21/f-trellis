@@ -423,11 +423,23 @@ exactly one of the four columns is live is written once.
 ### Citing a source
 
 Anything recorded can cite the `Source` it came from, through one of four join
-tables — `entity_sources`, `relationship_sources`,
-`entity_attribute_value_sources`, `relationship_type_value_sources` — each
-carrying the cited `source_id` and a `confidence` between 1 and 100, defaulting
-to 100. Citing is optional. A source that is still cited cannot be destroyed:
-losing the page a fact came from must not lose the fact.
+tables — `entity_extraction_runs`, `relationship_extraction_runs`,
+`entity_attribute_value_extraction_runs`,
+`relationship_type_value_extraction_runs` — each carrying the cited `source_id`,
+the `extraction_run_id` that recorded it, and a `confidence` between 1 and 100,
+defaulting to 100. Citing is optional. A source that is still cited cannot be
+destroyed: losing the page a fact came from must not lose the fact.
+
+A row is a **sighting**, not merely a mention: unique on
+`(owner, source, extraction_run)`, so extracting the same page twice records
+that the fact was seen twice rather than updating one row and losing the second
+observation. That is what the tables are named for, and why the run is required
+rather than optional.
+
+Facts a person enters by hand are sightings too. They get a run of their own —
+`ExtractionRun.manual`, one per form submission per source, pointing at a
+sentinel `Model` with provider `manual` that no picker offers because it is
+absent from `Model::SELECTABLE_PROVIDERS`.
 
 ---
 

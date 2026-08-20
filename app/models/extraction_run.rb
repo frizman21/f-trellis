@@ -1,9 +1,13 @@
-# One attempt at running a project's extraction prompt over one source.
+# One occasion on which a project's facts were recorded against one source.
 #
-# It records the reply and nothing more: no entity, relationship, value or
-# citation is created from it. Turning the JSON into records is separate work
-# with its own questions — matching against entities that already exist, what to
-# do with a type the model invented, what confidence a citation earns.
+# Usually an attempt at running the extraction prompt: it records the reply and
+# nothing more, because turning the JSON into records is separate work with its
+# own questions — matching against entities that already exist, what to do with
+# a type the model invented, what confidence a citation earns.
+#
+# Since #71 it is also what a person's own edit belongs to. Every citation names
+# a run, so a fact recorded by hand needs one too; `manual` builds it. Such a
+# run has no chat and no reply, and its model is the sentinel described there.
 class ExtractionRun < ApplicationRecord
   STATUSES = %w[pending running complete failed].freeze
   # A run is in flight while it is one of these; the button stays disabled so a
@@ -16,6 +20,27 @@ class ExtractionRun < ApplicationRecord
   belongs_to :chat, optional: true
 
   validates :status, inclusion: { in: STATUSES }
+
+  # The run a person's own edit belongs to, created fresh for each submission —
+  # editing the same entity twice is two sightings, not one.
+  #
+  # Not a nullable model_id: `manual` is absent from Model::SELECTABLE_PROVIDERS,
+  # so every picker excludes the sentinel already, and Model.current excludes it
+  # from the models index since nothing stamps its last_seen_at.
+  def self.manual(project:, source: nil, source_id: nil)
+    create!(project: project, source: source, source_id: source_id || source&.id,
+            model: manual_model, status: "complete",
+            started_at: Time.current, completed_at: Time.current)
+  end
+
+  def self.manual_model
+    Model.find_or_create_by!(provider: "manual", model_id: "manual") do |model|
+      model.name = "Entered by hand"
+    end
+  end
+
+  # Nothing asked a model for this one.
+  def manual? = model&.provider == "manual"
 
   scope :recent, -> { order(created_at: :desc) }
   scope :in_flight, -> { where(status: IN_FLIGHT) }
