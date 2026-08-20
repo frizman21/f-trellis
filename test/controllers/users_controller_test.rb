@@ -25,6 +25,21 @@ class UsersControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Rendered beside the read-only marker rather than instead of it, because an
+  # account can be both.
+  test "index marks admin accounts" do
+    get users_path
+
+    assert_select "tbody tr" do |rows|
+      admin = rows.detect { |r| r.text.include?(users(:admin).email) }
+      assert_match(/admin/, admin.text)
+
+      plain = rows.detect { |r| r.text.include?(users(:other).email) }
+      assert_no_match(/admin/, plain.text)
+      assert_match(/full/, plain.text)
+    end
+  end
+
   test "index is ordered by email" do
     User.create!(email: "aaa@example.com", password: "password")
     User.create!(email: "zzz@example.com", password: "password")

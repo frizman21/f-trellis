@@ -22,6 +22,12 @@
           <% else %>
             <span class="text-muted">full</span>
           <% end %>
+          <%# Independent of the flag above rather than a third value of it: an
+              admin account can also be read-only, and then it opens every
+              /admin page and writes on none of them. %>
+          <% if user.is_admin? %>
+            <span class="badge text-bg-warning">admin</span>
+          <% end %>
         </td>
         <td class="text-muted"><%= user.created_at.to_date.to_fs(:long) %></td>
       </tr>
