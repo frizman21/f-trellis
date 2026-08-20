@@ -163,7 +163,10 @@ class ProjectSidesTest < ActionDispatch::IntegrationTest
     get new_project_path
 
     assert_response :success
-    assert_select "nav.navbar svg", count: 0
+    # Scoped to the structure link rather than to every navbar svg. It counted
+    # svgs while the gear was the only icon up there; the data admin icon is
+    # one too, and its presence says nothing about this.
+    assert_select "nav.navbar a[href$=?]", "/structure", count: 0
   end
 
   # The old index addresses moved; the per-record ones did not.
