@@ -58,7 +58,7 @@ class RelationshipsController < ApplicationController
   # Retyping an edge is only possible to a kind whose declared ends match the
   # two entities it already joins.
   def set_compatible_types
-    @compatible_types = @project.relationship_types.where(
+    @compatible_types = @project.relationship_types.kept.where(
       from_entity_type_id: @relationship.from_entity.entity_type_id,
       to_entity_type_id: @relationship.to_entity.entity_type_id
     )

@@ -1,0 +1,147 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Stage 1 — fetch each URL and keep the HTML exactly as it arrived.
+#
+#   docker compose exec web bundle exec ruby script/poc/bin/fetch
+#   docker compose exec web bundle exec ruby script/poc/bin/fetch --only 003,007 --force
+#
+# Raw HTML is stored, not text. Stripping is the next stage's job and the one
+# most likely to be changed: keeping the original means a better stripper can be
+# tried over the same pages without paying to fetch them again, and without the
+# pages having moved underneath the comparison.
+#
+# No Rails. This stage needs an HTTP client and a file, and booting the
+# application to get them would only make the loop slower to iterate on.
+
+require "net/http"
+require "optparse"
+require "uri"
+require "time"
+require "zlib"
+require "stringio"
+require_relative "../lib/poc"
+
+MAX_REDIRECTS = 5
+
+options = { force: false, timeout: 30, renumber: false }
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: fetch [--only NNN,NNN] [--limit N] [--force]"
+  opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v.split(",").map(&:strip) }
+  opts.on("--limit N", Integer, "Stop after N fetches") { |v| options[:limit] = v }
+  opts.on("--force", "Re-fetch even if the file is already there") { options[:force] = true }
+  opts.on("--timeout SECONDS", Integer, "Per-request timeout (default 30)") { |v| options[:timeout] = v }
+  opts.on("--renumber", "Allow urls.txt to reassign existing numbers (destructive)") { options[:renumber] = true }
+  opts.on("--work PATH", "Work directory (default script/poc/work)") { |v| Poc.work = v }
+  opts.on("-h", "--help") { puts opts; exit }
+end.parse!
+
+USER_AGENT = ENV.fetch("CRAWLER_USER_AGENT", "f-trellis-poc/1.0 (+extraction proof of concept)")
+
+# Follows redirects by hand so the final URL can be recorded. A page that
+# redirected is a different page from the one listed, and when an extraction
+# looks wrong that is worth being able to see.
+def get(url, timeout:, depth: 0)
+  raise "too many redirects" if depth > MAX_REDIRECTS
+
+  uri = URI.parse(url)
+  raise "unsupported scheme #{uri.scheme.inspect}" unless %w[http https].include?(uri.scheme)
+
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = uri.scheme == "https"
+  http.open_timeout = timeout
+  http.read_timeout = timeout
+
+  request = Net::HTTP::Get.new(uri.request_uri)
+  request["User-Agent"] = USER_AGENT
+  request["Accept"] = "text/html,application/xhtml+xml,*/*;q=0.8"
+  request["Accept-Encoding"] = "gzip"
+
+  response = http.request(request)
+
+  if response.is_a?(Net::HTTPRedirection) && response["location"]
+    return get(URI.join(url, response["location"]).to_s, timeout: timeout, depth: depth + 1)
+  end
+
+  [ response, url ]
+end
+
+def body_of(response)
+  raw = response.body.to_s
+  raw = Zlib::GzipReader.new(StringIO.new(raw)).read if response["content-encoding"].to_s.include?("gzip")
+  # Pages lie about their encoding often enough that trusting the header breaks
+  # the stripper later with an invalid byte sequence. Scrub once, here.
+  raw.dup.force_encoding(Encoding::UTF_8).scrub
+rescue Zlib::Error
+  response.body.to_s.dup.force_encoding(Encoding::UTF_8).scrub
+end
+
+manifest = Poc::Manifest.new.sync!(Poc.urls, renumber: options[:renumber])
+Poc.mkdir(Poc.stage_dir(:fetched))
+
+targets = manifest.numbers
+targets &= options[:only] if options[:only]
+
+fetched = skipped = failed = 0
+
+targets.each do |n|
+  break if options[:limit] && fetched >= options[:limit]
+
+  item = manifest.entry(n)
+  next if item["retired"]
+
+  url = item["url"]
+  path = Poc.path_for(:fetched, n)
+
+  if File.exist?(path) && !options[:force]
+    puts "#{n} skip   #{url}"
+    skipped += 1
+    next
+  end
+
+  started = Time.now
+
+  begin
+    response, final_url = get(url, timeout: options[:timeout])
+    body = body_of(response)
+
+    unless response.is_a?(Net::HTTPSuccess)
+      raise "HTTP #{response.code} #{response.message}"
+    end
+
+    File.write(path, body)
+
+    manifest.record(n, :fetched, {
+      "url" => url,
+      "final_url" => final_url,
+      "status" => response.code.to_i,
+      "content_type" => response["content-type"],
+      "bytes" => body.bytesize,
+      "sha256" => Poc.sha(body),
+      "seconds" => (Time.now - started).round(2),
+      "at" => Time.now.utc.iso8601,
+      "file" => File.basename(path)
+    })
+
+    puts "#{n} ok     #{body.bytesize} bytes  #{url}"
+    fetched += 1
+  rescue StandardError => e
+    manifest.record(n, :fetched, {
+      "url" => url,
+      "error" => "#{e.class}: #{e.message}",
+      "seconds" => (Time.now - started).round(2),
+      "at" => Time.now.utc.iso8601
+    })
+    warn "#{n} FAIL   #{url} — #{e.class}: #{e.message}"
+    failed += 1
+  end
+end
+
+manifest.save
+
+puts
+puts "fetched #{fetched}, skipped #{skipped}, failed #{failed} — #{Poc.stage_dir(:fetched)}"
+# Non-zero on any failure so a run cannot be mistaken for complete, but whatever
+# succeeded is on disk and --only retries just the gaps.
+exit(failed.zero? ? 0 : 1)

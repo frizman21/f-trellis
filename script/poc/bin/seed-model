@@ -1,0 +1,229 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Stage 0a — the project whose ontology the proof of concept measures against.
+#
+#   docker compose exec web bundle exec ruby script/poc/bin/seed-model
+#   docker compose exec web bundle exec ruby script/poc/bin/seed-model --prune
+#
+# A script rather than a console session, because the ontology under test is the
+# independent variable: a scoreboard is only comparable across runs if the thing
+# being scored is written down somewhere that can be diffed. Editing the tables
+# below and re-running is how the model changes.
+#
+# Its own project rather than a reshape of F-DoD. F-DoD holds 352,894 entities
+# and 1,015,988 relationships concentrated in seven relationship types, two of
+# which run in the opposite direction from the ones here — Employment is
+# Person -> Organization, Awardee is Contract -> Organization. Reshaping it
+# would be a data migration swapping the ends of 346,175 rows, not an ontology
+# edit, and it would discard about a million relationships in types this model
+# has no equivalent for.
+#
+# Idempotent. Re-running updates definitions in place and leaves ids alone, so
+# the numbers in work/ keep pointing at the same types.
+
+require "optparse"
+require_relative "../lib/poc"
+
+PROJECT_NAME = "Extraction PoC"
+
+# Attribute names are the ones a page actually states. `name` is a column on
+# Entity already, so nothing here repeats it.
+ENTITY_TYPES = [
+  { name: "Person",
+    description: "An individual human being named by the source. A role held by " \
+                 "nobody in particular is not a Person, and neither is a team, a " \
+                 "department, or a job title with no name attached to it.",
+    attributes: { "title" => "string", "email" => "string", "phone" => "string" } },
+
+  { name: "Organization",
+    description: "A company, agency, university, laboratory, or other body that " \
+                 "acts as one. A division named only in passing is part of its " \
+                 "parent, not its own Organization, unless the source treats it as " \
+                 "acting on its own behalf.",
+    attributes: { "website" => "string", "headquarters" => "string",
+                  "founded" => "int", "employee_count" => "int" } },
+
+  { name: "Technology",
+    description: "A capability or technical approach that can be built into things " \
+                 "— a propulsion method, a sensing technique, an architecture. Not " \
+                 "a product you can buy, which is a Product, and not the underlying " \
+                 "principle it rests on, which is a Science.",
+    attributes: { "category" => "string", "maturity_level" => "string",
+                  "application_area" => "string" } },
+
+  { name: "Science",
+    description: "A field of study or a body of underlying principle — fluid " \
+                 "dynamics, materials science, machine learning theory. Distinct " \
+                 "from Technology: Science is what is understood, Technology is " \
+                 "what is built with it.",
+    attributes: { "field" => "string", "discipline" => "string",
+                  "key_publication" => "string" } },
+
+  { name: "Contract",
+    description: "A specific funded agreement between parties, identified as one " \
+                 "thing by the source — an award, a task order, a grant. A " \
+                 "programme that funds many awards is not itself a Contract unless " \
+                 "the source names it as a single agreement.",
+    attributes: { "contract_number" => "string", "award_amount" => "float",
+                  "start_date" => "datetime", "end_date" => "datetime" } },
+
+  { name: "Product",
+    description: "A specific thing offered for sale or delivery under its own " \
+                 "name — a model, a platform, a system. Distinct from Technology: " \
+                 "a Product is the article, the Technology is what makes it work.",
+    attributes: { "model_number" => "string", "category" => "string",
+                  "price" => "float", "released" => "datetime" } }
+].freeze
+
+# Names are unique within a project, which is why the two Contract-side verbs
+# carry a qualifier: "Develops" and "Researches" are already taken by the
+# Organization-side pair.
+RELATIONSHIP_TYPES = [
+  { name: "Employs", from: "Organization", to: "Person",
+    description: "The organization employs this person, or the person holds a " \
+                 "named position at it. A person merely quoted about an " \
+                 "organization is not employed by it.",
+    attributes: { "role" => "string" } },
+
+  { name: "Enters", from: "Organization", to: "Contract",
+    description: "The organization is a party to this contract — it was awarded " \
+                 "it, signed it, or is named as performing it. An agency that " \
+                 "awarded the contract is also a party and belongs here.",
+    attributes: { "role" => "string" } },
+
+  { name: "Point Of Contact", from: "Contract", to: "Person",
+    description: "The person the contract names as a contact — principal " \
+                 "investigator, technical contact, contracting officer. Somebody " \
+                 "mentioned in the same paragraph is not a point of contact.",
+    attributes: { "role" => "string" } },
+
+  { name: "Develops", from: "Organization", to: "Technology",
+    description: "The organization builds or advances this technology itself. " \
+                 "Buying or using it is not developing it." },
+
+  { name: "Researches", from: "Organization", to: "Science",
+    description: "The organization conducts study in this field. Applying an " \
+                 "established result is not researching it." },
+
+  { name: "Supports", from: "Science", to: "Technology",
+    description: "This field of study is the principle the technology rests on — " \
+                 "the source states the technology works because of it." },
+
+  { name: "Sells", from: "Organization", to: "Product",
+    description: "The organization offers this product commercially. A reseller " \
+                 "or distributor counts; a customer does not." },
+
+  { name: "Uses", from: "Product", to: "Technology",
+    description: "The product is built with this technology, as the source " \
+                 "describes it — a specification, a feature, a stated approach." },
+
+  { name: "Acquires", from: "Organization", to: "Organization",
+    description: "The first organization acquires the second, taking ownership of " \
+                 "it. The direction is acquirer to acquired. An investment, a " \
+                 "partnership, a supplier arrangement, or a merger of equals is " \
+                 "not an acquisition.",
+    attributes: { "announced" => "datetime" } },
+
+  { name: "Contract Develops", from: "Contract", to: "Technology",
+    description: "The contract funds work that builds or advances this " \
+                 "technology. Naming a technology as background is not developing it." },
+
+  { name: "Contract Researches", from: "Contract", to: "Science",
+    description: "The contract funds study in this field." }
+].freeze
+
+options = { prune: false }
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: seed-model [--prune]"
+  opts.on("--prune", "Delete types in the project that this script does not define") { options[:prune] = true }
+  opts.on("-h", "--help") { puts opts; exit }
+end.parse!
+
+require_relative "../../../config/environment"
+
+# Project carries a name and nothing else to describe it with — what this
+# project is for is recorded here, in the script that defines it.
+project = Project.find_or_create_by!(name: PROJECT_NAME)
+
+created = updated = 0
+
+# Reuse a soft-deleted type rather than adding a second row beside it: the
+# partial unique index would allow the duplicate, and two types with one name is
+# exactly the confusion the index exists to prevent.
+def upsert(scope, name, &)
+  record = scope.find_or_initialize_by(name: name)
+  record.undiscard if record.persisted? && record.discarded?
+  was_new = record.new_record?
+  yield record
+  record.save!
+  [ record, was_new ]
+end
+
+def sync_attributes(owner, association, declared)
+  declared.each_with_index do |(name, value_type), index|
+    attribute = association.find_or_initialize_by(name: name)
+    attribute.value_type = value_type
+    # One column on the list is enough to make a type's entities legible without
+    # making the table unreadable.
+    attribute.is_displayed_on_index = index.zero?
+    attribute.is_disabled = false
+    attribute.save!
+  end
+
+  # An attribute the script no longer declares is disabled, not destroyed:
+  # values recorded against it are still knowledge (#18).
+  association.where.not(name: declared.keys).find_each do |extra|
+    next if extra.is_disabled?
+
+    extra.update!(is_disabled: true)
+    puts "  disabled #{owner.name}.#{extra.name} — no longer declared"
+  end
+end
+
+ENTITY_TYPES.each do |spec|
+  type, was_new = upsert(project.entity_types, spec[:name]) { |t| t.description = spec[:description] }
+  sync_attributes(type, type.entity_type_attributes, spec[:attributes])
+  was_new ? created += 1 : updated += 1
+  puts format("%-8s %-14s %d attributes", was_new ? "created" : "updated", type.name, spec[:attributes].size)
+end
+
+by_name = project.entity_types.kept.index_by(&:name)
+
+RELATIONSHIP_TYPES.each do |spec|
+  from = by_name.fetch(spec[:from])
+  to   = by_name.fetch(spec[:to])
+
+  type, was_new = upsert(project.relationship_types, spec[:name]) do |t|
+    t.description = spec[:description]
+    t.from_entity_type = from
+    t.to_entity_type = to
+  end
+  sync_attributes(type, type.relationship_type_attributes, spec[:attributes] || {})
+  was_new ? created += 1 : updated += 1
+  puts format("%-8s %-20s %s -> %s", was_new ? "created" : "updated", type.name, from.name, to.name)
+end
+
+if options[:prune]
+  # Soft, so a mis-edit of the tables above is recoverable, and cascading —
+  # deleting an entity type takes the relationship types that name it.
+  extra_relationships = project.relationship_types.kept.where.not(name: RELATIONSHIP_TYPES.map { |s| s[:name] })
+  extra_relationships.find_each do |type|
+    type.discard_with_relationships
+    puts "deleted relationship type #{type.name.inspect} — not defined here"
+  end
+
+  extra_entities = project.entity_types.kept.where.not(name: ENTITY_TYPES.map { |s| s[:name] })
+  extra_entities.find_each do |type|
+    type.discard_with_entities
+    puts "deleted entity type #{type.name.inspect} — not defined here"
+  end
+end
+
+puts
+puts "project #{project.id}: #{project.name.inspect}"
+puts "  #{project.entity_types.kept.count} entity types, #{project.relationship_types.kept.count} relationship types"
+puts "  #{created} created, #{updated} updated"
+puts
+puts "next: bundle exec ruby script/poc/bin/export-model --project #{project.id} --force"

@@ -1,0 +1,89 @@
+{
+  "entities": [
+    {
+      "id": "org-dow",
+      "name": "DOW",
+      "type": "Organization",
+      "attributes": []
+    },
+    {
+      "id": "org-osd",
+      "name": "OSD",
+      "type": "Organization",
+      "attributes": []
+    },
+    {
+      "id": "org-ousd",
+      "name": "OUSD (R&E)",
+      "type": "Organization",
+      "attributes": []
+    },
+    {
+      "id": "org-nga",
+      "name": "NGA",
+      "type": "Organization",
+      "attributes": []
+    },
+    {
+      "id": "org-microsoft",
+      "name": "Microsoft",
+      "type": "Organization",
+      "attributes": []
+    },
+    {
+      "id": "t-labeling",
+      "name": "Machine-Assisted Image Labeling",
+      "type": "Technology",
+      "attributes": []
+    },
+    {
+      "id": "t-cv",
+      "name": "Computer Vision",
+      "type": "Technology",
+      "attributes": []
+    },
+    {
+      "id": "t-ml",
+      "name": "Machine Learning",
+      "type": "Technology",
+      "attributes": []
+    },
+    {
+      "id": "t-autonomy",
+      "name": "Trusted AI and Autonomy",
+      "type": "Technology",
+      "attributes": []
+    },
+    {
+      "id": "p-sager",
+      "name": "Sager, C.",
+      "type": "Person",
+      "attributes": []
+    },
+    {
+      "id": "p-jamiesch",
+      "name": "Jamiesch, C.",
+      "type": "Person",
+      "attributes": []
+    },
+    {
+      "id": "p-zscheh",
+      "name": "Zscheh, P.",
+      "type": "Person",
+      "attributes": []
+    },
+    {
+      "id": "p-haider",
+      "name": "Haider, T.",
+      "type": "Person",
+      "attributes": []
+    },
+    {
+      "id": "p-michahelles",
+      "name": "Michahelles, F.",
+      "type": "Person",
+      "attributes": []
+    }
+  ],
+  "relationships": []
+}

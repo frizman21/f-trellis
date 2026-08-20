@@ -75,7 +75,7 @@
             <%# A fresh query rather than current_project.entity_types: on a "new type"
                 page the unsaved record is already in the association's target, and it
                 has no name and so no address to link to. %>
-            <% project_types = current_project&.persisted? ? EntityType.where(project_id: current_project.id) : [] %>
+            <% project_types = current_project&.persisted? ? EntityType.kept.where(project_id: current_project.id) : [] %>
             <% if project_types.any? %>
               <h6 class="sidebar-heading px-3 mt-3 mb-1 text-muted text-uppercase small">
                 <%= current_project.name %>

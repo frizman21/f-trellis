@@ -131,6 +131,18 @@ end
   end
 end
 
+# One deleted relationship, so the structure page's "(1 deleted)" count is
+# visible in a seeded database rather than only in a test. Soft delete keeps the
+# row; what the page needed was for the count to stop pretending it was not
+# there (#66).
+#
+# Idempotent by the discard itself: re-running seeds finds it already discarded
+# and leaves its deleted_at where it was.
+retired = seeded_entities["Raptor 2"]
+if retired
+  Relationship.kept.find_by(from_entity: retired)&.discard
+end
+
 # The F-DoD landscape: the tier 1 model removed in #4, rebuilt as ontology.
 # Its own file — several hundred lines of data would swamp this one.
 load Rails.root.join("db/seeds/f_dod.rb").to_s

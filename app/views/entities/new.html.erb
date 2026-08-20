@@ -26,7 +26,7 @@
 
   <div class="mb-3">
     <%= f.label :entity_type_id, "Entity type", class: "form-label" %>
-    <%= f.collection_select :entity_type_id, @project.entity_types, :id, :name,
+    <%= f.collection_select :entity_type_id, @project.entity_types.kept, :id, :name,
                             { prompt: "Choose a type" }, class: "form-select", required: true %>
   </div>
 

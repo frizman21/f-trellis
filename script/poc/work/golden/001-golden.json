@@ -1,0 +1,80 @@
+{
+  "entities": [
+    {
+      "id": "org-albers",
+      "name": "Albers Aerospace",
+      "type": "Organization",
+      "attributes": [
+        {
+          "name": "headquarters",
+          "value": "McKinney, TX 75069"
+        }
+      ]
+    },
+    {
+      "id": "org-parallel",
+      "name": "Parallel Ventures",
+      "type": "Organization",
+      "attributes": []
+    },
+    {
+      "id": "p-carter",
+      "name": "Rich Carter",
+      "type": "Person",
+      "attributes": [
+        {
+          "name": "title",
+          "value": "Chief Revenue Officer"
+        }
+      ]
+    },
+    {
+      "id": "t-cnc",
+      "name": "CNC Precision Machining",
+      "type": "Technology",
+      "attributes": []
+    },
+    {
+      "id": "t-milling",
+      "name": "CNC Milling",
+      "type": "Technology",
+      "attributes": []
+    },
+    {
+      "id": "t-turning",
+      "name": "CNC Turning",
+      "type": "Technology",
+      "attributes": []
+    },
+    {
+      "id": "t-edm",
+      "name": "Electrical Discharge Machining (EDM)",
+      "type": "Technology",
+      "attributes": []
+    }
+  ],
+  "relationships": [
+    {
+      "type": "Employs",
+      "from": "org-albers",
+      "to": "p-carter",
+      "attributes": [
+        {
+          "name": "role",
+          "value": "Chief Revenue Officer"
+        }
+      ]
+    },
+    {
+      "type": "Acquires",
+      "from": "org-albers",
+      "to": "org-parallel",
+      "attributes": [
+        {
+          "name": "announced",
+          "value": "2025-02-19"
+        }
+      ]
+    }
+  ]
+}

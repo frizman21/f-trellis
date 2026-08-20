@@ -7,7 +7,7 @@
     <%= link_to "Edit", edit_project_relationship_type_path(@project, @relationship_type), class: "btn btn-sm btn-outline-primary" %>
     <%= button_to "Delete", project_relationship_type_path(@project, @relationship_type), method: :delete,
                   class: "btn btn-sm btn-outline-danger",
-                  form: { class: "d-inline", data: { turbo_confirm: "Delete this relationship type?" } } %>
+                  form: { class: "d-inline", data: { turbo_confirm: "Delete this relationship type? The relationships of this kind are deleted too." } } %>
   </div>
 </div>
 <p class="mb-1">

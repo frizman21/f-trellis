@@ -252,4 +252,80 @@ class ExtractionApplierTest < ActiveSupport::TestCase
     assert_equal before, [ Entity.count, EntitySource.count ],
                  "the first entity was left behind by a half-applied reply"
   end
+
+  # --- deleted types (#66) ---------------------------------------------------
+
+  test "does not create an entity of a deleted type" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    summary = apply reply(entities: [ entity_json ])
+
+    assert_equal 0, summary.dig("entities", "created").to_i
+    assert_nil @project.entities.kept.find_by(name: "Merlin 1D")
+  end
+
+  test "does not create a relationship of a deleted type" do
+    relationship_types(:powers).discard_with_relationships
+
+    summary = apply reply(
+      entities: [ entity_json,
+                  { "id" => "e2", "name" => "Falcon 9", "type" => "Launch Vehicle" } ],
+      relationships: [ { "type" => "Powers", "from" => "e1", "to" => "e2" } ]
+    )
+
+    assert_equal 0, summary.dig("relationships", "created").to_i
+  end
+
+  # --- attributes as a list (#67) --------------------------------------------
+  #
+  # Every test above uses the hash shape deliberately: it is what every
+  # ExtractionRun recorded before #67, and leaving them unchanged makes them the
+  # regression test for re-applying a stored reply. These mirror them in the
+  # shape the schema now declares, and must reach the same outcomes.
+
+  def pairs(**attrs) = attrs.map { |name, value| { "name" => name.to_s, "value" => value } }
+
+  test "creates values from a list of name/value pairs" do
+    summary = apply reply(entities: [ entity_json("attributes" => pairs(thrust_kn: "845.0", chambers: "1")) ])
+
+    entity = @project.entities.kept.find_by(name: "Merlin 1D")
+
+    assert_equal 2, summary.dig("values", "created")
+    assert_in_delta 845.0, entity.value_for("thrust_kn")
+    assert_equal 1, entity.value_for("chambers")
+  end
+
+  test "skips a listed attribute the type does not declare" do
+    summary = apply reply(entities: [ entity_json("attributes" => pairs(colour: "red")) ])
+
+    assert_equal 0, summary.dig("values", "created")
+    assert_equal 1, summary.dig("values", "skipped").size
+  end
+
+  test "skips a listed value that will not cast" do
+    summary = apply reply(entities: [ entity_json("attributes" => pairs(first_flight: "sometime in the sixties")) ])
+
+    assert_equal 0, summary.dig("values", "created")
+    assert_equal 1, summary.dig("values", "skipped").size
+  end
+
+  test "an empty attribute list records nothing and is not an error" do
+    summary = apply reply(entities: [ entity_json("attributes" => []) ])
+
+    assert_equal 0, summary.dig("values", "created")
+    assert_empty summary.dig("values", "skipped")
+  end
+
+  # This reads model output. A malformed entry is a result to record, not an
+  # exception to abandon the run for.
+  test "a malformed attribute entry is skipped rather than raised on" do
+    summary = nil
+
+    assert_nothing_raised do
+      summary = apply reply(entities: [ entity_json("attributes" => [ "thrust_kn", { "value" => "845.0" } ]) ])
+    end
+
+    assert_equal 0, summary.dig("values", "created")
+    assert_equal 2, summary.dig("values", "skipped").size
+  end
 end

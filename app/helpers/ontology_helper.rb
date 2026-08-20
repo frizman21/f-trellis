@@ -15,6 +15,26 @@ module OntologyHelper
             }
   end
 
+  # How many instances a type has, saying how many of them are deleted rather
+  # than quietly leaving them out.
+  #
+  # A kept count alone is what made #66 invisible: the structure page reported
+  # "0 relationships" while the delete refused because a discarded one still
+  # existed, and nothing on screen could account for the contradiction. Soft
+  # delete removed the refusal; this removes the contradiction's other half.
+  #
+  # Takes two numbers rather than a collection. Counting in Ruby would mean
+  # loading every instance of every type on the page, and one project here holds
+  # over a million relationships.
+  #
+  # Nothing is appended when nothing is deleted — the common row must not
+  # acquire noise to make the rare one legible.
+  def instance_count(kept, deleted)
+    return kept.to_i.to_s if deleted.to_i.zero?
+
+    safe_join([ kept.to_i.to_s, tag.span("(#{deleted} deleted)", class: "text-muted small ms-1") ])
+  end
+
   # The popover body. Plain text rather than markup: it is set as an attribute
   # value and read back by Bootstrap, and text cannot carry an injection.
   def type_attribute_summary(type)

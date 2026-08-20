@@ -6,20 +6,44 @@
 # type that says it joins a Rocket Engine to a Launch Vehicle, while accepting an
 # edge between two Contracts, would be documentation rather than a type.
 class RelationshipType < ApplicationRecord
+  # Soft delete, on the same terms as Relationship and EntityType: no default
+  # scope, and the reads that mean "the ontology as it stands now" say `kept`.
+  include Discard::Model
+  self.discard_column = :deleted_at
+
   belongs_to :project
   belongs_to :from_entity_type, class_name: "EntityType"
   belongs_to :to_entity_type,   class_name: "EntityType"
 
+  # Kept for a hard destroy from a console. It is no longer what the delete
+  # button reaches, and it was never the guard it appeared to be: it counts
+  # discarded rows too, so a relationship removed through the UI blocked its own
+  # type from ever being deleted (#66).
   has_many :relationships, dependent: :restrict_with_error
   has_many :relationship_type_attributes, -> { order(:name) }, dependent: :destroy
 
   accepts_nested_attributes_for :relationship_type_attributes, allow_destroy: true,
                                 reject_if: :all_blank
 
+  # Among the kept ones only, matching the partial index the database carries.
   validates :name, presence: true,
-                   uniqueness: { scope: :project_id, case_sensitive: false }
+                   uniqueness: { scope: :project_id, case_sensitive: false,
+                                 conditions: -> { kept } }
 
   validate :ends_are_in_this_project
+
+  # Deleting a kind of edge takes the edges of that kind: an edge whose kind the
+  # project no longer defines is not a fact, which is the argument
+  # Entity#discard_with_relationships already makes about dangling edges.
+  #
+  # Already-discarded relationships are left alone rather than re-discarded, so
+  # a cascade cannot restamp when something was deleted.
+  def discard_with_relationships
+    transaction do
+      relationships.kept.find_each(&:discard)
+      discard
+    end
+  end
 
   def declared_attributes = relationship_type_attributes.active
 

@@ -1,0 +1,432 @@
+{
+  "exported_at": "2026-08-20T16:11:57Z",
+  "project": {
+    "id": 6,
+    "name": "Extraction PoC"
+  },
+  "entity_types": [
+    {
+      "name": "Contract",
+      "description": "A specific funded agreement between parties, identified as one thing by the source — an award, a task order, a grant. A programme that funds many awards is not itself a Contract unless the source names it as a single agreement.",
+      "attributes": [
+        {
+          "name": "award_amount",
+          "value_type": "float"
+        },
+        {
+          "name": "contract_number",
+          "value_type": "string"
+        },
+        {
+          "name": "end_date",
+          "value_type": "datetime"
+        },
+        {
+          "name": "start_date",
+          "value_type": "datetime"
+        }
+      ]
+    },
+    {
+      "name": "Organization",
+      "description": "A company, agency, university, laboratory, or other body that acts as one. A division named only in passing is part of its parent, not its own Organization, unless the source treats it as acting on its own behalf.",
+      "attributes": [
+        {
+          "name": "employee_count",
+          "value_type": "int"
+        },
+        {
+          "name": "founded",
+          "value_type": "int"
+        },
+        {
+          "name": "headquarters",
+          "value_type": "string"
+        },
+        {
+          "name": "website",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Person",
+      "description": "An individual human being named by the source. A role held by nobody in particular is not a Person, and neither is a team, a department, or a job title with no name attached to it.",
+      "attributes": [
+        {
+          "name": "email",
+          "value_type": "string"
+        },
+        {
+          "name": "phone",
+          "value_type": "string"
+        },
+        {
+          "name": "title",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "description": "A specific thing offered for sale or delivery under its own name — a model, a platform, a system. Distinct from Technology: a Product is the article, the Technology is what makes it work.",
+      "attributes": [
+        {
+          "name": "category",
+          "value_type": "string"
+        },
+        {
+          "name": "model_number",
+          "value_type": "string"
+        },
+        {
+          "name": "price",
+          "value_type": "float"
+        },
+        {
+          "name": "released",
+          "value_type": "datetime"
+        }
+      ]
+    },
+    {
+      "name": "Science",
+      "description": "A field of study or a body of underlying principle — fluid dynamics, materials science, machine learning theory. Distinct from Technology: Science is what is understood, Technology is what is built with it.",
+      "attributes": [
+        {
+          "name": "discipline",
+          "value_type": "string"
+        },
+        {
+          "name": "field",
+          "value_type": "string"
+        },
+        {
+          "name": "key_publication",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Technology",
+      "description": "A capability or technical approach that can be built into things — a propulsion method, a sensing technique, an architecture. Not a product you can buy, which is a Product, and not the underlying principle it rests on, which is a Science.",
+      "attributes": [
+        {
+          "name": "application_area",
+          "value_type": "string"
+        },
+        {
+          "name": "category",
+          "value_type": "string"
+        },
+        {
+          "name": "maturity_level",
+          "value_type": "string"
+        }
+      ]
+    }
+  ],
+  "relationship_types": [
+    {
+      "name": "Acquires",
+      "description": "The first organization acquires the second, taking ownership of it. The direction is acquirer to acquired. An investment, a partnership, a supplier arrangement, or a merger of equals is not an acquisition.",
+      "from": "Organization",
+      "to": "Organization",
+      "attributes": [
+        {
+          "name": "announced",
+          "value_type": "datetime"
+        }
+      ]
+    },
+    {
+      "name": "Contract Develops",
+      "description": "The contract funds work that builds or advances this technology. Naming a technology as background is not developing it.",
+      "from": "Contract",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Contract Researches",
+      "description": "The contract funds study in this field.",
+      "from": "Contract",
+      "to": "Science",
+      "attributes": []
+    },
+    {
+      "name": "Develops",
+      "description": "The organization builds or advances this technology itself. Buying or using it is not developing it.",
+      "from": "Organization",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Employs",
+      "description": "The organization employs this person, or the person holds a named position at it. A person merely quoted about an organization is not employed by it.",
+      "from": "Organization",
+      "to": "Person",
+      "attributes": [
+        {
+          "name": "role",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Enters",
+      "description": "The organization is a party to this contract — it was awarded it, signed it, or is named as performing it. An agency that awarded the contract is also a party and belongs here.",
+      "from": "Organization",
+      "to": "Contract",
+      "attributes": [
+        {
+          "name": "role",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Point Of Contact",
+      "description": "The person the contract names as a contact — principal investigator, technical contact, contracting officer. Somebody mentioned in the same paragraph is not a point of contact.",
+      "from": "Contract",
+      "to": "Person",
+      "attributes": [
+        {
+          "name": "role",
+          "value_type": "string"
+        }
+      ]
+    },
+    {
+      "name": "Researches",
+      "description": "The organization conducts study in this field. Applying an established result is not researching it.",
+      "from": "Organization",
+      "to": "Science",
+      "attributes": []
+    },
+    {
+      "name": "Sells",
+      "description": "The organization offers this product commercially. A reseller or distributor counts; a customer does not.",
+      "from": "Organization",
+      "to": "Product",
+      "attributes": []
+    },
+    {
+      "name": "Supports",
+      "description": "This field of study is the principle the technology rests on — the source states the technology works because of it.",
+      "from": "Science",
+      "to": "Technology",
+      "attributes": []
+    },
+    {
+      "name": "Uses",
+      "description": "The product is built with this technology, as the source describes it — a specification, a feature, a stated approach.",
+      "from": "Product",
+      "to": "Technology",
+      "attributes": []
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "entities",
+      "relationships"
+    ],
+    "properties": {
+      "entities": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "name",
+            "type",
+            "attributes"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "A short id you assign, unique within this response."
+            },
+            "name": {
+              "type": "string",
+              "description": "What the source calls this thing."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "Contract",
+                "Organization",
+                "Person",
+                "Product",
+                "Science",
+                "Technology"
+              ]
+            },
+            "attributes": {
+              "type": "array",
+              "description": "The attributes this entity has, as name and value. Use the attribute names given in the definitions above, and include only the ones the source states.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "application_area",
+                      "award_amount",
+                      "category",
+                      "contract_number",
+                      "discipline",
+                      "email",
+                      "employee_count",
+                      "end_date",
+                      "field",
+                      "founded",
+                      "headquarters",
+                      "key_publication",
+                      "maturity_level",
+                      "model_number",
+                      "phone",
+                      "price",
+                      "released",
+                      "start_date",
+                      "title",
+                      "website"
+                    ]
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "relationships": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "from",
+            "to",
+            "attributes"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "Acquires",
+                "Contract Develops",
+                "Contract Researches",
+                "Develops",
+                "Employs",
+                "Enters",
+                "Point Of Contact",
+                "Researches",
+                "Sells",
+                "Supports",
+                "Uses"
+              ]
+            },
+            "from": {
+              "type": "string",
+              "description": "The id of the entity at the from end."
+            },
+            "to": {
+              "type": "string",
+              "description": "The id of the entity at the to end."
+            },
+            "attributes": {
+              "type": "array",
+              "description": "The attributes this relationship has, as name and value. Use the attribute names given in the definitions above, and include only the ones the source states.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "announced",
+                      "role"
+                    ]
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "example": {
+    "entities": [
+      {
+        "id": "e1",
+        "name": "The name the source gives this Organization",
+        "type": "Organization",
+        "attributes": [
+          {
+            "name": "employee_count",
+            "value": "1"
+          },
+          {
+            "name": "founded",
+            "value": "1"
+          },
+          {
+            "name": "headquarters",
+            "value": "the headquarters the source states"
+          }
+        ]
+      },
+      {
+        "id": "e2",
+        "name": "The name the source gives this Organization",
+        "type": "Organization",
+        "attributes": [
+          {
+            "name": "employee_count",
+            "value": "1"
+          },
+          {
+            "name": "founded",
+            "value": "1"
+          },
+          {
+            "name": "headquarters",
+            "value": "the headquarters the source states"
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "type": "Acquires",
+        "from": "e1",
+        "to": "e2",
+        "attributes": [
+          {
+            "name": "announced",
+            "value": "1969-07-16T13:32:00Z"
+          }
+        ]
+      }
+    ]
+  }
+}

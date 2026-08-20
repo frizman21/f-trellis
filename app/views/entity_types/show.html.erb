@@ -7,7 +7,7 @@
     <%= link_to "Edit", edit_project_entity_type_path(@project, @entity_type), class: "btn btn-sm btn-outline-primary" %>
     <%= button_to "Delete", project_entity_type_path(@project, @entity_type), method: :delete,
                   class: "btn btn-sm btn-outline-danger",
-                  form: { class: "d-inline", data: { turbo_confirm: "Delete this entity type?" } } %>
+                  form: { class: "d-inline", data: { turbo_confirm: "Delete this entity type? Its entities, their relationships, and the relationship types that use it are deleted too." } } %>
   </div>
 </div>
 <p class="text-muted"><%= @entity_type.description %></p>
@@ -40,4 +40,46 @@
   </table>
 <% else %>
   <p class="text-muted">No attributes defined.</p>
+<% end %>
+
+<h2 class="h5 mt-4 mb-3">Relationship Types</h2>
+
+<%# The same four columns the structure page uses for relationship types, so the
+    same data is not described two ways in one application. What differs is the
+    end that is this type: it renders as plain text rather than a link, because
+    linking to the page you are on is a dead control, and because the contrast
+    is what makes the direction readable without a Direction column. %>
+<% if @relationship_types.any? %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>From</th>
+        <th>To</th>
+        <th>Attributes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @relationship_types.each do |relationship_type| %>
+        <tr>
+          <td><%= type_with_attributes relationship_type,
+                                       project_relationship_type_path(@project, relationship_type) %></td>
+          <% [ relationship_type.from_entity_type, relationship_type.to_entity_type ].each do |end_type| %>
+            <td>
+              <% if end_type == @entity_type %>
+                <span class="fw-semibold"><%= end_type.name %></span>
+              <% else %>
+                <%= type_with_attributes end_type,
+                                         project_entity_type_path(@project, end_type),
+                                         css_class: "text-muted" %>
+              <% end %>
+            </td>
+          <% end %>
+          <td><%= relationship_type.relationship_type_attributes.size %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="text-muted">No relationship types connect this entity type.</p>
 <% end %>

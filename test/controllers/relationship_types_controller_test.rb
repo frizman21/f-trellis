@@ -47,19 +47,45 @@ class RelationshipTypesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Renamed", type.reload.name
   end
 
+  # Soft since #66: the row stays and the type leaves the ontology.
   test "destroy removes an unused type" do
-    assert_difference -> { RelationshipType.count }, -1 do
-      delete project_relationship_type_path(@project, relationship_types(:bare_relation))
+    type = relationship_types(:bare_relation)
+
+    assert_difference -> { RelationshipType.kept.count }, -1 do
+      assert_no_difference -> { RelationshipType.count } do
+        delete project_relationship_type_path(@project, type)
+      end
     end
+
+    assert type.reload.discarded?
   end
 
-  # Edges of a kind mean nothing once the kind is gone.
-  test "destroy is refused while relationships still use the type" do
-    assert_no_difference -> { RelationshipType.count } do
-      delete project_relationship_type_path(@project, relationship_types(:powers))
+  # Edges of a kind mean nothing once the kind is gone, so they go with it.
+  test "destroy takes the relationships of that kind with it" do
+    type = relationship_types(:powers)
+    relationship = relationships(:f1_powers_saturn_v)
+
+    delete project_relationship_type_path(@project, type)
+
+    assert_redirected_to structure_project_path(@project)
+    assert flash[:alert].blank?, "a type with relationships is no longer a refusal"
+    assert type.reload.discarded?
+    assert relationship.reload.discarded?
+  end
+
+  # The state that had no exit before #66. The relationship was removed through
+  # the UI, which discards it, so the structure page read "0 relationships"
+  # while restrict_with_error kept refusing on a row nothing could reach.
+  test "destroy succeeds when the only relationship of that kind is already deleted" do
+    type = relationship_types(:powers)
+    relationships(:f1_powers_saturn_v).discard!
+
+    assert_difference -> { RelationshipType.kept.count }, -1 do
+      delete project_relationship_type_path(@project, type)
     end
 
-    assert flash[:alert].present?
+    assert flash[:alert].blank?
+    assert type.reload.discarded?
   end
 
 

@@ -74,4 +74,78 @@ class EntityTypeTest < ActiveSupport::TestCase
     assert_not type.valid?
     assert_match(/reserved/, type.errors.full_messages.to_sentence)
   end
+
+  # --- soft delete (#66) -----------------------------------------------------
+
+  test "discarding a type takes its entities and their relationships" do
+    type = entity_types(:rocket_engine)
+
+    type.discard_with_entities
+
+    assert type.reload.discarded?
+    assert entities(:f1).reload.discarded?
+    assert relationships(:f1_powers_saturn_v).reload.discarded?
+  end
+
+  test "discarding a type takes the relationship types at either end" do
+    # Bare Type is the `to` end of Bare Relation and the `from` end of nothing.
+    # A cascade that only followed outgoing types would leave this one live.
+    entity_types(:bare).discard_with_entities
+
+    assert relationship_types(:bare_relation).reload.discarded?
+  end
+
+  test "discarding a type leaves another project's ontology alone" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    assert_not entity_types(:gemini_capsule).reload.discarded?
+    assert_not relationship_types(:gemini_docks).reload.discarded?
+    assert_not entities(:gemini_capsule).reload.discarded?
+  end
+
+  test "a cascade does not restamp an already deleted entity" do
+    already = entities(:unnamed_engine)
+    already.discard!
+    deleted_at = already.reload.deleted_at
+
+    travel 1.hour do
+      entity_types(:rocket_engine).discard_with_entities
+    end
+
+    assert_equal deleted_at, already.reload.deleted_at
+  end
+
+  test "a discarded type's name is free for a new one" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    replacement = projects(:apollo).entity_types.new(name: "Rocket Engine")
+
+    assert replacement.save, replacement.errors.full_messages.to_sentence
+  end
+
+  # The partial unique index is the half a validation-only test never reaches:
+  # without it this is a PG::UniqueViolation rather than a clean insert.
+  test "the database allows a discarded type's name to be reused" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    assert_nothing_raised do
+      projects(:apollo).entity_types.create!(name: "Rocket Engine")
+    end
+  end
+
+  test "a discarded type's slug is free for a new one" do
+    entity_types(:rocket_engine).discard_with_entities
+
+    replacement = projects(:apollo).entity_types.new(name: "Rocket Engines")
+
+    assert replacement.valid?, replacement.errors.full_messages.to_sentence
+  end
+
+  # The console guard the controller no longer reaches.
+  test "a hard destroy is still refused while entities exist" do
+    type = entity_types(:rocket_engine)
+
+    assert_not type.destroy
+    assert_includes type.errors.full_messages.to_sentence, "dependent entities exist"
+  end
 end

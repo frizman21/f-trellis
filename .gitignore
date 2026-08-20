@@ -39,3 +39,6 @@
 
 # Local database dumps (see docs/dokku_devops.md)
 /backups/
+
+# Extraction proof of concept: generated stages only. See script/poc/work/.gitignore
+# — inputs and ground truth under script/poc/work are deliberately tracked.

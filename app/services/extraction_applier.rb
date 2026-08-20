@@ -87,7 +87,7 @@ class ExtractionApplier
   end
 
   def apply_relationship(attrs)
-    type = project.relationship_types.find { |t| t.name.casecmp?(attrs["type"].to_s) }
+    type = project.relationship_types.kept.find { |t| t.name.casecmp?(attrs["type"].to_s) }
     return skip_relationship(attrs, "no relationship type named #{attrs['type'].inspect}") if type.nil?
 
     from = @by_reply_id[attrs["from"].to_s]
@@ -118,9 +118,35 @@ class ExtractionApplier
                  citation_class: RelationshipTypeValueSource, citation_key: :relationship_type_value)
   end
 
+  # Attributes as (name, value) pairs, from either shape a reply can carry.
+  #
+  # A list of {name, value} objects is what the schema declares since #67. A
+  # plain name => value object is what it declared before, and what every
+  # ExtractionRun recorded up to that point still holds — reading only the new
+  # shape would make re-applying a stored run record nothing while reporting
+  # success, which is worse than refusing it.
+  #
+  # A malformed entry is skipped with a reason rather than raised on: this reads
+  # model output, and being brittle to it turns a bad reply into a failed run.
+  def attribute_pairs(owner, offered)
+    case offered
+    when Hash then offered.to_a
+    when Array
+      offered.filter_map do |pair|
+        unless pair.is_a?(Hash) && pair["name"].present?
+          skip_value(owner, pair.inspect, "attribute is not a {name, value} pair")
+          next
+        end
+
+        [ pair["name"], pair["value"] ]
+      end
+    end
+  end
+
   def apply_values(owner, declared, offered, value_class:, owner_key:, attribute_key:,
                    citation_class:, citation_key:)
-    return if offered.blank? || !offered.is_a?(Hash)
+    offered = attribute_pairs(owner, offered)
+    return if offered.blank?
 
     offered.each do |name, raw|
       attribute = declared.find { |a| a.name.casecmp?(name.to_s) }
@@ -176,7 +202,7 @@ class ExtractionApplier
   end
 
   def entity_type_for(name)
-    project.entity_types.find { |t| t.name.casecmp?(name.to_s) }
+    project.entity_types.kept.find { |t| t.name.casecmp?(name.to_s) }
   end
 
   def find_entity(type, name, scope:)

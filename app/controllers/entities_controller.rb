@@ -119,7 +119,7 @@ class EntitiesController < ApplicationController
     slug = params[:type].to_s
     return nil if slug.blank?
 
-    @project.entity_types.detect { |type| type.slug == slug }
+    @project.entity_types.kept.detect { |type| type.slug == slug }
   end
 
   DIRECTIONS = %w[asc desc].freeze
@@ -201,7 +201,7 @@ class EntitiesController < ApplicationController
   # this is what keeps a type's name and its address in step by construction.
   def find_entity_type_by_slug
     slug = params[:type_slug].to_s
-    @project.entity_types.detect { |type| type.slug == slug } ||
+    @project.entity_types.kept.detect { |type| type.slug == slug } ||
       raise(ActiveRecord::RecordNotFound, "no entity type at #{slug.inspect}")
   end
 

@@ -1,0 +1,272 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Stage 3 — send the instructions and one stripped page to a model, keep the JSON.
+#
+#   docker compose exec web bundle exec ruby script/poc/bin/llm-process --model claude-haiku-4-5
+#   docker compose exec web bundle exec ruby script/poc/bin/llm-process --model gpt-5-nano --schema
+#   docker compose exec web bundle exec ruby script/poc/bin/llm-process --model qwen3:8b --endpoint ollama
+#   docker compose exec web bundle exec ruby script/poc/bin/llm-process --model claude-opus-5 --dry-run
+#
+# Every model writes into its own run directory, so answers to the same source
+# sit side by side under the same number and can be diffed directly. The run
+# label defaults to the model id, which is what makes `--model X` twice a
+# re-run and `--model X --model Y` a comparison.
+#
+# Calls go through RubyLLM directly rather than through the application's Chat
+# record. Two reasons, and both matter for a pipeline whose output is a cost
+# figure: a PoC sweep should not deposit hundreds of rows in the chats table,
+# and ChatCost's own comment records that persisted input_tokens are wrong
+# (every chat in the database reports 3 input tokens regardless of prompt size).
+# RubyLLM's reply carries the provider's real usage numbers, so that is what is
+# recorded here.
+
+require "optparse"
+require "time"
+require_relative "../lib/poc"
+require_relative "../lib/poc/ontology"
+
+options = { force: false, schema: false, dry_run: false, max_retries: 1 }
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: llm-process --model ID [--endpoint NAME] [--run LABEL] [--schema] [--dry-run]"
+  opts.on("--model ID", "Model id, e.g. claude-haiku-4-5 or gpt-5-nano") { |v| options[:model] = v }
+  opts.on("--provider NAME", "Force a provider instead of resolving from the registry") { |v| options[:provider] = v }
+  opts.on("--endpoint NAME_OR_ID", "Route through a ModelEndpoint (how a local model is reached)") { |v| options[:endpoint] = v }
+  opts.on("--run LABEL", "Run directory name (default: the model id)") { |v| options[:run] = v }
+  opts.on("--schema", "Constrain decoding with the mental model's JSON Schema") { options[:schema] = true }
+  opts.on("--instructions PATH", "Instructions file (default 00-input/instructions.md)") { |v| options[:instructions] = v }
+  opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v.split(",").map(&:strip) }
+  opts.on("--limit N", Integer, "Stop after N calls") { |v| options[:limit] = v }
+  opts.on("--max-retries N", Integer, "Retries per call (default 1 — a dropped call bills for every attempt)") { |v| options[:max_retries] = v }
+  opts.on("--force", "Re-ask even if this run already has an answer") { options[:force] = true }
+  opts.on("--dry-run", "Show what would be sent and what it would cost; call nothing") { options[:dry_run] = true }
+  opts.on("--work PATH", "Work directory (default script/poc/work)") { |v| Poc.work = v }
+  opts.on("-h", "--help") { puts opts; exit }
+end.parse!
+
+abort "--model is required" if options[:model].to_s.empty?
+
+require_relative "../../../config/environment"
+
+run = Poc.slug(options[:run] || options[:model])
+instructions_path = options[:instructions] || Poc.instructions_file
+abort "no instructions at #{instructions_path} — run bin/export-model" unless File.exist?(instructions_path)
+
+instructions = File.read(instructions_path)
+ontology = Poc::Ontology.load
+
+# The registry knows the provider and the prices. Falling back to nil lets
+# RubyLLM resolve a model the application has not refreshed yet.
+registry_model = Model.find_by(model_id: options[:model])
+provider = options[:provider] || registry_model&.provider
+
+endpoint = nil
+if options[:endpoint]
+  endpoint = if options[:endpoint].match?(/\A\d+\z/)
+               ModelEndpoint.find_by(id: options[:endpoint])
+             else
+               ModelEndpoint.find_by(name: options[:endpoint])
+             end
+  abort "no model endpoint matching #{options[:endpoint].inspect}" if endpoint.nil?
+
+  # A custom endpoint serves ids no provider registry has heard of, which is
+  # exactly the case for a locally served model.
+  provider = "custom_endpoint"
+end
+
+context = endpoint ? endpoint.to_context(max_retries: options[:max_retries])
+                   : RubyLLM.context { |config| config.max_retries = options[:max_retries] }
+
+manifest = Poc::Manifest.new
+targets = manifest.numbers
+targets &= options[:only] if options[:only]
+abort "nothing stripped yet — run bin/html-strip first" if targets.empty?
+
+out_dir = Poc.mkdir(Poc.stage_dir(:extracted, run: run))
+
+# Rates from the application's own registry, so a dry run and a real run price
+# the same call the same way.
+rates = registry_model&.pricing&.dig("text_tokens", "standard") || {}
+
+def price(tokens, rate) = rate ? tokens / 1_000_000.0 * rate.to_f : nil
+
+processed = skipped = failed = attempted = 0
+totals = { "input_tokens" => 0, "output_tokens" => 0, "cached_tokens" => 0, "cost" => 0.0, "seconds" => 0.0 }
+unpriced = false
+
+puts "model        #{options[:model]}#{provider ? " (#{provider})" : ''}"
+puts "endpoint     #{endpoint.name} #{endpoint.base_url}" if endpoint
+puts "run          #{run}"
+puts "instructions #{instructions.length} chars (~#{instructions.length / 4} tokens), sha #{Poc.sha(instructions)[0, 12]}"
+puts "schema       #{options[:schema] ? 'constrained decoding on' : 'prose only'}"
+puts
+
+targets.each do |n|
+  # Counted on attempts, not successes: a failed call can still have been
+  # billed, so a limit that only counted successes would not cap anything.
+  break if options[:limit] && attempted >= options[:limit]
+
+  text_path = Poc.path_for(:stripped, n)
+  out_path = Poc.path_for(:extracted, n, run: run)
+  raw_path = Poc.path_for(:extracted, n, run: run, kind: :raw)
+
+  unless File.exist?(text_path)
+    puts "#{n} none   no stripped text"
+    next
+  end
+
+  if File.exist?(out_path) && !options[:force] && !options[:dry_run]
+    puts "#{n} skip   #{out_path}"
+    skipped += 1
+    next
+  end
+
+  content = File.read(text_path)
+
+  if content.strip.empty?
+    puts "#{n} empty  nothing to send"
+    skipped += 1
+    next
+  end
+
+  if options[:dry_run]
+    # Characters over four is the same rough conversion ChatCost uses. It is an
+    # estimate and says so; the point of a dry run is the order of magnitude
+    # before committing to a sweep.
+    input_tokens = ((instructions.length + content.length) / 4.0).ceil
+    estimate = price(input_tokens, rates["input_per_million"])
+    totals["input_tokens"] += input_tokens
+    totals["cost"] += estimate.to_f
+    unpriced ||= estimate.nil?
+    puts format("%s dry    ~%d input tokens%s", n, input_tokens,
+                estimate ? format("  ~$%.4f input", estimate) : "  (no pricing in registry)")
+    attempted += 1
+    processed += 1
+    next
+  end
+
+  started = Time.now
+  attempted += 1
+
+  begin
+    chat = RubyLLM.chat(model: options[:model], provider: provider,
+                        assume_model_exists: !endpoint.nil?, context: context)
+    chat.with_instructions(instructions)
+    # The schema the prompt already describes, now enforced at decoding. Whether
+    # this is what makes a small model usable is one of the things the sweep is
+    # meant to find out, so it is a flag rather than a default.
+    chat.with_schema(ontology.schema) if options[:schema]
+
+    reply = chat.ask(content)
+    seconds = (Time.now - started).round(2)
+
+    # With a schema, RubyLLM has already parsed the reply into a Hash
+    # (Chat#normalize_schema_response) — `.to_s` on that yields Ruby inspect
+    # syntax, not JSON, and every reply would be recorded as unparseable.
+    # Without one, the reply is the string the model produced.
+    if reply.content.is_a?(Hash) || reply.content.is_a?(Array)
+      parsed = reply.content
+      body = JSON.pretty_generate(parsed)
+      fenced = false
+    else
+      body = reply.content.to_s
+
+      # Models fence JSON despite being told not to. Unfencing is a one-line fix
+      # and refusing to do it would waste the call, but the fact that it was
+      # needed is recorded — a model that cannot follow that instruction is
+      # telling you something about the rest of them.
+      fenced = body.strip.start_with?("```")
+      json_text = fenced ? body.strip.sub(/\A```(?:json)?\s*/m, "").sub(/```\s*\z/m, "") : body
+
+      parsed = begin
+        JSON.parse(json_text)
+      rescue JSON::ParserError
+        nil
+      end
+    end
+
+    usage = {
+      "input_tokens" => reply.input_tokens.to_i,
+      "output_tokens" => reply.output_tokens.to_i,
+      "cached_tokens" => reply.cached_tokens.to_i
+    }
+
+    cost = chat.cost.to_h rescue {}
+    cost_total = cost[:total] || cost["total"]
+    if cost_total.nil?
+      # RubyLLM returns nil when any component has no published price. The
+      # application's registry usually does have one, so fall back to it rather
+      # than reporting a sweep with no cost at all.
+      input_cost = price(usage["input_tokens"] - usage["cached_tokens"], rates["input_per_million"])
+      output_cost = price(usage["output_tokens"], rates["output_per_million"])
+      cached_cost = price(usage["cached_tokens"], rates["cache_read_input_per_million"] || rates["input_per_million"])
+      cost_total = [ input_cost, output_cost, cached_cost ].all? ? input_cost + output_cost + cached_cost : nil
+    end
+    unpriced ||= cost_total.nil?
+
+    if parsed
+      Poc.write_json(out_path, parsed)
+      File.delete(raw_path) if File.exist?(raw_path)
+    else
+      # The reply is kept whatever it was. A model that returned prose instead
+      # of JSON has produced a result worth reading, and deleting it would leave
+      # only a number saying the call failed.
+      File.write(raw_path, body)
+    end
+
+    record = usage.merge(
+      "model" => options[:model], "provider" => provider,
+      "schema" => options[:schema], "parsed" => !parsed.nil?, "fenced" => fenced,
+      "cost" => cost_total, "seconds" => seconds,
+      "instructions_sha" => Poc.sha(instructions), "input_chars" => content.length,
+      "entities" => parsed ? Array(parsed["entities"]).size : nil,
+      "relationships" => parsed ? Array(parsed["relationships"]).size : nil,
+      "at" => Time.now.utc.iso8601,
+      "file" => File.basename(parsed ? out_path : raw_path)
+    )
+    manifest.record_run(n, :extracted, run, record)
+
+    totals["input_tokens"] += usage["input_tokens"]
+    totals["output_tokens"] += usage["output_tokens"]
+    totals["cached_tokens"] += usage["cached_tokens"]
+    totals["cost"] += cost_total.to_f
+    totals["seconds"] += seconds
+
+    if parsed
+      puts format("%s ok     %d entities, %d relationships  %ds  %s%s", n,
+                  record["entities"], record["relationships"], seconds,
+                  cost_total ? format("$%.4f", cost_total) : "cost unknown",
+                  fenced ? "  (fenced)" : "")
+      processed += 1
+    else
+      warn format("%s BAD    reply is not JSON — kept at %s", n, raw_path)
+      failed += 1
+    end
+  rescue StandardError => e
+    manifest.record_run(n, :extracted, run, {
+      "model" => options[:model], "error" => "#{e.class}: #{e.message}",
+      "seconds" => (Time.now - started).round(2), "at" => Time.now.utc.iso8601
+    })
+    warn "#{n} FAIL   #{e.class}: #{e.message}"
+    failed += 1
+  end
+end
+
+manifest.save unless options[:dry_run]
+
+summary = {
+  "run" => run, "model" => options[:model], "provider" => provider,
+  "endpoint" => endpoint&.name, "schema" => options[:schema],
+  "instructions_sha" => Poc.sha(instructions), "instructions_chars" => instructions.length,
+  "processed" => processed, "skipped" => skipped, "failed" => failed,
+  "totals" => totals, "at" => Time.now.utc.iso8601
+}
+Poc.write_json(File.join(out_dir, "run.json"), summary) unless options[:dry_run]
+
+puts
+puts "#{options[:dry_run] ? 'would process' : 'processed'} #{processed}, skipped #{skipped}, failed #{failed}"
+puts format("tokens in %d, out %d, cached %d", totals["input_tokens"], totals["output_tokens"], totals["cached_tokens"])
+puts format("cost $%.4f%s in %.1fs", totals["cost"], unpriced ? " (incomplete — some calls had no published price)" : "", totals["seconds"])
+puts out_dir
+exit(failed.zero? ? 0 : 1)

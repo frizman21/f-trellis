@@ -10,9 +10,11 @@
 class ExtractionPrompt
   def initialize(project)
     @project = project
-    # Active only: the prompt asks for what the project tracks now.
-    @entity_types = project.entity_types.includes(:entity_type_attributes).to_a
-    @relationship_types = project.relationship_types
+    # Active and undeleted only: the prompt asks for what the project tracks
+    # now. A deleted type left in here is paid for on every source — tokens
+    # spent asking a model for a kind of thing nobody wants back.
+    @entity_types = project.entity_types.kept.includes(:entity_type_attributes).to_a
+    @relationship_types = project.relationship_types.kept
                                  .includes(:relationship_type_attributes,
                                            :from_entity_type, :to_entity_type).to_a
   end
@@ -39,8 +41,11 @@ class ExtractionPrompt
       Rules:
 
       - Record only what the source states. If the source does not give a value
-        for an attribute, omit that attribute. Do not infer, estimate, or fill a
-        gap from your own knowledge.
+        for an attribute, leave that attribute out of the list. Do not infer,
+        estimate, or fill a gap from your own knowledge.
+      - Attributes are a list of name and value pairs, and every entity and
+        relationship carries one. Where the source states nothing, the list is
+        empty — the key is still there.
       - Every entity needs an id, a name, and a type. The name is what the source
         calls the thing.
       - Give each entity a short id of your own — e1, e2, org-nasa, whatever is
@@ -129,25 +134,39 @@ class ExtractionPrompt
 
   # Illustrative placeholders by value type: the example should show the shape of
   # a value without inventing facts that read as real data about real things.
+  #
+  # Always present, even when empty. The schema requires the key, and an example
+  # that omitted it would contradict the structure printed directly above it —
+  # which is the gap a model improvises into.
   def example_attributes(attributes)
-    attributes = attributes.to_a
-    return {} if attributes.empty?
+    list = attributes.to_a.first(3).map do |a|
+      { "name" => a.name, "value" => example_value(a) }
+    end
 
-    { "attributes" => attributes.first(3).to_h { |a| [ a.name, example_value(a) ] } }
+    { "attributes" => list }
   end
 
+  # Strings throughout, because `value` is a string in the schema. The declared
+  # value type is stated in the prose definitions and enforced by
+  # TypedValue#cast_value on the way in; saying it a third time in the schema
+  # would be a third place for it to disagree with the other two.
   def example_value(attribute)
     case attribute.value_type
-    when "int" then 1
-    when "float" then 1.5
+    when "int" then "1"
+    when "float" then "1.5"
     when "datetime" then "1969-07-16T13:32:00Z"
     else "the #{attribute.name} the source states"
     end
   end
 
+  # Every object closes itself and requires every property it declares. That is
+  # what makes this expressible as a grammar the provider can enforce, rather
+  # than a shape a model is asked to observe — see #67. A reply that is not this
+  # shape becomes unrepresentable instead of merely wrong.
   def schema
     {
       "type" => "object",
+      "additionalProperties" => false,
       "required" => %w[entities relationships],
       "properties" => {
         "entities" => { "type" => "array", "items" => entity_schema },
@@ -194,13 +213,15 @@ class ExtractionPrompt
     "#{article} #{name}"
   end
 
-  # id, name and type are required; attributes are not. A source that does not
-  # state a value should produce no value rather than an invented one, and the
-  # instructions say so too — a schema alone does not stop a model filling gaps.
+  # Everything is required, including attributes — a constrained grammar has no
+  # notion of an optional key. "Nothing stated" is an empty list, which the
+  # instructions say as well, because a schema alone does not stop a model
+  # filling gaps and an empty list is the thing to fill them with.
   def entity_schema
     {
       "type" => "object",
-      "required" => %w[id name type],
+      "additionalProperties" => false,
+      "required" => %w[id name type attributes],
       "properties" => {
         # The model's own id, not a database one. Names repeat and vary between
         # sentences; an id the model assigned is unambiguous and cheap to repeat
@@ -209,45 +230,80 @@ class ExtractionPrompt
                   "description" => "A short id you assign, unique within this response." },
         "name" => { "type" => "string", "description" => "What the source calls this thing." },
         "type" => { "type" => "string", "enum" => entity_types.map(&:name) },
-        "attributes" => attribute_bag("entity")
+        "attributes" => attribute_list("entity", entity_attribute_names)
       }
     }
   end
 
-  # A plain name/value bag rather than a declared property per attribute. The
-  # definitions above already say each attribute's name and value type in prose;
-  # declaring them again in JSON Schema said nothing new and made the schema as
-  # long as the ontology.
+  # A list of name/value pairs rather than a declared property per attribute.
+  # The definitions above already say each attribute's name and value type in
+  # prose; declaring them again in JSON Schema says nothing new and makes the
+  # schema as long as the ontology.
   #
-  # It was also quietly wrong: flattening every type's attributes into one
-  # properties map collides when two types share an attribute name with different
-  # value types, and the first one written wins. A bag makes no such claim.
-  def attribute_bag(subject)
+  # It would also be quietly wrong: flattening every type's attributes into one
+  # properties map collides when two types share an attribute name with
+  # different value types, and the first one written wins. A name carried as
+  # *data* makes no such claim, which is what lets one list serve every type.
+  #
+  # It was an open object until #67. That shape cannot be expressed as a
+  # constrained grammar — a provider has no way to describe "an object whose
+  # keys I do not know" — so the reply could not be enforced, only requested.
+  #
+  # The enum closes a gap the open shape never could: an attribute name the
+  # project has not declared becomes unrepresentable rather than something the
+  # applier discards afterwards. Omitted entirely when a project declares no
+  # attributes, because an empty enum is invalid and would fail validation at
+  # the provider rather than here.
+  def attribute_list(subject, names)
+    name_schema = { "type" => "string" }
+    name_schema["enum"] = names if names.any?
+
     {
-      "type" => "object",
+      "type" => "array",
       "description" => "The attributes this #{subject} has, as name and value. " \
-                       "Use the attribute names given in the definitions above, and " \
-                       "include only the ones the source states."
+                       "Use the attribute names given in the definitions above, " \
+                       "and include only the ones the source states.",
+      "items" => {
+        "type" => "object",
+        "additionalProperties" => false,
+        "required" => %w[name value],
+        "properties" => {
+          "name" => name_schema,
+          # A string whatever the declared type. The prose says what the type is
+          # and TypedValue#cast_value enforces it on the way in; a third statement
+          # here would be a third place for the three to disagree.
+          "value" => { "type" => "string" }
+        }
+      }
     }
   end
 
+  def entity_attribute_names
+    entity_types.flat_map { |type| type.entity_type_attributes.active.map(&:name) }.uniq.sort
+  end
+
+  def relationship_attribute_names
+    relationship_types.flat_map { |type| type.relationship_type_attributes.active.map(&:name) }.uniq.sort
+  end
+
   # Entities are referenced by the ids the model assigned in the entities list.
-  # The ends carry the same constraint the database enforces (#11).
+  #
+  # Which types a relationship may join is stated once, in the prose definitions
+  # above ("Joins an Organization (from) to a Person (to)"). It used to be
+  # repeated here as an `ends` property carrying a `const`, which read to a model
+  # as a field it was required to emit — and models emitted it, echoing the whole
+  # table once per relationship into output tokens. Removed in #67; the
+  # constraint is unchanged and the database still enforces it (#11).
   def relationship_schema
     {
       "type" => "object",
-      "required" => %w[type from to],
+      "additionalProperties" => false,
+      "required" => %w[type from to attributes],
       "properties" => {
         "type" => { "type" => "string", "enum" => relationship_types.map(&:name) },
         "from" => { "type" => "string", "description" => "The id of the entity at the from end." },
         "to" => { "type" => "string", "description" => "The id of the entity at the to end." },
-        "ends" => {
-          "description" => "Which entity types each relationship type may join.",
-          "const" => relationship_types.to_h { |type|
-            [ type.name, { "from" => type.from_entity_type.name, "to" => type.to_entity_type.name } ]
-          }
-        },
-        "attributes" => attribute_bag("relationship")
+        "attributes" => attribute_list("relationship", relationship_attribute_names)
       }
     }
   end
