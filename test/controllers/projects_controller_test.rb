@@ -47,6 +47,17 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_select "main.col-md-9", count: 0
   end
 
+  # The list was only reachable from the breadcrumb, which is absent outside a
+  # project — so from Sources or Models there was no way back to it but the
+  # browser's own history.
+  test "the sidebar links back to the projects list" do
+    get sources_path
+
+    assert_response :success
+    assert_select "nav.sidebar h6", text: "Research"
+    assert_select "nav.sidebar a[href=?]", projects_path, text: "Projects"
+  end
+
   test "suppressing the sidebar does not leak to other pages" do
     get domains_path
 

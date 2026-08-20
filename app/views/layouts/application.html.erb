@@ -102,6 +102,13 @@
                 triage and evaluation are about which skill runs and how well. %>
             <h6 class="sidebar-heading px-3 <%= project_types.any? ? "mt-4" : "mt-3" %> mb-1 text-muted text-uppercase small">Research</h6>
             <ul class="nav flex-column">
+              <%# First, and reachable from anywhere: the projects list was only
+                  linked from the breadcrumb, which is absent on every page
+                  outside a project — so from Sources or Models the way back was
+                  the browser's own history. %>
+              <li class="nav-item">
+                <%= link_to "Projects", projects_path, class: "nav-link" %>
+              </li>
               <li class="nav-item">
                 <%= link_to "Sources", sources_path, class: "nav-link" %>
               </li>
