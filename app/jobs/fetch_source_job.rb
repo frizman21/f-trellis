@@ -86,19 +86,6 @@ class FetchSourceJob < ApplicationJob
   # useless to us.
   MAX_PDF_BYTES = 10.megabytes
 
-  # The zip entry's extension. The container is not what the payload is, and a
-  # PDF stored as `page.html` misleads anyone who opens the archive.
-  FILENAME_SUFFIXES = {
-    "text/html"             => [ ".html", ".htm" ],
-    "application/xhtml+xml" => [ ".html", ".htm" ],
-    "application/pdf"       => [ ".pdf" ]
-  }.freeze
-
-  # Assumed when a server sends no Content-Type at all. Some do; refusing them
-  # would be stricter than the situation warrants, and the parse path already
-  # tolerates whatever it gets.
-  DEFAULT_CONTENT_TYPE = "text/html".freeze
-
   # What came back, where it came from after any redirects, what the server
   # said it was, the status that ended the attempt, and any X-Robots-Tag it
   # carried. The header is only knowable here — the stored payload is the body
@@ -145,13 +132,8 @@ class FetchSourceJob < ApplicationJob
       return fetched.status_code
     end
 
-    bytes = zip_payload(filename_for(source, fetched.content_type), fetched.body)
-
-    SourceDatum.create!(
-      source: source,
-      content_type: fetched.content_type,
-      data: bytes
-    )
+    SourcePayload.store(source: source, content: fetched.body,
+                        content_type: fetched.content_type)
 
     source.update!(status: "complete",
                    resolved_url: resolved_url_for(source, fetched),
@@ -232,7 +214,7 @@ class FetchSourceJob < ApplicationJob
     end
 
     Fetched.new(body: decode(response), final_url: url,
-                content_type: type || DEFAULT_CONTENT_TYPE, status_code: response.code.to_i,
+                content_type: type || SourcePayload::DEFAULT_CONTENT_TYPE, status_code: response.code.to_i,
                 robots_tag: response["X-Robots-Tag"],
                 etag: response["ETag"].presence,
                 last_modified_at: parse_http_date(response["Last-Modified"]))
@@ -473,20 +455,4 @@ class FetchSourceJob < ApplicationJob
     { "User-Agent" => CrawlerIdentity.user_agent }
   end
 
-  def zip_payload(entry_name, content)
-    buffer = Zip::OutputStream.write_buffer do |zos|
-      zos.put_next_entry(entry_name)
-      zos.write(content)
-    end
-    buffer.rewind
-    buffer.read
-  end
-
-  def filename_for(source, content_type = DEFAULT_CONTENT_TYPE)
-    basename = File.basename(URI.parse(source.url).path.to_s)
-    basename = "source_#{source.id}" if basename.blank? || basename == "/"
-
-    suffixes = FILENAME_SUFFIXES.fetch(content_type.to_s, FILENAME_SUFFIXES[DEFAULT_CONTENT_TYPE])
-    basename.end_with?(*suffixes) ? basename : "#{basename}#{suffixes.first}"
-  end
 end
