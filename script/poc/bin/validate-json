@@ -27,6 +27,8 @@
 
 require "json"
 require "optparse"
+# Time.parse, for checking a datetime attribute. This script does not boot
+# Rails, so the stdlib require is load-bearing.
 require "time"
 require_relative "../lib/poc"
 require_relative "../lib/poc/ontology"
@@ -266,8 +268,7 @@ runs.each do |run|
 
     result = {
       "n" => n, "run" => run, "ok" => ok,
-      "counts" => counts, "error_count" => errors.size, "errors" => errors,
-      "at" => Time.now.utc.iso8601
+      "counts" => counts, "error_count" => errors.size, "errors" => errors
     }
     Poc.write_json(Poc.path_for(:validated, n, run: run), result)
     manifest.record_run(n, :validated, run, result.slice("ok", "counts", "error_count", "at"))
@@ -289,8 +290,7 @@ runs.each do |run|
   summary = {
     "run" => run, "files" => total, "passed" => passed, "failed" => failed,
     "pass_rate" => total.positive? ? (passed.to_f / total).round(3) : nil,
-    "errors_by_code" => by_code.sort_by { |_, v| -v }.to_h,
-    "at" => Time.now.utc.iso8601
+    "errors_by_code" => by_code.sort_by { |_, v| -v }.to_h
   }
   Poc.write_json(File.join(out_dir, "summary.json"), summary)
 

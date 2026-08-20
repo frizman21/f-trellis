@@ -120,7 +120,6 @@ targets.each do |n|
       "bytes" => body.bytesize,
       "sha256" => Poc.sha(body),
       "seconds" => (Time.now - started).round(2),
-      "at" => Time.now.utc.iso8601,
       "file" => File.basename(path)
     })
 
@@ -130,8 +129,7 @@ targets.each do |n|
     manifest.record(n, :fetched, {
       "url" => url,
       "error" => "#{e.class}: #{e.message}",
-      "seconds" => (Time.now - started).round(2),
-      "at" => Time.now.utc.iso8601
+      "seconds" => (Time.now - started).round(2)
     })
     warn "#{n} FAIL   #{url} — #{e.class}: #{e.message}"
     failed += 1

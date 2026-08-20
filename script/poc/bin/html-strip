@@ -21,7 +21,6 @@
 # worth is a question this pipeline can now answer instead of assume.
 
 require "optparse"
-require "time"
 require "nokogiri"
 require_relative "../lib/poc"
 require_relative "../../../app/services/content_extractor"
@@ -100,7 +99,6 @@ targets.each do |n|
     "approx_tokens" => (text.length / 4.0).ceil,
     "reduction_percent" => reduction,
     "sha256" => Poc.sha(text),
-    "at" => Time.now.utc.iso8601,
     "file" => File.basename(path)
   })
 

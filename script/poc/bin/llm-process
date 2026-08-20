@@ -222,7 +222,6 @@ targets.each do |n|
       "instructions_sha" => Poc.sha(instructions), "input_chars" => content.length,
       "entities" => parsed ? Array(parsed["entities"]).size : nil,
       "relationships" => parsed ? Array(parsed["relationships"]).size : nil,
-      "at" => Time.now.utc.iso8601,
       "file" => File.basename(parsed ? out_path : raw_path)
     )
     manifest.record_run(n, :extracted, run, record)
@@ -246,7 +245,7 @@ targets.each do |n|
   rescue StandardError => e
     manifest.record_run(n, :extracted, run, {
       "model" => options[:model], "error" => "#{e.class}: #{e.message}",
-      "seconds" => (Time.now - started).round(2), "at" => Time.now.utc.iso8601
+      "seconds" => (Time.now - started).round(2)
     })
     warn "#{n} FAIL   #{e.class}: #{e.message}"
     failed += 1
@@ -260,7 +259,7 @@ summary = {
   "endpoint" => endpoint&.name, "schema" => options[:schema],
   "instructions_sha" => Poc.sha(instructions), "instructions_chars" => instructions.length,
   "processed" => processed, "skipped" => skipped, "failed" => failed,
-  "totals" => totals, "at" => Time.now.utc.iso8601
+  "totals" => totals
 }
 Poc.write_json(File.join(out_dir, "run.json"), summary) unless options[:dry_run]
 
