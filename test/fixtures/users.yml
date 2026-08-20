@@ -1,6 +1,9 @@
+# The account ActionDispatch::IntegrationTest signs in as, so it is the one that
+# has to be an admin for the /admin tests to have an allowed path to exercise.
 admin:
   email: admin@example.com
   encrypted_password: <%= Devise::Encryptor.digest(User, "password") %>
+  is_admin: true
 
 other:
   email: other@example.com

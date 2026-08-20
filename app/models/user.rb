@@ -5,6 +5,11 @@ class User < ApplicationRecord
   # behave that way" without being one stray POST from spending money on a
   # model call or editing the knowledge base.
 
+  # `is_admin` accounts additionally reach the generated CRUD back office at
+  # /admin, which can read and write every table in the database. Independent of
+  # `read_only`: an account may be both, and then it may open every /admin page
+  # and write on none of them.
+
   # Admin-invite only — no public sign-up. New users are created via the
   # rails console (see README).
   devise :database_authenticatable,

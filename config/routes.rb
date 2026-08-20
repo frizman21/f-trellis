@@ -1,4 +1,26 @@
 Rails.application.routes.draw do
+  # The CRUD back office, at /admin rather than motor-admin's own default so
+  # the address says what it is. Passive by design: motor reads the schema at
+  # request time and builds the screens from it, so there is nothing here to
+  # keep in step with the models.
+  #
+  # A routing constraint, which is the opposite of what the rest of this
+  # application does — and correct here for the reason it is wrong elsewhere.
+  # Motor::Admin is a mounted engine whose controllers this application does
+  # not own, so there is no before_action to hang the check on. The constraint
+  # is the only place the check can live, and it covers the whole engine
+  # rather than an action list that could fall behind it.
+  #
+  # A failing constraint means no route matched, so a non-admin gets 404. That
+  # is what is wanted: a 403 would confirm the interface is there and that they
+  # are the wrong kind of account.
+  #
+  # Writes by read-only accounts are refused separately, by Motor::Ability —
+  # the engine is outside ApplicationController, so the verb rule there does
+  # not reach it.
+  authenticate :user, ->(user) { user.is_admin? } do
+    mount Motor::Admin => "/admin"
+  end
   devise_for :users, skip: [:registrations]
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

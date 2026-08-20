@@ -4,6 +4,10 @@ if Rails.env.local?
   User.find_or_create_by!(email: "admin@example.com") do |user|
     user.password = "Password1"
   end
+  # Set outside the block as well as in it: find_or_create_by! only yields when
+  # it creates, so a development database seeded before is_admin existed would
+  # otherwise never gain the flag and /admin would stay unreachable there.
+  User.find_by(email: "admin@example.com")&.update!(is_admin: true)
 
   # A read-only counterpart, so the restriction can be exercised by signing in
   # as it rather than only in the test suite. Reads everything, writes nothing.
