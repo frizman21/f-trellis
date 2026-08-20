@@ -1,0 +1,224 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Stage 6 — turn validated extractions into records in the project.
+#
+#   docker-compose exec web bundle exec ruby script/poc/bin/apply-json --run nano-schema --dry-run
+#   docker-compose exec web bundle exec ruby script/poc/bin/apply-json --run nano-schema
+#
+# The stages before this one answer "how good is this model". This one answers
+# "what would it actually put in the graph", which is a different question and
+# the one the application exists to ask. Everything that only happens at that
+# boundary — matching an entity that already exists rather than adding a second,
+# a value conflicting with one a person recorded, an end naming an entity the
+# reply never introduced, a match on a soft-deleted row — is invisible to
+# scoring, because scoring compares a reply to a file rather than to a database
+# with rows already in it.
+#
+# Applying is the application's own ExtractionApplier, not a reimplementation of
+# it. Those rules are the substance of the thing being tested; a second copy
+# here would test the copy.
+#
+# Nothing is applied for a source that has not passed validate-json. The gate is
+# the artifact that stage already wrote, so the stages stay composable and
+# validation is defined in exactly one place.
+
+require "optparse"
+require "digest"
+require "time"
+require_relative "../lib/poc"
+
+options = { dry_run: false }
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: apply-json --run LABEL [--only NNN,NNN] [--dry-run]"
+  opts.on("--run LABEL", "Which run's extractions to apply") { |v| options[:run] = v }
+  opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v.split(",").map(&:strip) }
+  opts.on("--dry-run", "Apply inside a transaction and roll back; write nothing") { options[:dry_run] = true }
+  opts.on("--work PATH", "Work directory (default script/poc/work)") { |v| Poc.work = v }
+  opts.on("-h", "--help") { puts opts; exit }
+end.parse!
+
+abort "--run is required — which run's extractions should be applied?" if options[:run].to_s.empty?
+
+require_relative "../../../config/environment"
+
+run_label = options[:run]
+extracted_dir = Poc.stage_dir(:extracted, run: run_label)
+abort "no run at #{extracted_dir}" unless Dir.exist?(extracted_dir)
+
+run_meta = begin
+  Poc.read_json(File.join(extracted_dir, "run.json"))
+rescue StandardError
+  {}
+end
+
+# The project the mental model was exported from. Read rather than passed, so a
+# run can only ever be applied to the ontology it was extracted against.
+mental_model = Poc.read_json(Poc.mental_model_file)
+project = Project.find_by(id: mental_model.dig("project", "id"))
+abort "no project #{mental_model.dig('project', 'id').inspect} — re-run export-model" if project.nil?
+
+# Refused up front rather than halfway through: a run whose model is not in the
+# registry cannot record an ExtractionRun, and finding that out after writing
+# three sources' worth of entities is worse than finding it out now.
+model = Model.find_by(model_id: run_meta["model"].to_s)
+if model.nil?
+  abort "run.json names model #{run_meta['model'].inspect}, which is not in the registry"
+end
+
+manifest = Poc::Manifest.new
+targets = Dir.glob(File.join(extracted_dir, "*-extracted.json")).map { |p| File.basename(p)[0, 3] }.sort
+targets &= options[:only] if options[:only]
+abort "nothing extracted in #{run_label}" if targets.empty?
+
+puts "project      #{project.id} #{project.name.inspect}"
+puts "run          #{run_label} (#{model.provider}/#{model.model_id})"
+puts "mode         #{options[:dry_run] ? 'DRY RUN — everything rolls back' : 'writing'}"
+puts
+
+# Only what validate-json passed. `ok` is its word, and this asks for it rather
+# than forming a second opinion.
+def validated?(number, run_label)
+  path = Poc.path_for(:validated, number, run: run_label)
+  return [ false, "not validated — run validate-json first" ] unless File.exist?(path)
+
+  record = Poc.read_json(path)
+  return [ false, "#{record['error_count']} validation error(s)" ] unless record["ok"]
+
+  [ true, nil ]
+end
+
+# The source, holding the bytes this extraction was actually made from.
+#
+# Deliberately not a re-fetch. Source.for_url would queue FetchSourceJob and the
+# application would end up holding a different copy of the page from the one
+# that was scored — a citation pointing at content the extraction was not made
+# from is a quietly false provenance record, which is worse than none.
+def source_for(number, manifest)
+  url = manifest.url_for(number)
+  return [ nil, "no url in the manifest" ] if url.blank?
+
+  source = Source.for_url(url)
+  return [ nil, "#{url} is not a usable web address" ] if source.nil?
+
+  html_path = Poc.path_for(:fetched, number)
+  return [ source, nil ] unless File.exist?(html_path)
+
+  content = File.binread(html_path)
+  latest = source.source_data.order(:id).last
+
+  # Stored unless the newest snapshot is already these exact bytes.
+  #
+  # "Has any content at all" is the wrong test and was the first version of
+  # this: several of these URLs already existed from a crawl or another
+  # project, holding a copy fetched on a different day. Skipping on that basis
+  # left the application's newest snapshot showing content the extraction was
+  # not made from — the precise falsehood this stage stores content to avoid.
+  #
+  # A snapshot rather than an overwrite: SourceDatum is a history of what a page
+  # said when, and the older copy is still true about the day it was fetched.
+  if latest.nil? || Digest::SHA256.hexdigest(latest.raw_bytes.to_s) != Digest::SHA256.hexdigest(content)
+    SourcePayload.store(source: source, content: content, content_type: "text/html")
+  end
+
+  [ source, nil ]
+end
+
+applied = skipped = 0
+totals = Hash.new(0)
+conflicts = []
+
+apply_all = lambda do
+  targets.each do |n|
+    ok, reason = validated?(n, run_label)
+
+    unless ok
+      warn format("%s skip   %s", n, reason)
+      skipped += 1
+      next
+    end
+
+    source, source_error = source_for(n, manifest)
+
+    unless source
+      warn format("%s skip   %s", n, source_error)
+      skipped += 1
+      next
+    end
+
+    ProjectSource.find_or_create_by!(project: project, source: source)
+
+    # Recorded as a run so the apply is visible in the application exactly the
+    # way ExtractionJob's own runs are, and so the reply that produced these
+    # records is still readable next to them.
+    run = ExtractionRun.create!(
+      project: project, source: source, model: model, status: "complete",
+      response: File.read(Poc.path_for(:extracted, n, run: run_label)),
+      started_at: Time.current, completed_at: Time.current
+    )
+
+    summary = ExtractionApplier.new(run).call
+    run.update!(summary: summary)
+
+    %w[entities relationships].each do |kind|
+      totals["#{kind}_created"] += summary.dig(kind, "created").to_i
+      totals["#{kind}_matched"] += summary.dig(kind, "matched").to_i
+      totals["#{kind}_skipped"] += Array(summary.dig(kind, "skipped")).size
+    end
+    totals["values_created"] += summary.dig("values", "created").to_i
+    totals["values_skipped"] += Array(summary.dig("values", "skipped")).size
+    totals["citations"] += summary["citations"].to_i
+    conflicts.concat(Array(summary.dig("values", "conflicts")))
+
+    manifest.record_run(n, :applied, run_label, {
+      "project_id" => project.id, "source_id" => source.id,
+      "extraction_run_id" => run.id, "dry_run" => options[:dry_run],
+      "summary" => summary, "at" => Time.now.utc.iso8601
+    })
+
+    puts format("%s ok     %d/%d entities, %d/%d relationships, %d values  (%s)",
+                n,
+                summary.dig("entities", "created").to_i, summary.dig("entities", "matched").to_i,
+                summary.dig("relationships", "created").to_i, summary.dig("relationships", "matched").to_i,
+                summary.dig("values", "created").to_i,
+                source.url)
+    applied += 1
+  end
+end
+
+if options[:dry_run]
+  # The real path, rolled back. A dry run that described what it would do rather
+  # than doing it would be a second implementation to keep in step.
+  ActiveRecord::Base.transaction do
+    apply_all.call
+    raise ActiveRecord::Rollback
+  end
+else
+  apply_all.call
+  manifest.save
+end
+
+puts
+puts format("entities      %d created, %d matched, %d skipped",
+            totals["entities_created"], totals["entities_matched"], totals["entities_skipped"])
+puts format("relationships %d created, %d matched, %d skipped",
+            totals["relationships_created"], totals["relationships_matched"], totals["relationships_skipped"])
+puts format("values        %d created, %d skipped", totals["values_created"], totals["values_skipped"])
+puts format("citations     %d", totals["citations"])
+
+if conflicts.any?
+  # A stored value the model disagreed with. Nothing was overwritten — this is
+  # the list of things worth a person's attention.
+  puts
+  puts "#{conflicts.size} value conflict(s), stored value kept:"
+  conflicts.first(10).each do |c|
+    puts format("  %s.%s  stored %s  offered %s",
+                c["owner"], c["attribute"], c["stored"].inspect, c["offered"].inspect)
+  end
+  puts "  ... and #{conflicts.size - 10} more" if conflicts.size > 10
+end
+
+puts
+puts "applied #{applied}, skipped #{skipped}"
+puts(options[:dry_run] ? "DRY RUN — rolled back, nothing was written" : "see /projects/#{project.id}")

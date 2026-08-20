@@ -177,6 +177,36 @@ Read the precision and recall split, not just the score. A wrong entity written
 into a shared graph has to be found again by hand; a missed one is usually
 restated by the next source that mentions it.
 
+## 6. `apply-json` — put the extraction into the project
+
+```bash
+docker-compose exec web bundle exec ruby script/poc/bin/apply-json --run nano-schema --dry-run
+```
+
+**Run this first.** It takes the real path and rolls it back, so the summary it
+prints is the one the applier actually produced rather than a description of
+what it might do.
+
+```bash
+docker-compose exec web bundle exec ruby script/poc/bin/apply-json --run nano-schema
+```
+
+Applies to the project the mental model was exported from — read from
+`mental-model.json`, so a run can only ever be applied to the ontology it was
+extracted against. Only sources that passed `validate-json` are applied; the
+rest are named and skipped.
+
+Re-running is safe. `ExtractionApplier` matches by name and type rather than
+duplicating, so a second apply reports matches instead of creations and the
+counts do not move.
+
+This is the stage that answers a different question from `score-json`. Scoring
+compares a reply to a file; applying compares it to a database with rows already
+in it, which is the only place you see an entity matching one another source
+already created, or a value conflicting with one a person recorded. Conflicts
+are printed and the stored value is kept — nothing a person recorded is
+overwritten by a model.
+
 ---
 
 ## A full pass, start to finish
@@ -191,6 +221,7 @@ poc html-strip
 poc llm-process --model gpt-5-nano --schema
 poc validate-json
 poc score-json
+poc apply-json --run gpt-5-nano --dry-run
 ```
 
 ## Comparing two models

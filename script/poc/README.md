@@ -59,6 +59,7 @@ carrying those numbers would silently start describing a different page.
 | 3 | `llm-process` | `instructions.md` + stripped text | `03-extracted/<run>/NNN-extracted.json` |
 | 4 | `validate-json` | extractions + `mental-model.json` | `04-validated/<run>/NNN-validation.json` |
 | 5 | `score-json` | extractions + `golden/NNN-golden.json` | `05-scored/<run>/NNN-score.json` |
+| 6 | `apply-json` | extractions + their validation | records in the project |
 
 ## A full pass
 
@@ -140,6 +141,19 @@ completely can share an overall figure and are not the same result.
 Read the precision/recall split, not just the score. A wrong entity written into
 a shared graph stays there and has to be found by hand; an entity this source
 missed is usually stated again by the next source that mentions it.
+
+**`apply-json`** is the only stage that touches the ontology. It uses the
+application's own `ExtractionApplier`, so what lands is what a real extraction
+run would land, and it gates on `validate-json`'s verdict rather than forming a
+second opinion about validity.
+
+It stores the HTML the proof of concept fetched as the source's newest snapshot,
+rather than letting the application re-download the page. A citation pointing at
+content the extraction was not made from is a quietly false provenance record.
+Several of these URLs already existed from a crawl or another project, holding a
+copy fetched on a different day — so the test is whether the newest snapshot's
+bytes match the ones that were scored, not whether the source has any content at
+all.
 
 ## What this cannot tell you yet
 
