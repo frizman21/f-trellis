@@ -30,7 +30,6 @@
 
 require "json"
 require "optparse"
-require "time"
 require_relative "../lib/poc"
 require_relative "../lib/poc/extraction"
 
@@ -152,8 +151,7 @@ runs.each do |run|
       # What was actually wrong, not just how much. This is the part worth
       # reading when a score drops.
       "missing" => CHANNELS.to_h { |c| [ c, (want_channels[c] - got_channels[c]).map { |k| label(k) } ] },
-      "extra" => CHANNELS.to_h { |c| [ c, (got_channels[c] - want_channels[c]).map { |k| label(k) } ] },
-      "at" => Time.now.utc.iso8601
+      "extra" => CHANNELS.to_h { |c| [ c, (got_channels[c] - want_channels[c]).map { |k| label(k) } ] }
     }
 
     Poc.write_json(Poc.path_for(:scored, n, run: run), result)
@@ -189,8 +187,7 @@ runs.each do |run|
     "cost" => run_meta.dig("totals", "cost"),
     "input_tokens" => run_meta.dig("totals", "input_tokens"),
     "output_tokens" => run_meta.dig("totals", "output_tokens"),
-    "seconds" => run_meta.dig("totals", "seconds"),
-    "at" => Time.now.utc.iso8601
+    "seconds" => run_meta.dig("totals", "seconds")
   }
   Poc.write_json(File.join(out_dir, "summary.json"), summary)
   table << summary

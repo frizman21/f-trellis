@@ -64,20 +64,21 @@ carrying those numbers would silently start describing a different page.
 ## A full pass
 
 ```bash
-C="docker compose exec web bundle exec ruby script/poc/bin"
+poc() { docker-compose exec web bundle exec ruby script/poc/bin/"$1" "${@:2}"; }
 
-$C/seed-model                           # define the ontology under test
-$C/export-model --project 6 --force     # mental model + instructions
-$C/fetch                                # pull the pages
-$C/html-strip                           # HTML -> text
+poc seed-model                           # define the ontology under test
+poc export-model --project 6 --force     # mental model + instructions
+poc fetch                                # pull the pages
+poc html-strip                           # HTML -> text
 
-$C/llm-process --model claude-opus-5 --dry-run    # what would this cost?
-$C/llm-process --model claude-haiku-4-5
-$C/llm-process --model gpt-5-nano
-$C/llm-process --model claude-haiku-4-5 --schema --run haiku-schema
+poc llm-process --model claude-opus-5 --dry-run    # what would this cost?
+poc llm-process --model claude-haiku-4-5
+poc llm-process --model gpt-5-nano
+poc llm-process --model claude-haiku-4-5 --schema --run haiku-schema
 
-$C/validate-json                        # is every reply appliable?
-$C/score-json                           # how good is it, and what did it cost?
+poc validate-json                        # is every reply appliable?
+poc score-json                           # how good is it, and what did it cost?
+poc apply-json --run gpt-5-nano --dry-run   # what would it put in the graph?
 ```
 
 `score-json` finishes with the table the exercise exists to produce: every run,

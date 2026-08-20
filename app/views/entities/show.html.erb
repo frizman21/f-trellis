@@ -10,7 +10,12 @@
                   form: { class: "d-inline", data: { turbo_confirm: "Delete this entity?" } } %>
   </div>
 </div>
-<p class="text-muted"><%= @entity.entity_type.name %></p>
+<p class="text-muted">
+  <%= @entity.entity_type.name %>
+  <%# The entity's own citations were recorded and shown nowhere, so "where did
+      this thing come from at all?" had no answer on its own page. %>
+  <%= pedigree_link @project, @entity %>
+</p>
 
 <h2 class="h5 mt-4">Attributes</h2>
 <% if @rows.any? %>
@@ -19,7 +24,7 @@
       <tr>
         <th>Attribute</th>
         <th>Value</th>
-        <th>Cited from</th>
+        <th>Sources</th>
       </tr>
     </thead>
     <tbody>
@@ -37,10 +42,19 @@
           </td>
           <%# Whole, not truncated: one value to a row here, and no column width
               to protect. A web address is linked. %>
-          <td><%= value_as_link value&.display_value, truncate: nil %></td>
           <td>
-            <%= render "shared/citations",
-                       citations: value ? value.entity_attribute_value_sources.includes(:source) : [] %>
+            <%= value_as_link value&.display_value, truncate: nil %>
+            <%= pedigree_link @project, value if value %>
+          </td>
+          <%# The count, not the list. A value seen in six runs used to push the
+              row it belongs to off the screen; the pedigree page has room for
+              all of them and this column says whether it is worth opening. %>
+          <td class="text-muted small">
+            <% if value %>
+              <%= pluralize value.entity_attribute_value_extraction_runs.size, "sighting" %>
+            <% else %>
+              —
+            <% end %>
           </td>
         </tr>
       <% end %>
@@ -72,7 +86,10 @@
         <% other = relationship.other_end(@entity) %>
         <tr>
           <%# Reads as a sentence: Powers → to → Saturn V → Launch Vehicle. %>
-          <td><%= relationship.relationship_type.name %></td>
+          <td>
+            <%= relationship.relationship_type.name %>
+            <%= pedigree_link @project, relationship %>
+          </td>
           <td class="text-muted">
             <%= relationship.from_entity_id == @entity.id ? "→ to" : "← from" %>
           </td>
@@ -88,7 +105,11 @@
           </td>
           <% values = relationship.values_by_attribute_id %>
           <% @relationship_columns.each do |attribute| %>
-            <td><%= value_as_link values[attribute.id]&.display_value, truncate: 40 %></td>
+            <% value = values[attribute.id] %>
+            <td>
+              <%= value_as_link value&.display_value, truncate: 40 %>
+              <%= pedigree_link @project, value if value %>
+            </td>
           <% end %>
           <td class="text-nowrap">
             <%= link_to "Edit", edit_project_relationship_path(@project, relationship),

@@ -1,6 +1,6 @@
 require "administrate/base_dashboard"
 
-class EntitySourceDashboard < Administrate::BaseDashboard
+class EntityAttributeValueExtractionRunDashboard < Administrate::BaseDashboard
   # ATTRIBUTE_TYPES
   # a hash that describes the type of each of the model's fields.
   #
@@ -10,7 +10,8 @@ class EntitySourceDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::Number,
     confidence: Field::Number,
-    entity: Field::BelongsTo,
+    entity_attribute_value: Field::BelongsTo,
+    extraction_run: Field::BelongsTo,
     source: Field::BelongsTo,
     created_at: Field::DateTime,
     updated_at: Field::DateTime,
@@ -24,8 +25,8 @@ class EntitySourceDashboard < Administrate::BaseDashboard
   COLLECTION_ATTRIBUTES = %i[
     id
     confidence
-    entity
-    source
+    entity_attribute_value
+    extraction_run
   ].freeze
 
   # SHOW_PAGE_ATTRIBUTES
@@ -33,7 +34,8 @@ class EntitySourceDashboard < Administrate::BaseDashboard
   SHOW_PAGE_ATTRIBUTES = %i[
     id
     confidence
-    entity
+    entity_attribute_value
+    extraction_run
     source
     created_at
     updated_at
@@ -44,7 +46,8 @@ class EntitySourceDashboard < Administrate::BaseDashboard
   # on the model's form (`new` and `edit`) pages.
   FORM_ATTRIBUTES = %i[
     confidence
-    entity
+    entity_attribute_value
+    extraction_run
     source
   ].freeze
 
@@ -60,10 +63,10 @@ class EntitySourceDashboard < Administrate::BaseDashboard
   #   }.freeze
   COLLECTION_FILTERS = {}.freeze
 
-  # Overwrite this method to customize how entity sources are displayed
+  # Overwrite this method to customize how entity attribute value extraction runs are displayed
   # across all pages of the admin dashboard.
   #
-  # def display_resource(entity_source)
-  #   "EntitySource ##{entity_source.id}"
+  # def display_resource(entity_attribute_value_extraction_run)
+  #   "EntityAttributeValueExtractionRun ##{entity_attribute_value_extraction_run.id}"
   # end
 end

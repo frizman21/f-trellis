@@ -12,8 +12,8 @@ class SourceDashboard < Administrate::BaseDashboard
     child_sources: Field::HasMany,
     description: Field::Text,
     domain: Field::BelongsTo,
-    entity_attribute_value_sources: Field::HasMany,
-    entity_sources: Field::HasMany,
+    entity_attribute_value_extraction_runs: Field::HasMany,
+    entity_extraction_runs: Field::HasMany,
     etag: Field::String,
     inbound_links: Field::HasMany,
     is_fixtured: Field::Boolean,
@@ -28,8 +28,8 @@ class SourceDashboard < Administrate::BaseDashboard
     parent_source: Field::BelongsTo,
     project_sources: Field::HasMany,
     projects: Field::HasMany,
-    relationship_sources: Field::HasMany,
-    relationship_type_value_sources: Field::HasMany,
+    relationship_extraction_runs: Field::HasMany,
+    relationship_type_value_extraction_runs: Field::HasMany,
     resolved_url: Field::String,
     sitemap_lastmod_at: Field::DateTime,
     skill_evaluation_results: Field::HasMany,
@@ -60,8 +60,8 @@ class SourceDashboard < Administrate::BaseDashboard
     child_sources
     description
     domain
-    entity_attribute_value_sources
-    entity_sources
+    entity_attribute_value_extraction_runs
+    entity_extraction_runs
     etag
     inbound_links
     is_fixtured
@@ -76,8 +76,8 @@ class SourceDashboard < Administrate::BaseDashboard
     parent_source
     project_sources
     projects
-    relationship_sources
-    relationship_type_value_sources
+    relationship_extraction_runs
+    relationship_type_value_extraction_runs
     resolved_url
     sitemap_lastmod_at
     skill_evaluation_results
@@ -96,8 +96,8 @@ class SourceDashboard < Administrate::BaseDashboard
     child_sources
     description
     domain
-    entity_attribute_value_sources
-    entity_sources
+    entity_attribute_value_extraction_runs
+    entity_extraction_runs
     etag
     inbound_links
     is_fixtured
@@ -112,8 +112,8 @@ class SourceDashboard < Administrate::BaseDashboard
     parent_source
     project_sources
     projects
-    relationship_sources
-    relationship_type_value_sources
+    relationship_extraction_runs
+    relationship_type_value_extraction_runs
     resolved_url
     sitemap_lastmod_at
     skill_evaluation_results

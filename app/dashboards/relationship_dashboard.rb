@@ -12,7 +12,7 @@ class RelationshipDashboard < Administrate::BaseDashboard
     deleted_at: Field::DateTime,
     from_entity: Field::BelongsTo,
     project: Field::BelongsTo,
-    relationship_sources: Field::HasMany,
+    relationship_extraction_runs: Field::HasMany,
     relationship_type: Field::BelongsTo,
     relationship_type_values: Field::HasMany,
     sources: Field::HasMany,
@@ -40,7 +40,7 @@ class RelationshipDashboard < Administrate::BaseDashboard
     deleted_at
     from_entity
     project
-    relationship_sources
+    relationship_extraction_runs
     relationship_type
     relationship_type_values
     sources
@@ -56,7 +56,7 @@ class RelationshipDashboard < Administrate::BaseDashboard
     deleted_at
     from_entity
     project
-    relationship_sources
+    relationship_extraction_runs
     relationship_type
     relationship_type_values
     sources

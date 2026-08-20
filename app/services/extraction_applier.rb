@@ -79,11 +79,11 @@ class ExtractionApplier
     end
 
     @by_reply_id[attrs["id"].to_s] = entity if attrs["id"].present?
-    cite(EntitySource, :entity, entity)
+    cite(EntityExtractionRun, :entity, entity)
     apply_values(entity, type.entity_type_attributes.active, attrs["attributes"],
                  value_class: EntityAttributeValue, owner_key: :entity,
                  attribute_key: :entity_type_attribute,
-                 citation_class: EntityAttributeValueSource, citation_key: :entity_attribute_value)
+                 citation_class: EntityAttributeValueExtractionRun, citation_key: :entity_attribute_value)
   end
 
   def apply_relationship(attrs)
@@ -111,11 +111,11 @@ class ExtractionApplier
       summary["relationships"]["created"] += 1
     end
 
-    cite(RelationshipSource, :relationship, relationship)
+    cite(RelationshipExtractionRun, :relationship, relationship)
     apply_values(relationship, type.relationship_type_attributes.active, attrs["attributes"],
                  value_class: RelationshipTypeValue, owner_key: :relationship,
                  attribute_key: :relationship_type_attribute,
-                 citation_class: RelationshipTypeValueSource, citation_key: :relationship_type_value)
+                 citation_class: RelationshipTypeValueExtractionRun, citation_key: :relationship_type_value)
   end
 
   # Attributes as (name, value) pairs, from either shape a reply can carry.
@@ -192,8 +192,13 @@ class ExtractionApplier
     probe.value
   end
 
+  # Scoped to this run as well as this source (#71). A second run over the same
+  # page cites it again rather than finding the first run's row and doing
+  # nothing — that a fact was seen twice is the thing worth recording, and it
+  # was previously lost.
   def cite(citation_class, key, record)
-    citation = citation_class.find_or_initialize_by(key => record, source: source)
+    citation = citation_class.find_or_initialize_by(key => record, source: source,
+                                                    extraction_run: run)
     return unless citation.new_record?
 
     citation.confidence = CONFIDENCE

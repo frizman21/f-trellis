@@ -10,44 +10,44 @@ Rails.application.routes.draw do
   # added later and can be tested per-action; a constraint here would be a
   # second place to remember.
   namespace :admin do
-    resources :chats
     resources :domains
     resources :entities
+    resources :entity_attribute_value_extraction_runs
     resources :entity_attribute_values
-    resources :entity_attribute_value_sources
-    resources :entity_sources
-    resources :entity_types
+    resources :entity_extraction_runs
     resources :entity_type_attributes
+    resources :entity_types
     resources :extraction_runs
     resources :fetch_records
-    resources :learning_sets
     resources :learning_set_sources
+    resources :learning_sets
     resources :messages
-    resources :models
     resources :model_endpoints
-    resources :projects
+    resources :models
     resources :project_sources
-    resources :relationships
-    resources :relationship_sources
-    resources :relationship_types
+    resources :projects
+    resources :relationship_extraction_runs
     resources :relationship_type_attributes
+    resources :relationship_type_value_extraction_runs
     resources :relationship_type_values
-    resources :relationship_type_value_sources
+    resources :relationship_types
+    resources :relationships
     resources :research_starting_points
-    resources :skills
-    resources :skill_evaluations
     resources :skill_evaluation_models
     resources :skill_evaluation_results
+    resources :skill_evaluations
     resources :skill_revisions
-    resources :sources
+    resources :skills
     resources :source_data
     resources :source_exclusions
     resources :source_imports
     resources :source_links
     resources :source_processing_reports
+    resources :sources
     resources :tool_calls
     resources :triage_configurations
     resources :users
+resources :chats
 
     # Administrate's landing page is whichever resource is named here. The
     # generator picks the alphabetically first one; projects is what the rest of
@@ -103,6 +103,14 @@ Rails.application.routes.draw do
 
     resources :entities, except: [:index]
     resources :relationships, only: [:create, :edit, :update, :destroy]
+
+    # Where one recorded fact came from. Four kinds of fact can be cited, so the
+    # kind is in the path rather than four near-identical routes — see
+    # PedigreesController::KINDS.
+    #
+    # Three segments, so it cannot collide with the one-segment :type_slug
+    # catch-all below and needs no entry in RESERVED_SLUGS.
+    get "pedigree/:kind/:id", to: "pedigrees#show", as: :pedigree
 
     # A project's entities of one kind, at the type's own slug — /projects/1/
     # rocket-engines. Declared last so every named route above wins the match

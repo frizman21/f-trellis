@@ -1,6 +1,6 @@
 require "administrate/base_dashboard"
 
-class RelationshipSourceDashboard < Administrate::BaseDashboard
+class RelationshipTypeValueExtractionRunDashboard < Administrate::BaseDashboard
   # ATTRIBUTE_TYPES
   # a hash that describes the type of each of the model's fields.
   #
@@ -10,7 +10,8 @@ class RelationshipSourceDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::Number,
     confidence: Field::Number,
-    relationship: Field::BelongsTo,
+    extraction_run: Field::BelongsTo,
+    relationship_type_value: Field::BelongsTo,
     source: Field::BelongsTo,
     created_at: Field::DateTime,
     updated_at: Field::DateTime,
@@ -24,8 +25,8 @@ class RelationshipSourceDashboard < Administrate::BaseDashboard
   COLLECTION_ATTRIBUTES = %i[
     id
     confidence
-    relationship
-    source
+    extraction_run
+    relationship_type_value
   ].freeze
 
   # SHOW_PAGE_ATTRIBUTES
@@ -33,7 +34,8 @@ class RelationshipSourceDashboard < Administrate::BaseDashboard
   SHOW_PAGE_ATTRIBUTES = %i[
     id
     confidence
-    relationship
+    extraction_run
+    relationship_type_value
     source
     created_at
     updated_at
@@ -44,7 +46,8 @@ class RelationshipSourceDashboard < Administrate::BaseDashboard
   # on the model's form (`new` and `edit`) pages.
   FORM_ATTRIBUTES = %i[
     confidence
-    relationship
+    extraction_run
+    relationship_type_value
     source
   ].freeze
 
@@ -60,10 +63,10 @@ class RelationshipSourceDashboard < Administrate::BaseDashboard
   #   }.freeze
   COLLECTION_FILTERS = {}.freeze
 
-  # Overwrite this method to customize how relationship sources are displayed
+  # Overwrite this method to customize how relationship type value extraction runs are displayed
   # across all pages of the admin dashboard.
   #
-  # def display_resource(relationship_source)
-  #   "RelationshipSource ##{relationship_source.id}"
+  # def display_resource(relationship_type_value_extraction_run)
+  #   "RelationshipTypeValueExtractionRun ##{relationship_type_value_extraction_run.id}"
   # end
 end

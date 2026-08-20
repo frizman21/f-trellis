@@ -12,12 +12,12 @@ class Relationship < ApplicationRecord
   scoped_to_project_through :from_entity
 
   has_many :relationship_type_values, dependent: :destroy
-  has_many :relationship_sources, dependent: :destroy
-  has_many :sources, through: :relationship_sources
+  has_many :relationship_extraction_runs, dependent: :destroy
+  has_many :sources, through: :relationship_extraction_runs
 
   accepts_nested_attributes_for :relationship_type_values,
                                 reject_if: ->(attrs) { attrs["id"].blank? && attrs["value"].blank? }
-  accepts_nested_attributes_for :relationship_sources, reject_if: ->(attrs) { attrs["source_id"].blank? }
+  accepts_nested_attributes_for :relationship_extraction_runs, reject_if: ->(attrs) { attrs["source_id"].blank? }
 
   validate :ends_are_different
   validate :ends_share_a_project

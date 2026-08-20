@@ -11,7 +11,7 @@ class EntityDashboard < Administrate::BaseDashboard
     id: Field::Number,
     deleted_at: Field::DateTime,
     entity_attribute_values: Field::HasMany,
-    entity_sources: Field::HasMany,
+    entity_extraction_runs: Field::HasMany,
     entity_type: Field::BelongsTo,
     incoming_relationships: Field::HasMany,
     name: Field::String,
@@ -31,7 +31,7 @@ class EntityDashboard < Administrate::BaseDashboard
     id
     deleted_at
     entity_attribute_values
-    entity_sources
+    entity_extraction_runs
   ].freeze
 
   # SHOW_PAGE_ATTRIBUTES
@@ -40,7 +40,7 @@ class EntityDashboard < Administrate::BaseDashboard
     id
     deleted_at
     entity_attribute_values
-    entity_sources
+    entity_extraction_runs
     entity_type
     incoming_relationships
     name
@@ -57,7 +57,7 @@ class EntityDashboard < Administrate::BaseDashboard
   FORM_ATTRIBUTES = %i[
     deleted_at
     entity_attribute_values
-    entity_sources
+    entity_extraction_runs
     entity_type
     incoming_relationships
     name

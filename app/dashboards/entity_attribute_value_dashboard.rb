@@ -11,7 +11,7 @@ class EntityAttributeValueDashboard < Administrate::BaseDashboard
     id: Field::Number,
     datetime_value: Field::DateTime,
     entity: Field::BelongsTo,
-    entity_attribute_value_sources: Field::HasMany,
+    entity_attribute_value_extraction_runs: Field::HasMany,
     entity_type_attribute: Field::BelongsTo,
     float_value: Field::Number.with_options(decimals: 2),
     int_value: Field::Number,
@@ -31,7 +31,7 @@ class EntityAttributeValueDashboard < Administrate::BaseDashboard
     id
     datetime_value
     entity
-    entity_attribute_value_sources
+    entity_attribute_value_extraction_runs
   ].freeze
 
   # SHOW_PAGE_ATTRIBUTES
@@ -40,7 +40,7 @@ class EntityAttributeValueDashboard < Administrate::BaseDashboard
     id
     datetime_value
     entity
-    entity_attribute_value_sources
+    entity_attribute_value_extraction_runs
     entity_type_attribute
     float_value
     int_value
@@ -57,7 +57,7 @@ class EntityAttributeValueDashboard < Administrate::BaseDashboard
   FORM_ATTRIBUTES = %i[
     datetime_value
     entity
-    entity_attribute_value_sources
+    entity_attribute_value_extraction_runs
     entity_type_attribute
     float_value
     int_value

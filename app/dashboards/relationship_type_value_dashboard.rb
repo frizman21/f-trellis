@@ -15,7 +15,7 @@ class RelationshipTypeValueDashboard < Administrate::BaseDashboard
     project: Field::BelongsTo,
     relationship: Field::BelongsTo,
     relationship_type_attribute: Field::BelongsTo,
-    relationship_type_value_sources: Field::HasMany,
+    relationship_type_value_extraction_runs: Field::HasMany,
     sources: Field::HasMany,
     string_value: Field::String,
     created_at: Field::DateTime,
@@ -44,7 +44,7 @@ class RelationshipTypeValueDashboard < Administrate::BaseDashboard
     project
     relationship
     relationship_type_attribute
-    relationship_type_value_sources
+    relationship_type_value_extraction_runs
     sources
     string_value
     created_at
@@ -61,7 +61,7 @@ class RelationshipTypeValueDashboard < Administrate::BaseDashboard
     project
     relationship
     relationship_type_attribute
-    relationship_type_value_sources
+    relationship_type_value_extraction_runs
     sources
     string_value
   ].freeze

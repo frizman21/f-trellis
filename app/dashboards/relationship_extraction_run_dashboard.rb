@@ -1,6 +1,6 @@
 require "administrate/base_dashboard"
 
-class RelationshipTypeValueSourceDashboard < Administrate::BaseDashboard
+class RelationshipExtractionRunDashboard < Administrate::BaseDashboard
   # ATTRIBUTE_TYPES
   # a hash that describes the type of each of the model's fields.
   #
@@ -10,7 +10,8 @@ class RelationshipTypeValueSourceDashboard < Administrate::BaseDashboard
   ATTRIBUTE_TYPES = {
     id: Field::Number,
     confidence: Field::Number,
-    relationship_type_value: Field::BelongsTo,
+    extraction_run: Field::BelongsTo,
+    relationship: Field::BelongsTo,
     source: Field::BelongsTo,
     created_at: Field::DateTime,
     updated_at: Field::DateTime,
@@ -24,8 +25,8 @@ class RelationshipTypeValueSourceDashboard < Administrate::BaseDashboard
   COLLECTION_ATTRIBUTES = %i[
     id
     confidence
-    relationship_type_value
-    source
+    extraction_run
+    relationship
   ].freeze
 
   # SHOW_PAGE_ATTRIBUTES
@@ -33,7 +34,8 @@ class RelationshipTypeValueSourceDashboard < Administrate::BaseDashboard
   SHOW_PAGE_ATTRIBUTES = %i[
     id
     confidence
-    relationship_type_value
+    extraction_run
+    relationship
     source
     created_at
     updated_at
@@ -44,7 +46,8 @@ class RelationshipTypeValueSourceDashboard < Administrate::BaseDashboard
   # on the model's form (`new` and `edit`) pages.
   FORM_ATTRIBUTES = %i[
     confidence
-    relationship_type_value
+    extraction_run
+    relationship
     source
   ].freeze
 
@@ -60,10 +63,10 @@ class RelationshipTypeValueSourceDashboard < Administrate::BaseDashboard
   #   }.freeze
   COLLECTION_FILTERS = {}.freeze
 
-  # Overwrite this method to customize how relationship type value sources are displayed
+  # Overwrite this method to customize how relationship extraction runs are displayed
   # across all pages of the admin dashboard.
   #
-  # def display_resource(relationship_type_value_source)
-  #   "RelationshipTypeValueSource ##{relationship_type_value_source.id}"
+  # def display_resource(relationship_extraction_run)
+  #   "RelationshipExtractionRun ##{relationship_extraction_run.id}"
   # end
 end

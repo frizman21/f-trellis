@@ -73,15 +73,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_212349) do
     t.index ["project_id"], name: "index_entities_on_project_id"
   end
 
-  create_table "entity_attribute_value_sources", force: :cascade do |t|
+  create_table "entity_attribute_value_extraction_runs", force: :cascade do |t|
     t.integer "confidence", default: 100, null: false
     t.datetime "created_at", null: false
     t.bigint "entity_attribute_value_id", null: false
+    t.bigint "extraction_run_id", null: false
     t.bigint "source_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["entity_attribute_value_id", "source_id"], name: "index_entity_attribute_value_sources_on_owner_and_source", unique: true
-    t.index ["entity_attribute_value_id"], name: "idx_on_entity_attribute_value_id_36db6dab02"
-    t.index ["source_id"], name: "index_entity_attribute_value_sources_on_source_id"
+    t.index ["entity_attribute_value_id", "source_id", "extraction_run_id"], name: "idx_eav_ers_on_owner_source_run", unique: true
+    t.index ["entity_attribute_value_id"], name: "idx_on_entity_attribute_value_id_f2288a1d8d"
+    t.index ["extraction_run_id"], name: "idx_on_extraction_run_id_63a00ce4eb"
+    t.index ["source_id"], name: "index_entity_attribute_value_extraction_runs_on_source_id"
   end
 
   create_table "entity_attribute_values", force: :cascade do |t|
@@ -100,15 +102,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_212349) do
     t.index ["project_id"], name: "index_entity_attribute_values_on_project_id"
   end
 
-  create_table "entity_sources", force: :cascade do |t|
+  create_table "entity_extraction_runs", force: :cascade do |t|
     t.integer "confidence", default: 100, null: false
     t.datetime "created_at", null: false
     t.bigint "entity_id", null: false
+    t.bigint "extraction_run_id", null: false
     t.bigint "source_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["entity_id", "source_id"], name: "index_entity_sources_on_owner_and_source", unique: true
-    t.index ["entity_id"], name: "index_entity_sources_on_entity_id"
-    t.index ["source_id"], name: "index_entity_sources_on_source_id"
+    t.index ["entity_id", "source_id", "extraction_run_id"], name: "idx_entity_ers_on_owner_source_run", unique: true
+    t.index ["entity_id"], name: "index_entity_extraction_runs_on_entity_id"
+    t.index ["extraction_run_id"], name: "index_entity_extraction_runs_on_extraction_run_id"
+    t.index ["source_id"], name: "index_entity_extraction_runs_on_source_id"
   end
 
   create_table "entity_type_attributes", force: :cascade do |t|
@@ -270,15 +274,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_212349) do
     t.index ["default_model_id"], name: "index_projects_on_default_model_id"
   end
 
-  create_table "relationship_sources", force: :cascade do |t|
+  create_table "relationship_extraction_runs", force: :cascade do |t|
     t.integer "confidence", default: 100, null: false
     t.datetime "created_at", null: false
+    t.bigint "extraction_run_id", null: false
     t.bigint "relationship_id", null: false
     t.bigint "source_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["relationship_id", "source_id"], name: "index_relationship_sources_on_owner_and_source", unique: true
-    t.index ["relationship_id"], name: "index_relationship_sources_on_relationship_id"
-    t.index ["source_id"], name: "index_relationship_sources_on_source_id"
+    t.index ["extraction_run_id"], name: "index_relationship_extraction_runs_on_extraction_run_id"
+    t.index ["relationship_id", "source_id", "extraction_run_id"], name: "idx_relationship_ers_on_owner_source_run", unique: true
+    t.index ["relationship_id"], name: "index_relationship_extraction_runs_on_relationship_id"
+    t.index ["source_id"], name: "index_relationship_extraction_runs_on_source_id"
   end
 
   create_table "relationship_type_attributes", force: :cascade do |t|
@@ -295,15 +301,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_212349) do
     t.index ["relationship_type_id"], name: "index_relationship_type_attributes_on_relationship_type_id"
   end
 
-  create_table "relationship_type_value_sources", force: :cascade do |t|
+  create_table "relationship_type_value_extraction_runs", force: :cascade do |t|
     t.integer "confidence", default: 100, null: false
     t.datetime "created_at", null: false
+    t.bigint "extraction_run_id", null: false
     t.bigint "relationship_type_value_id", null: false
     t.bigint "source_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["relationship_type_value_id", "source_id"], name: "index_relationship_type_value_sources_on_owner_and_source", unique: true
-    t.index ["relationship_type_value_id"], name: "idx_on_relationship_type_value_id_3df863f22b"
-    t.index ["source_id"], name: "index_relationship_type_value_sources_on_source_id"
+    t.index ["extraction_run_id"], name: "idx_on_extraction_run_id_fd488ba60e"
+    t.index ["relationship_type_value_id", "source_id", "extraction_run_id"], name: "idx_rtv_ers_on_owner_source_run", unique: true
+    t.index ["relationship_type_value_id"], name: "idx_on_relationship_type_value_id_6636859f59"
+    t.index ["source_id"], name: "index_relationship_type_value_extraction_runs_on_source_id"
   end
 
   create_table "relationship_type_values", force: :cascade do |t|
@@ -566,13 +574,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_212349) do
   add_foreign_key "chats", "models"
   add_foreign_key "entities", "entity_types"
   add_foreign_key "entities", "projects"
-  add_foreign_key "entity_attribute_value_sources", "entity_attribute_values"
-  add_foreign_key "entity_attribute_value_sources", "sources"
+  add_foreign_key "entity_attribute_value_extraction_runs", "entity_attribute_values"
+  add_foreign_key "entity_attribute_value_extraction_runs", "extraction_runs"
+  add_foreign_key "entity_attribute_value_extraction_runs", "sources"
   add_foreign_key "entity_attribute_values", "entities"
   add_foreign_key "entity_attribute_values", "entity_type_attributes"
   add_foreign_key "entity_attribute_values", "projects"
-  add_foreign_key "entity_sources", "entities"
-  add_foreign_key "entity_sources", "sources"
+  add_foreign_key "entity_extraction_runs", "entities"
+  add_foreign_key "entity_extraction_runs", "extraction_runs"
+  add_foreign_key "entity_extraction_runs", "sources"
   add_foreign_key "entity_type_attributes", "entity_types"
   add_foreign_key "entity_type_attributes", "projects"
   add_foreign_key "entity_types", "projects"
@@ -590,12 +600,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_212349) do
   add_foreign_key "project_sources", "projects"
   add_foreign_key "project_sources", "sources"
   add_foreign_key "projects", "models", column: "default_model_id"
-  add_foreign_key "relationship_sources", "relationships"
-  add_foreign_key "relationship_sources", "sources"
+  add_foreign_key "relationship_extraction_runs", "extraction_runs"
+  add_foreign_key "relationship_extraction_runs", "relationships"
+  add_foreign_key "relationship_extraction_runs", "sources"
   add_foreign_key "relationship_type_attributes", "projects"
   add_foreign_key "relationship_type_attributes", "relationship_types"
-  add_foreign_key "relationship_type_value_sources", "relationship_type_values"
-  add_foreign_key "relationship_type_value_sources", "sources"
+  add_foreign_key "relationship_type_value_extraction_runs", "extraction_runs"
+  add_foreign_key "relationship_type_value_extraction_runs", "relationship_type_values"
+  add_foreign_key "relationship_type_value_extraction_runs", "sources"
   add_foreign_key "relationship_type_values", "projects"
   add_foreign_key "relationship_type_values", "relationship_type_attributes"
   add_foreign_key "relationship_type_values", "relationships"

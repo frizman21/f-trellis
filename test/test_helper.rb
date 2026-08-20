@@ -176,6 +176,21 @@ module ActiveSupport
 
     include FakeHttp
 
+    # A run to hang citations off. Every citation names the run that recorded it
+    # since #71, so anything building one by hand needs this.
+    #
+    # Built on demand rather than as a fixture: several suites clear the model
+    # registry, and fixture runs referencing a model turn that into a foreign
+    # key violation in tests that have nothing to do with extraction.
+    def an_extraction_run(project:, source:, status: "complete")
+      model = Model.find_or_create_by!(provider: "anthropic", model_id: "claude-test-fixture") do |m|
+        m.name = "Claude Test Fixture"
+        m.last_seen_at = Time.current
+      end
+
+      ExtractionRun.create!(project: project, source: source, model: model, status: status)
+    end
+
     # Add more helper methods to be used by all tests here...
   end
 end
