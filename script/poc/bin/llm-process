@@ -56,9 +56,41 @@ abort "no instructions at #{instructions_path} — run bin/export-model" unless 
 instructions = File.read(instructions_path)
 ontology = Poc::Ontology.load
 
-# The registry knows the provider and the prices. Falling back to nil lets
-# RubyLLM resolve a model the application has not refreshed yet.
-registry_model = Model.find_by(model_id: options[:model])
+# The registry knows the provider and the prices.
+#
+# A model id names a model only together with a provider — 88 ids in this
+# registry are served by more than one. `Model.find_by(model_id:)` picked
+# whichever row came first, which for gpt-4.1 was the Azure one, and the run
+# then failed six times over on Azure credentials nobody has. So the search is
+# among the providers this application actually calls, and an id that is still
+# ambiguous is refused rather than guessed at.
+registry_model =
+  if options[:provider]
+    Model.find_by(provider: options[:provider], model_id: options[:model])
+  else
+    candidates = Model.selectable.where(model_id: options[:model]).to_a
+
+    if candidates.size > 1
+      abort "#{options[:model].inspect} is served by #{candidates.map(&:provider).sort.join(' and ')} — " \
+            "say which with --provider"
+    end
+
+    candidates.first
+  end
+
+if registry_model.nil? && options[:provider].nil?
+  # Named by a provider this application does not call. Saying so beats letting
+  # RubyLLM resolve it and fail on credentials for a provider nobody chose.
+  elsewhere = Model.where(model_id: options[:model]).pluck(:provider).uniq.sort
+
+  if elsewhere.any?
+    abort "#{options[:model].inspect} is in the registry only under " \
+          "#{elsewhere.join(', ')}, which this application does not call. " \
+          "Selectable providers are #{Model::SELECTABLE_PROVIDERS.join(', ')}."
+  end
+end
+
+# nil lets RubyLLM resolve a model the application has not refreshed yet.
 provider = options[:provider] || registry_model&.provider
 
 endpoint = nil
