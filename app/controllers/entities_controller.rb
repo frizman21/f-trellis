@@ -28,9 +28,14 @@ class EntitiesController < ApplicationController
   def show
     @entity = find_entity
     @rows = @entity.attribute_rows
+    # The citations are counted beside every value and behind every pedigree
+    # icon. Preloaded, or a Contract with seventeen attributes is eighteen
+    # extra queries before the relationships are even reached.
+    @entity.entity_attribute_values.includes(:entity_attribute_value_extraction_runs).load
     @relationships = @entity.relationships.kept
-                            .includes(:relationship_type, :relationship_type_values,
-                                      from_entity: :entity_type, to_entity: :entity_type)
+                            .includes(:relationship_type, :relationship_extraction_runs,
+                                      { relationship_type_values: :relationship_type_value_extraction_runs },
+                                      { from_entity: :entity_type }, { to_entity: :entity_type })
                             .order(:id)
     # The union of columns the kinds of edge on this page ask for. An entity can
     # hold edges of several kinds, so the table shows what any of them declares

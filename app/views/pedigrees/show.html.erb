@@ -1,0 +1,65 @@
+<% content_for :title, "Pedigree — #{pedigree_subject(@record)}" %>
+<%= render "projects/back", project: @project, side: :data %>
+
+<h1 class="h4 mb-1">Where this came from</h1>
+
+<%# The fact itself, restated, so the page stands on its own when it arrives
+    from a bookmark or a link rather than from the row that was clicked. %>
+<p class="mb-1"><%= pedigree_subject(@record) %></p>
+<p class="text-muted small mb-4"><%= pedigree_context(@project, @record) %></p>
+
+<% if @citations.any? %>
+  <p class="text-muted">
+    Seen <%= pluralize(@citations.size, "time") %>
+    across <%= pluralize(@citations.map(&:source_id).uniq.size, "source") %>.
+  </p>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Source</th>
+        <th>Recorded by</th>
+        <th>When</th>
+        <th>Confidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @citations.each do |citation| %>
+        <tr>
+          <td>
+            <%= external_link_to citation.source.url.truncate(70), citation.source.url %>
+          </td>
+          <%# A run recorded by a person says so; one recorded by a model names
+              the model, because "which model said this" is the question a
+              disagreement between two sources turns into. %>
+          <td>
+            <% if citation.extraction_run.manual? %>
+              <span class="badge text-bg-light">Entered by hand</span>
+            <% else %>
+              <%= citation.extraction_run.model.model_id %>
+              <span class="text-muted small"><%= citation.extraction_run.model.provider %></span>
+            <% end %>
+          </td>
+          <td class="text-muted"><%= citation.extraction_run.created_at.strftime("%Y-%m-%d %H:%M") %></td>
+          <td><span class="badge text-bg-light"><%= citation.confidence %>%</span></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%# The same page seen twice is two rows above, which reads as duplication
+      until you notice the runs differ. Saying it here is cheaper than making
+      the table explain itself. %>
+  <% repeated = @citations.group_by(&:source_id).select { |_, group| group.size > 1 } %>
+  <% if repeated.any? %>
+    <p class="text-muted small">
+      <%= pluralize(repeated.size, "source") %>
+      <%= repeated.size == 1 ? "states" : "state" %> this more than once — each row is a
+      separate run that saw it, not a duplicate.
+    </p>
+  <% end %>
+<% else %>
+  <p class="text-muted">
+    Nothing records where this came from. It was added without citing a source.
+  </p>
+<% end %>

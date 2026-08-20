@@ -325,18 +325,45 @@ class EntitiesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "show displays what each fact is cited from, with its confidence" do
+  # The sources moved behind an icon rather than off the page: a value seen in
+  # six runs used to push the row it belonged to off the screen. The row now
+  # says how many, and the pedigree page says which.
+  test "show links each value to where it came from" do
+    value = entity_attribute_values(:f1_manufacturer)
     EntityAttributeValueExtractionRun.create!(
-      entity_attribute_value: entity_attribute_values(:f1_manufacturer),
-      source: sources(:one), confidence: 42,
+      entity_attribute_value: value, source: sources(:one), confidence: 42,
       extraction_run: an_extraction_run(project: @project, source: sources(:one))
     )
 
     get project_entity_path(@project, entities(:f1))
 
     assert_response :success
-    assert_select "th", text: "Cited from"
-    assert_match(/42%/, response.body)
+    assert_select "a[href=?]",
+                  project_pedigree_path(@project, kind: "entity-value", id: value.id)
+    assert_match(/1 sighting/, response.body)
+  end
+
+  test "show links the entity itself to where it came from" do
+    entity = entities(:f1)
+    EntityExtractionRun.create!(entity: entity, source: sources(:one),
+                                extraction_run: an_extraction_run(project: @project, source: sources(:one)))
+
+    get project_entity_path(@project, entity)
+
+    assert_response :success
+    assert_select "a[href=?]", project_pedigree_path(@project, kind: "entity", id: entity.id)
+  end
+
+  # A fact nobody cited has nothing to show, so it is a muted mark rather than a
+  # link to an empty page.
+  test "show does not link a value that cites nothing" do
+    get project_entity_path(@project, entities(:f1))
+
+    assert_response :success
+    assert_select "a[href=?]",
+                  project_pedigree_path(@project, kind: "entity-value",
+                                        id: entity_attribute_values(:f1_manufacturer).id),
+                  count: 0
   end
 
   test "the entity form offers a source search field" do
