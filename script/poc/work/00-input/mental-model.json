@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-08-20T15:25:12Z",
+  "exported_at": "2026-08-20T15:52:10Z",
   "project": {
     "id": 6,
     "name": "Extraction PoC"
@@ -127,6 +127,18 @@
     }
   ],
   "relationship_types": [
+    {
+      "name": "Acquires",
+      "description": "The first organization acquires the second, taking ownership of it. The direction is acquirer to acquired. An investment, a partnership, a supplier arrangement, or a merger of equals is not an acquisition.",
+      "from": "Organization",
+      "to": "Organization",
+      "attributes": [
+        {
+          "name": "announced",
+          "value_type": "datetime"
+        }
+      ]
+    },
     {
       "name": "Contract Develops",
       "description": "The contract funds work that builds or advances this technology. Naming a technology as background is not developing it.",
@@ -269,6 +281,7 @@
             "type": {
               "type": "string",
               "enum": [
+                "Acquires",
                 "Contract Develops",
                 "Contract Researches",
                 "Develops",
@@ -292,6 +305,10 @@
             "ends": {
               "description": "Which entity types each relationship type may join.",
               "const": {
+                "Acquires": {
+                  "from": "Organization",
+                  "to": "Organization"
+                },
                 "Contract Develops": {
                   "from": "Contract",
                   "to": "Technology"
@@ -347,30 +364,33 @@
     "entities": [
       {
         "id": "e1",
-        "name": "The name the source gives this Contract",
-        "type": "Contract",
+        "name": "The name the source gives this Organization",
+        "type": "Organization",
         "attributes": {
-          "award_amount": 1.5,
-          "contract_number": "the contract_number the source states",
-          "end_date": "1969-07-16T13:32:00Z"
+          "employee_count": 1,
+          "founded": 1,
+          "headquarters": "the headquarters the source states"
         }
       },
       {
         "id": "e2",
-        "name": "The name the source gives this Technology",
-        "type": "Technology",
+        "name": "The name the source gives this Organization",
+        "type": "Organization",
         "attributes": {
-          "application_area": "the application_area the source states",
-          "category": "the category the source states",
-          "maturity_level": "the maturity_level the source states"
+          "employee_count": 1,
+          "founded": 1,
+          "headquarters": "the headquarters the source states"
         }
       }
     ],
     "relationships": [
       {
-        "type": "Contract Develops",
+        "type": "Acquires",
         "from": "e1",
-        "to": "e2"
+        "to": "e2",
+        "attributes": {
+          "announced": "1969-07-16T13:32:00Z"
+        }
       }
     ]
   }

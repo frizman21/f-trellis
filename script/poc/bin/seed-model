@@ -118,6 +118,13 @@ RELATIONSHIP_TYPES = [
     description: "The product is built with this technology, as the source " \
                  "describes it — a specification, a feature, a stated approach." },
 
+  { name: "Acquires", from: "Organization", to: "Organization",
+    description: "The first organization acquires the second, taking ownership of " \
+                 "it. The direction is acquirer to acquired. An investment, a " \
+                 "partnership, a supplier arrangement, or a merger of equals is " \
+                 "not an acquisition.",
+    attributes: { "announced" => "datetime" } },
+
   { name: "Contract Develops", from: "Contract", to: "Technology",
     description: "The contract funds work that builds or advances this " \
                  "technology. Naming a technology as background is not developing it." },

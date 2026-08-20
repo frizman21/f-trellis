@@ -50,6 +50,14 @@
       "attributes": {
         "role": "Chief Revenue Officer"
       }
+    },
+    {
+      "type": "Acquires",
+      "from": "org-albers",
+      "to": "org-parallel",
+      "attributes": {
+        "announced": "2025-02-19"
+      }
     }
   ]
 }
