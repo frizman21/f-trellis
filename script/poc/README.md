@@ -74,7 +74,7 @@ poc html-strip                           # HTML -> text
 
 poc evaluate --model gpt-5-nano --dry-run       # what would this cost?
 poc evaluate --model gpt-5-nano --schema       # ask, validate and score
-poc evaluate --model claude-haiku-4-5 --schema # again, for a second model
+poc evaluate --model grok-4.6 --schema --effort low   # again, cheaper reasoning
 
 poc score-json                                 # both runs, one table
 poc apply-json --run gpt-5-nano --dry-run      # what would it put in the graph?

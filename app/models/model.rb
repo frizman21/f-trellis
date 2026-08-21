@@ -14,7 +14,7 @@ class Model < ApplicationRecord
   # Providers whose models this app actually lets you pick. `custom_endpoint` is
   # the one that is not a provider in the world — it is this application's name
   # for "reachable at an address somebody entered".
-  SELECTABLE_PROVIDERS = %w[anthropic custom_endpoint openai].freeze
+  SELECTABLE_PROVIDERS = %w[anthropic custom_endpoint openai xai].freeze
 
   # Reasons drawn from a *declared* output modality. When a provider says what
   # comes out of a model, that settles it.
