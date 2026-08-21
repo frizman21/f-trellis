@@ -25,14 +25,31 @@ class ModelTest < ActiveSupport::TestCase
     now = Time.current
     anthropic = build_model(provider: "anthropic", model_id: "sel-anthropic", last_seen_at: now)
     openai    = build_model(provider: "openai",    model_id: "sel-openai",    last_seen_at: now)
+    xai       = build_model(provider: "xai",       model_id: "sel-xai",       last_seen_at: now)
     other     = build_model(provider: "openrouter", model_id: "sel-other",    last_seen_at: now)
     retired   = build_model(provider: "anthropic", model_id: "sel-retired",   last_seen_at: now - 1.day)
 
     selectable = Model.selectable
     assert_includes selectable, anthropic
     assert_includes selectable, openai
+    assert_includes selectable, xai
     assert_not_includes selectable, other
     assert_not_includes selectable, retired
+  end
+
+  # The risk in widening this list is widening it too far. Azure in particular:
+  # it serves ids OpenAI also serves — gpt-4.1 is in the registry under both —
+  # and a lookup that reached it produced a configuration error that read as a
+  # broken environment rather than a model that was never callable (#78).
+  test "adding xai did not make every provider in the registry pickable" do
+    now = Time.current
+    unwanted = %w[azure bedrock deepseek gemini mistral openrouter perplexity vertexai].map do |provider|
+      build_model(provider: provider, model_id: "sel-#{provider}", last_seen_at: now)
+    end
+
+    unwanted.each do |model|
+      assert_not_includes Model.selectable, model, "#{model.provider} should not be pickable"
+    end
   end
 
   def with_modalities(model_id, outputs)
