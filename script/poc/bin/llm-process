@@ -33,8 +33,9 @@ OptionParser.new do |opts|
   opts.on("--model ID", "Model id, e.g. claude-haiku-4-5 or gpt-5-nano") { |v| options[:model] = v }
   opts.on("--provider NAME", "Force a provider instead of resolving from the registry") { |v| options[:provider] = v }
   opts.on("--endpoint NAME_OR_ID", "Route through a ModelEndpoint (how a local model is reached)") { |v| options[:endpoint] = v }
-  opts.on("--run LABEL", "Run directory name (default: the model id)") { |v| options[:run] = v }
+  opts.on("--run LABEL", "Run directory name (default: derived from the configuration)") { |v| options[:run] = v }
   opts.on("--schema", "Constrain decoding with the mental model's JSON Schema") { options[:schema] = true }
+  opts.on("--effort LEVEL", "Reasoning effort: low, medium, high, xhigh — what the model supports is its own") { |v| options[:effort] = v }
   opts.on("--instructions PATH", "Instructions file (default 00-input/instructions.md)") { |v| options[:instructions] = v }
   opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v.split(",").map(&:strip) }
   opts.on("--limit N", Integer, "Stop after N calls") { |v| options[:limit] = v }
@@ -49,7 +50,21 @@ abort "--model is required" if options[:model].to_s.empty?
 
 require_relative "../../../config/environment"
 
-run = Poc.slug(options[:run] || options[:model])
+# The label names the configuration, not just the model.
+#
+# It used to be the bare model id, which meant a second run differing only in
+# --schema or --effort landed in the first one's directory — where every source
+# already had an answer, so all of them were skipped and the score table showed
+# the *old* results under the new name. Silently comparing a run against itself
+# is worse than failing, and it is the failure this pipeline exists to avoid.
+def derived_run_label(options)
+  parts = [ options[:model] ]
+  parts << "schema" if options[:schema]
+  parts << options[:effort] if options[:effort]
+  Poc.slug(parts.join("-"))
+end
+
+run = Poc.slug(options[:run] || derived_run_label(options))
 instructions_path = options[:instructions] || Poc.instructions_file
 abort "no instructions at #{instructions_path} — run bin/export-model" unless File.exist?(instructions_path)
 
@@ -115,6 +130,43 @@ targets = manifest.numbers
 targets &= options[:only] if options[:only]
 abort "nothing stripped yet — run bin/html-strip first" if targets.empty?
 
+# What this invocation is. Recorded in run.json and compared against whatever
+# the directory already holds.
+configuration = {
+  "model" => options[:model], "schema" => options[:schema],
+  "effort" => options[:effort], "instructions_sha" => Poc.sha(instructions)
+}
+
+# A label cannot express everything that changes a result. An edited
+# instructions.md is the case no naming scheme catches: same model, same flags,
+# different prompt, and results that look comparable and are not.
+previous = begin
+  Poc.read_json(File.join(Poc.stage_dir(:extracted, run: run), "run.json"))
+rescue StandardError
+  nil
+end
+
+if previous
+  differences = configuration.filter_map do |key, value|
+    was = previous[key]
+    next if was.nil? && value.nil?
+    next if was == value
+
+    "#{key}: was #{was.inspect}, now #{value.inspect}"
+  end
+
+  if differences.any?
+    abort <<~MSG.strip
+      #{run} already holds a run made with a different configuration:
+
+        #{differences.join("\n  ")}
+
+      Comparing across that difference is what this refuses to let you do by
+      accident. Give this one its own --run label, or delete #{run} first.
+    MSG
+  end
+end
+
 out_dir = Poc.mkdir(Poc.stage_dir(:extracted, run: run))
 
 # Rates from the application's own registry, so a dry run and a real run price
@@ -132,6 +184,7 @@ puts "endpoint     #{endpoint.name} #{endpoint.base_url}" if endpoint
 puts "run          #{run}"
 puts "instructions #{instructions.length} chars (~#{instructions.length / 4} tokens), sha #{Poc.sha(instructions)[0, 12]}"
 puts "schema       #{options[:schema] ? 'constrained decoding on' : 'prose only'}"
+puts "effort       #{options[:effort] || 'the model default'}"
 puts
 
 targets.each do |n|
@@ -189,6 +242,11 @@ targets.each do |n|
     # this is what makes a small model usable is one of the things the sweep is
     # meant to find out, so it is a flag rather than a default.
     chat.with_schema(ontology.schema) if options[:schema]
+    # reasoning_effort for OpenAI-compatible providers, which is what xAI's Grok
+    # reads, and the thinking config for Anthropic. What each model accepts is
+    # its own business — grok-4.6 takes xhigh and grok-4.5 does not — so this
+    # passes the value through and lets the provider refuse it.
+    chat.with_thinking(effort: options[:effort]) if options[:effort]
 
     reply = chat.ask(content)
     seconds = (Time.now - started).round(2)
@@ -289,6 +347,7 @@ manifest.save unless options[:dry_run]
 summary = {
   "run" => run, "model" => options[:model], "provider" => provider,
   "endpoint" => endpoint&.name, "schema" => options[:schema],
+  "effort" => options[:effort],
   "instructions_sha" => Poc.sha(instructions), "instructions_chars" => instructions.length,
   "processed" => processed, "skipped" => skipped, "failed" => failed,
   "totals" => totals

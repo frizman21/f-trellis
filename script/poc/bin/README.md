@@ -116,13 +116,30 @@ rather than merely unwanted. On the six-source corpus this was worth 4× the
 score for less money — leave it on unless the point is to measure its absence.
 
 ```bash
+docker-compose exec web bundle exec ruby script/poc/bin/llm-process --model grok-4.6 --schema --effort low
+```
+
+`--effort` is reasoning depth — `low`, `medium`, `high`, `xhigh`. It becomes
+`reasoning_effort` for OpenAI-compatible providers, which is what Grok reads,
+and the thinking config for Anthropic. What each model accepts is its own
+business: `grok-4.6` takes all four, `grok-4.5` does not take `xhigh`, and the
+provider refuses what it does not know rather than this guessing for it.
+
+```bash
 docker-compose exec web bundle exec ruby script/poc/bin/llm-process --model claude-haiku-4-5 --schema --run haiku-baseline
 ```
 
 Each model writes to its own run directory, so answers to the same source sit
-side by side under the same number. `--run` names it; the default is the model
-id, which makes the same `--model` twice a re-run and two different ones a
-comparison.
+side by side under the same number. **The default label names the
+configuration**, not just the model — `grok-4.6`, `grok-4.6-schema`,
+`grok-4.6-schema-low` — so varying a flag separates the results on its own.
+`--run` overrides it.
+
+> A run whose recorded configuration differs from the directory it would write
+> into is refused, naming what changed. That covers the case no label can
+> express: editing `instructions.md` and re-running gives the same model, the
+> same flags and a different prompt, and results that look comparable and are
+> not.
 
 ```bash
 docker-compose exec web bundle exec ruby script/poc/bin/llm-process --model qwen3:8b --endpoint ollama --schema

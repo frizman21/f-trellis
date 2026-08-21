@@ -30,6 +30,7 @@ parser = OptionParser.new do |opts|
   opts.on("--endpoint NAME_OR_ID", "Route through a ModelEndpoint") { |v| options[:endpoint] = v }
   opts.on("--run LABEL", "Run label (default: the model id)") { |v| options[:run] = v }
   opts.on("--schema", "Constrain decoding with the mental model's JSON Schema") { options[:schema] = true }
+  opts.on("--effort LEVEL", "Reasoning effort: low, medium, high, xhigh") { |v| options[:effort] = v }
   opts.on("--dry-run", "Show what the calls would cost; ask nothing, and stop there") { options[:dry_run] = true }
   opts.on("--only LIST", "Only these numbers, comma separated") { |v| options[:only] = v }
   opts.on("--limit N", "Stop after N calls") { |v| options[:limit] = v }
@@ -40,7 +41,18 @@ parser.parse!
 
 abort "--model is required\n\n#{parser}" if options[:model].to_s.empty?
 
-run = Poc.slug(options[:run] || options[:model])
+# Derived exactly as llm-process derives it. Two copies of this rule would
+# eventually disagree and point validate and score at a directory the extraction
+# never wrote — see the note in llm-process about why the label names the
+# configuration rather than the model.
+def derived_run_label(options)
+  parts = [ options[:model] ]
+  parts << "schema" if options[:schema]
+  parts << options[:effort] if options[:effort]
+  Poc.slug(parts.join("-"))
+end
+
+run = Poc.slug(options[:run] || derived_run_label(options))
 
 # Each stage as it would be typed. Built rather than interpolated into a shell
 # string: a model id or run label with a space in it would otherwise become two
@@ -58,6 +70,7 @@ extract += [ "--provider", options[:provider] ] if options[:provider]
 extract += [ "--endpoint", options[:endpoint] ] if options[:endpoint]
 extract += [ "--only", options[:only] ] if options[:only]
 extract += [ "--limit", options[:limit] ] if options[:limit]
+extract += [ "--effort", options[:effort] ] if options[:effort]
 extract << "--schema" if options[:schema]
 extract << "--force" if options[:force]
 extract << "--dry-run" if options[:dry_run]
